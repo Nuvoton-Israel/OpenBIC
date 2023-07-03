@@ -1,15 +1,15 @@
 manifest:
   remotes:
-    - name: aspeed
-      url-base: https://github.com/AspeedTech-BMC
+    - name: nuvoton
+      url-base: https://github.com/Nuvoton-Israel/zephyr
 
   # Please add items below based on alphabetical order.
   # These dependencies may need updating if new features are added to the firmware.
   projects:
     - name: zephyr
-      remote: aspeed
+      remote: nuvoton
       path: zephyr
-      revision: d014527731033db477f806f5bff2e1ca5d4b2ba7
+      revision: cf327357f28c63969a1ab01bdfb871cd6884f51c
       import: 
         name-allowlist:
           - cmsis

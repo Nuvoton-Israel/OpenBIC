@@ -1,0 +1,3 @@
+&twd0 {
+       status = "okay";
+};

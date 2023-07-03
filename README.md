@@ -2,19 +2,6 @@
 
 OpenBIC is an open software framework to build a complete firmware image for a BridgeIC.
 
-| Platform | Status | Description |
-|-------|--------|-------------|
-obat-cb | ![badge](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/goldenbug/62fb115c4fa43a02acad226534e10932/raw/at-cb.json) | Artemis Colter Bay
-obgt-cc | ![badge](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/goldenbug/62fb115c4fa43a02acad226534e10932/raw/gt-cc.json) | Grand Teton Cascade Creek
-obwc-mb | ![badge](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/goldenbug/62fb115c4fa43a02acad226534e10932/raw/wc-mb.json) | Waimea Canyon Mainboard
-oby3-dl | ![badge](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/goldenbug/62fb115c4fa43a02acad226534e10932/raw/yv3-dl.json) | Yosemite v3 Delta Lake
-oby3-vf | ![badge](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/goldenbug/62fb115c4fa43a02acad226534e10932/raw/yv3-vf.json) | Yosemite v3 Vernal Falls
-oby35-bb | ![badge](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/goldenbug/62fb115c4fa43a02acad226534e10932/raw/yv35-bb.json) | Yosemite v3.5 Baseboard
-oby35-cl | ![badge](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/goldenbug/62fb115c4fa43a02acad226534e10932/raw/yv35-cl.json) | Yosemite v3.5 Crater Lake
-oby35-gl | ![badge](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/goldenbug/62fb115c4fa43a02acad226534e10932/raw/yv35-gl.json) | Yosemite v3.5 Great Lakes Board
-oby35-hd | ![badge](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/goldenbug/62fb115c4fa43a02acad226534e10932/raw/yv35-hd.json) | Yosemite v3.5 Half Dome
-oby35-rf | ![badge](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/goldenbug/62fb115c4fa43a02acad226534e10932/raw/yv35-rf.json) | Yosemite v3.5 Rainbow Falls Board
-
 ## Contents
 
 Documentation: https://facebook.github.io/OpenBIC/
@@ -29,8 +16,7 @@ The currently supported RTOSs are:
 The board configuration files can be found in the `configs/` directory.
 
 The currently supported boards are:
-* ASPEED AST2600 EVB
-* ASPEED AST1030 EVB
+* Nuvoton NPCM400F EVB
 
 ## Build Instructions
 
@@ -75,7 +61,7 @@ west update
 Install the toolchain:
 ```
 cd ~
-wget https://github.com/zephyrproject-rtos/sdkng/releases/download/v0.12.4/zephyr-sdk-0.12.4-x86_64-linux-setup.run
+wget https://github.com/zephyrproject-rtos/sdk-ng/releases/download/v0.12.4/zephyr-sdk-0.12.4-x86_64-linux-setup.run
 ```
 Run the installer, installing the SDK in ~/zephyr-sdk-0.12.4:
 ```
@@ -87,9 +73,8 @@ chmod +x zephyr-sdk-0.12.4-x86_64-linux-setup.run
 
 Clean build application and Zephyr code
 ```
-cd $zephyrproject/openbic.odm
-touch meta-facebook/yv35-cl/CMakeLists.txt
-west build -p auto -b ast1030_evb meta-facebook/yv35-cl/
+cd $zephyrproject/zephyr
+west build -p always -b npcm400f_evb ../openbic/meta-facebook/yv35-npcm-test/
 ```
 
 ## Contributing
