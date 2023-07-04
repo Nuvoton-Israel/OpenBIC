@@ -19,8 +19,8 @@
 
 #include "version.h"
 
-#define PLATFORM_NAME "Yosemite 3.5"
-#define PROJECT_NAME "Rainbow Falls"
+#define PLATFORM_NAME "Yosemite 3.5 NPCM400F"
+#define PROJECT_NAME "NPCM400f EB"
 #define PROJECT_STAGE DVT
 
 /*

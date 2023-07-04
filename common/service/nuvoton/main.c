@@ -19,7 +19,7 @@
 #include "hal_i2c.h"
 //#include "hal_i3c.h"
 #include "hal_wdt.h"
-//#include "ipmi.h"
+#include "ipmi.h"
 
 #ifdef CONFIG_IPMI_KCS_ASPEED
 #include "kcs.h"
@@ -53,7 +53,8 @@ __weak void pal_set_sys_status()
 
 void main(void)
 {
-	printf("Hello, welcome to OpenBIC\n");
+	printf("Hello, welcome to %s %s %x%x.%x.%x\n", PLATFORM_NAME, PROJECT_NAME, BIC_FW_YEAR_MSB,
+	       BIC_FW_YEAR_LSB, BIC_FW_WEEK, BIC_FW_VER);
 
 	wdt_init();
 	util_init_timer();
