@@ -61,24 +61,50 @@ uint32_t GPIO_GROUP_REG_ACCESS[GPIO_GROUP_NUM] = {
 };
 
 uint32_t GPIO_MULTI_FUNC_PIN_CTL_REG_ACCESS[] = {
-	REG_SCU + 0x410, /* Multi-function pin ctl #1 */
-	REG_SCU + 0x414, /* Multi-function pin ctl #2 */
-	REG_SCU + 0x418, /* Multi-function pin ctl #3 */
-	REG_SCU + 0x41C, /* Multi-function pin ctl #4 */
-	REG_SCU + 0x430, /* Multi-function pin ctl #5 */
-	REG_SCU + 0x434, /* Multi-function pin ctl #6 */
-	REG_SCU + 0x438, /* Multi-function pin ctl #7 */
-	REG_SCU + 0x450, /* Multi-function pin ctl #9 */
-	REG_SCU + 0x454, /* Multi-function pin ctl #10 */
-	REG_SCU + 0x458, /* Multi-function pin ctl #11 */
-	REG_SCU + 0x4B0, /* Multi-function pin ctl #13 */
-	REG_SCU + 0x4B4, /* Multi-function pin ctl #14 */
-	REG_SCU + 0x4B8, /* Multi-function pin ctl #15 */
-	REG_SCU + 0x4BC, /* Multi-function pin ctl #16 */
-	REG_SCU + 0x4D4, /* Multi-function pin ctl #18 */
-	REG_SCU + 0x4D8, /* Multi-function pin ctl #19 */
-	REG_SCU + 0x510, /* Hardware Strap2 Register */
-	REG_SCU + 0x51C, /* Hardware Strap2 Clear Register */
+	REG_SCU + 0x03, /* DEV_CTL2 */
+	REG_SCU + 0x04, /* DEV_CTL3 */
+	REG_SCU + 0x06, /* DEV_CTL4 */
+	REG_SCU + 0x10, /* DEVLAT0 */
+	REG_SCU + 0x11, /* DEVLAT1 */
+	REG_SCU + 0x12, /* DEVLAT2 */
+	REG_SCU + 0x13, /* DEVLAT3 */
+	REG_SCU + 0x14, /* DEVLAT4 */
+	REG_SCU + 0x15, /* DEVLAT5 */
+	REG_SCU + 0x16, /* DEVLAT6 */
+	REG_SCU + 0x17, /* DEVLAT7 */
+	REG_SCU + 0x18, /* DEVLAT8 */
+	REG_SCU + 0x19, /* DEVLAT9 */
+	REG_SCU + 0x1A, /* DEVLATA */
+	REG_SCU + 0x1B, /* DEVLATB */
+	REG_SCU + 0x1C, /* DEVLATC */
+	REG_SCU + 0x24, /* DEVLATCX */
+	REG_SCU + 0x1E, /* DEVLATE */
+	REG_SCU + 0x0B, /* DEVLAT10 */
+	REG_SCU + 0x0C, /* DEVLAT11 */
+	REG_SCU + 0x0D, /* DEVLAT12 */
+	REG_SCU + 0x2E, /* DEVLAT2E */
+	REG_SCU + 0x30, /* DEVLAT30 */
+	REG_SCU + 0x31, /* DEVLAT31 */
+	REG_SCU + 0x32, /* DEVLAT32 */
+	REG_SCU + 0x33, /* DEVLAT33 */
+	REG_SCU + 0x34, /* DEVLAT34 */
+	REG_SCU + 0x50, /* DEVLAT50 */
+	REG_SCU + 0x51, /* DEVLAT51 */
+	REG_SCU + 0x52, /* DEVLAT52 */
+	REG_SCU + 0x53, /* DEVLAT53 */
+	REG_SCU + 0x54, /* DEVLAT54 */
+	REG_SCU + 0x55, /* DEVLAT55 */
+	REG_SCU + 0x59, /* DEVLAT59 */
+	REG_SCU + 0x5A, /* DEVLAT5A */
+	REG_SCU + 0x5B, /* DEVLAT5B */
+	REG_SCU + 0x5C, /* DEVLAT5C */
+	REG_SCU + 0x5D, /* DEVLAT5D */
+	REG_SCU + 0x5E, /* DEVLAT5E */
+	REG_SCU + 0x5F, /* DEVLAT5F */
+	REG_SCU + 0x62, /* DEVLAT62 */
+	REG_SCU + 0x66, /* DEVLAT66 */
+	REG_SCU + 0x67, /* DEVLAT67 */
+
 };
 const int GPIO_MULTI_FUNC_CFG_SIZE = ARRAY_SIZE(GPIO_MULTI_FUNC_PIN_CTL_REG_ACCESS);
 
@@ -99,25 +125,25 @@ void irq_callback(const struct device *dev, struct gpio_callback *cb, uint32_t p
 	} else if (dev == dev_gpio[GPIO_5]) {
 		group = GPIO_5;
 	} else if (dev == dev_gpio[GPIO_6]) {
-		group = GPIO_5;
+		group = GPIO_6;
 	} else if (dev == dev_gpio[GPIO_7]) {
-		group = GPIO_5;
+		group = GPIO_7;
 	} else if (dev == dev_gpio[GPIO_8]) {
-		group = GPIO_5;
+		group = GPIO_8;
 	} else if (dev == dev_gpio[GPIO_9]) {
-		group = GPIO_5;
+		group = GPIO_9;
 	} else if (dev == dev_gpio[GPIO_A]) {
-		group = GPIO_5;
+		group = GPIO_A;
 	} else if (dev == dev_gpio[GPIO_B]) {
-		group = GPIO_5;
+		group = GPIO_B;
 	} else if (dev == dev_gpio[GPIO_C]) {
-		group = GPIO_5;
+		group = GPIO_C;
 	} else if (dev == dev_gpio[GPIO_D]) {
-		group = GPIO_5;
+		group = GPIO_D;
 	} else if (dev == dev_gpio[GPIO_E]) {
-		group = GPIO_5;
+		group = GPIO_E;
 	} else if (dev == dev_gpio[GPIO_F]) {
-		group = GPIO_5;
+		group = GPIO_F;
 	} else {
 		LOG_ERR("Invalid dev group for isr cb");
 		return;
@@ -165,9 +191,7 @@ uint8_t gpio_get_reg_value(uint8_t gpio_num, uint8_t reg_offset)
 	uint8_t gpio_group = gpio_num / GPIO_GROUP_SIZE;
 	uint8_t gpio_group_index = gpio_num % GPIO_GROUP_SIZE;
 	uint8_t res = (sys_read8(GPIO_GROUP_REG_ACCESS[gpio_group] + reg_offset) &
-		       BIT(gpio_group_index)) ?
-			      1 :
-				    0;
+		       BIT(gpio_group_index)) ? 1 : 0;
 
 	return res;
 }
@@ -198,7 +222,7 @@ int gpio_get_direction(uint8_t gpio_num)
 
 	uint8_t gpio_group = gpio_num / GPIO_GROUP_SIZE;
 	uint8_t gpio_group_index = gpio_num % GPIO_GROUP_SIZE;
-	uint32_t g_dir = sys_read32(GPIO_GROUP_REG_ACCESS[gpio_group] + REG_DIRECTION_OFFSET);
+	uint32_t g_dir = sys_read8(GPIO_GROUP_REG_ACCESS[gpio_group] + REG_DIRECTION_OFFSET);
 	if (g_dir & BIT(gpio_group_index))
 		dir = 0x01;
 	else
@@ -306,9 +330,9 @@ void scu_init(SCU_CFG cfg[], size_t size)
 {
 	uint32_t value = 0;
 	for (int i = 0; i < size; ++i) {
-		value = sys_read32(cfg[i].reg);
+		value = sys_read8(cfg[i].reg);
 		if (value != cfg[i].value) {
-			sys_write32(cfg[i].value, cfg[i].reg);
+			sys_write8(cfg[i].value, cfg[i].reg);
 		}
 	}
 }
@@ -349,15 +373,11 @@ int gpio_init(const struct device *args)
 				case GPIO_OUTPUT:
 					switch (gpio_cfg[i].property) {
 					case OPEN_DRAIN:
-						if (gpio_cfg[i].status == GPIO_LOW) {
-							gpio_pin_set(dev_gpio[gpio_group],
-								     gpio_group_index,
-								     gpio_cfg[i].status);
-							gpio_conf(gpio_cfg[i].number,
-								  gpio_cfg[i].direction);
-						} else {
-							gpio_conf(gpio_cfg[i].number, GPIO_INPUT);
-						}
+						gpio_pin_set(dev_gpio[gpio_group],
+							     gpio_group_index,
+							     gpio_cfg[i].status);
+						gpio_conf(gpio_cfg[i].number,
+							  gpio_cfg[i].direction | GPIO_OPEN_DRAIN);
 						break;
 					case PUSH_PULL:
 						gpio_pin_set(dev_gpio[gpio_group], gpio_group_index,

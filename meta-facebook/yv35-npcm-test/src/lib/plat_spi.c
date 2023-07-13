@@ -32,6 +32,7 @@ LOG_MODULE_REGISTER(plat_spi);
 
 static bool switch_cxl_spi_mux(int gpio_status)
 {
+#if 0
 	if (gpio_status != CXL_FLASH_TO_BIC && gpio_status != CXL_FLASH_TO_CXL) {
 		LOG_ERR("Invalid argument");
 		return false;
@@ -42,12 +43,13 @@ static bool switch_cxl_spi_mux(int gpio_status)
 			(gpio_status == CXL_FLASH_TO_BIC) ? "BIC" : "PIONEER");
 		return false;
 	}
-
+#endif
 	return true;
 }
 
 static bool control_flash_power(int power_state)
 {
+#if 0
 	int control_mode = 0;
 
 	switch (power_state) {
@@ -74,7 +76,7 @@ static bool control_flash_power(int power_state)
 	}
 
 	LOG_ERR("Fail to %s the ASIC_1V8", (power_state == POWER_OFF) ? "disable" : "enable");
-
+#endif
 	return false;
 }
 

@@ -29,12 +29,12 @@
 
 #define GET_BIT_VAL(val, n) ((val & BIT(n)) >> (n))
 #define NUM_OF_GROUP 16
-#define REG_SCU 0x7E6E2000
+#define REG_SCU 0x400C3000
 #define GPIO_DEVICE_PREFIX "GPIO0_"
 
 int num_of_pin_in_one_group_lst[NUM_OF_GROUP] = { 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8 };
-char GPIO_GROUP_NAME_LST[NUM_OF_GROUP][10] = { "GPIO0", "GPIO1", "GPIO2",
-					       "GPIO3", "GPIO4", "GPIO5", "GPIO6", "GPIO7", "GPIO8", "GPIO9", "GPIOA", "GPIOB", "GPIOC", "GPIOD", "GPIOE", "GPIOF" };
+char GPIO_GROUP_NAME_LST[NUM_OF_GROUP][10] = { "GPIO_0", "GPIO_1", "GPIO_2",
+					       "GPIO_3", "GPIO_4", "GPIO_5", "GPIO_6", "GPIO_7", "GPIO_8", "GPIO_9", "GPIO_A", "GPIO_B", "GPIO_C", "GPIO_D", "GPIO_E", "GPIO_F" };
 enum GPIO_ACCESS { GPIO_READ, GPIO_WRITE };
 
 gpio_flags_t int_type_table[] = { GPIO_INT_DISABLE,   GPIO_INT_EDGE_RISING, GPIO_INT_EDGE_FALLING,
@@ -89,27 +89,29 @@ static int gpio_access_cfg(const struct shell *shell, int gpio_idx, enum GPIO_AC
 			return 1;
 		}
 
-		uint32_t g_out_val = sys_read8(GPIO_GROUP_REG_ACCESS[gpio_idx / 8] + 0x00);
-		uint32_t g_val = sys_read8(GPIO_GROUP_REG_ACCESS[gpio_idx / 8] + 0x01);
-		uint32_t g_dir = sys_read8(GPIO_GROUP_REG_ACCESS[gpio_idx / 8] + 0x02);
+		uint8_t g_out_val = sys_read8(GPIO_GROUP_REG_ACCESS[gpio_idx / GPIO_GROUP_SIZE] + 0x00);
+		uint8_t g_in_val = sys_read8(GPIO_GROUP_REG_ACCESS[gpio_idx / GPIO_GROUP_SIZE] + 0x01);
+		uint8_t g_dir = sys_read8(GPIO_GROUP_REG_ACCESS[gpio_idx / GPIO_GROUP_SIZE] + 0x02);
+		uint8_t g_type = sys_read8(GPIO_GROUP_REG_ACCESS[gpio_idx / GPIO_GROUP_SIZE] + 0x06);
 
 		char *pin_prop = (gpio_cfg[gpio_idx].property == OPEN_DRAIN) ? "OD" : "PP";
+		char *pin_real_prop = (GET_BIT_VAL(g_type, gpio_idx % GPIO_GROUP_SIZE) == 1) ? "OD" : "PP";
+
 		char *pin_dir = (gpio_cfg[gpio_idx].direction == GPIO_INPUT) ? "input" : "output";
 
 		char *pin_dir_reg = "I";
-		if (g_dir & BIT(gpio_idx % 8)) {
+		if (g_dir & BIT(gpio_idx % GPIO_GROUP_SIZE)) {
 			pin_dir_reg = "O";
-			g_val = g_out_val;
 		}
 
 		int val = gpio_get(gpio_idx);
 		if (val == 0 || val == 1) {
-			shell_print(shell, "[%-3d] %-35s: %-3s | %-6s(%s) | %d(%d)", gpio_idx,
-				    gpio_name[gpio_idx], pin_prop, pin_dir, pin_dir_reg, val,
-				    GET_BIT_VAL(g_val, gpio_idx % 8));
+			shell_print(shell, "[%-3d] %-35s: cfg:%-3s(hw:%-3s) | %-6s(%s) | get:%d(out:%d)(in:%d)", gpio_idx,
+				    gpio_name[gpio_idx], pin_prop, pin_real_prop, pin_dir, pin_dir_reg, val,
+				    GET_BIT_VAL(g_out_val, gpio_idx % GPIO_GROUP_SIZE), GET_BIT_VAL(g_in_val, gpio_idx % GPIO_GROUP_SIZE));
 		} else {
-			shell_print(shell, "[%-3d] %-35s: %-3s | %-6s(%s) | %s", gpio_idx,
-				    gpio_name[gpio_idx], pin_prop, pin_dir, pin_dir_reg, "resv");
+			shell_print(shell, "[%-3d] %-35s: %-3s(%-3s) | %-6s(%s) | %s", gpio_idx,
+				    gpio_name[gpio_idx], pin_prop, pin_real_prop, pin_dir, pin_dir_reg, "resv");
 		}
 
 		break;
@@ -198,13 +200,15 @@ void cmd_gpio_cfg_list_group(const struct shell *shell, size_t argc, char **argv
 	int g_idx = gpio_get_group_idx_by_dev_name(dev->name);
 	int max_group_pin = num_of_pin_in_one_group_lst[g_idx];
 
-	uint32_t g_val = sys_read32(GPIO_GROUP_REG_ACCESS[g_idx]);
-	uint32_t g_dir = sys_read32(GPIO_GROUP_REG_ACCESS[g_idx] + 0x4);
+	uint8_t g_out_val = sys_read8(GPIO_GROUP_REG_ACCESS[g_idx]);
+	uint8_t g_in_val = sys_read8(GPIO_GROUP_REG_ACCESS[g_idx] + 0x1);
+	uint8_t g_dir = sys_read8(GPIO_GROUP_REG_ACCESS[g_idx] + 0x2);
+	uint8_t g_type = sys_read8(GPIO_GROUP_REG_ACCESS[g_idx] + 0x06);
 
 	for (int index = 0; index < max_group_pin; index++) {
-		if (gpio_cfg[g_idx * 32 + index].is_init == DISABLE) {
+		if (gpio_cfg[g_idx * GPIO_GROUP_SIZE + index].is_init == DISABLE) {
 			shell_print(shell, "[%-3d][%s %-3d] %-35s: -- | %-9s | NA",
-				    g_idx * 32 + index, dev->name, index, "gpio_disable", "i/o");
+				    g_idx * GPIO_GROUP_SIZE + index, dev->name, index, "gpio_disable", "i/o");
 			continue;
 		}
 
@@ -212,12 +216,12 @@ void cmd_gpio_cfg_list_group(const struct shell *shell, size_t argc, char **argv
 		/* avoid pin_mask from devicetree "gpio-reserved" */
 		if (gpio_check_reserve(dev, index, CHECK_BY_GROUP_IDX)) {
 			shell_print(shell, "[%-3d][%s %-3d] %-35s: -- | %-9s | NA",
-				    g_idx * 32 + index, dev->name, index, "gpio_reserve", "i/o");
+				    g_idx * GPIO_GROUP_SIZE + index, dev->name, index, "gpio_reserve", "i/o");
 			continue;
 		}
 #endif
 		char *pin_dir = "output";
-		if (gpio_cfg[g_idx * 32 + index].direction == GPIO_INPUT) {
+		if (gpio_cfg[g_idx * GPIO_GROUP_SIZE + index].direction == GPIO_INPUT) {
 			pin_dir = "input";
 		}
 
@@ -227,19 +231,21 @@ void cmd_gpio_cfg_list_group(const struct shell *shell, size_t argc, char **argv
 		}
 
 		char *pin_prop =
-			(gpio_cfg[g_idx * 32 + index].property == OPEN_DRAIN) ? "OD" : "PP";
+			(gpio_cfg[g_idx * GPIO_GROUP_SIZE + index].property == OPEN_DRAIN) ? "OD" : "PP";
+
+		char *pin_real_prop = (GET_BIT_VAL(g_type, index) == 1) ? "OD" : "PP";
 
 		int rc;
 		rc = gpio_pin_get(dev, index);
 		if (rc >= 0) {
-			shell_print(shell, "[%-3d][%s %-3d] %-35s: %2s | %-6s(%s) | %d(%d)",
-				    g_idx * 32 + index, dev->name, index,
-				    gpio_get_name(dev->name, index), pin_prop, pin_dir, pin_dir_reg,
-				    rc, GET_BIT_VAL(g_val, index));
+			shell_print(shell, "[%-3d][%s %-3d] %-35s: cfg:%2s(hw:%2s) | %-6s(%s) | get:%d(out:%d)(in:%d)",
+				    g_idx * GPIO_GROUP_SIZE + index, dev->name, index,
+				    gpio_get_name(dev->name, index), pin_prop, pin_real_prop, pin_dir, pin_dir_reg,
+				    rc, GET_BIT_VAL(g_out_val, index), GET_BIT_VAL(g_in_val, index));
 		} else {
-			shell_error(shell, "[%-3d][%s %-3d] %-35s: %2s | %-6s | err[%d]",
-				    g_idx * 32 + index, dev->name, index,
-				    gpio_get_name(dev->name, index), pin_prop, pin_dir, rc);
+			shell_error(shell, "[%-3d][%s %-3d] %-35s: %2s(%2s) | %-6s | err[%d]",
+				    g_idx * GPIO_GROUP_SIZE + index, dev->name, index,
+				    gpio_get_name(dev->name, index), pin_prop, pin_real_prop,  pin_dir, rc);
 		}
 	}
 
@@ -334,11 +340,11 @@ void cmd_gpio_muti_fn_ctl_list(const struct shell *shell, size_t argc, char **ar
 		return;
 	}
 
-	printf("[   REG    ]  hi                                      lo\n");
+	printf("[   REG    ]    value\n");
 	for (int lst_idx = 0; lst_idx < GPIO_MULTI_FUNC_CFG_SIZE; lst_idx++) {
-		uint32_t cur_status = sys_read32(GPIO_MULTI_FUNC_PIN_CTL_REG_ACCESS[lst_idx]);
+		uint8_t cur_status = sys_read8(GPIO_MULTI_FUNC_PIN_CTL_REG_ACCESS[lst_idx]);
 		printf("[0x%x]", GPIO_MULTI_FUNC_PIN_CTL_REG_ACCESS[lst_idx]);
-		for (int i = 32; i > 0; i--) {
+		for (int i = 8; i > 0; i--) {
 			if (!(i % 4)) {
 				printf(" ");
 			}
