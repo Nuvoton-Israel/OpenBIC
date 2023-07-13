@@ -85,6 +85,7 @@
 #endif
 
 #define TOTAL_GPIO_NUM 128
+#define GPIO_CFG_SIZE 128
 #define ENABLE 1
 #define DISABLE 0
 #define CHIP_GPIO 0
@@ -98,20 +99,15 @@
 #define OPEN_DRAIN 0
 #define PUSH_PULL 1
 
-#define REG_ADC_BASE 0x7e6e9000
+#define REG_ADC_BASE 0x400D1100
 #define REG_GPIO_BASE 0x40081000
-#define REG_SCU 0x7E6E2000
+#define REG_SCU 0x400C3000
 #define REG_DIRECTION_OFFSET 2
-#define REG_INTERRUPT_ENABLE_OFFSET 8
-#define REG_INTERRUPT_TYPE0_OFFSET 0x0C
-#define REG_INTERRUPT_TYPE1_OFFSET 0x10
-#define REG_INTERRUPT_TYPE2_OFFSET 0x14
 
 extern uint32_t GPIO_GROUP_REG_ACCESS[];
 extern uint32_t GPIO_MULTI_FUNC_PIN_CTL_REG_ACCESS[];
 extern const int GPIO_MULTI_FUNC_CFG_SIZE;
 
-#define GPIO_CFG_SIZE 168
 typedef struct _GPIO_CFG_ {
 	uint8_t chip;
 	uint8_t number;
@@ -173,8 +169,8 @@ extern uint8_t gpio_ind_to_num_table[];
 extern uint8_t gpio_ind_to_num_table_cnt;
 
 typedef struct _SCU_CFG_ {
-	int reg;
-	int value;
+	uint32_t reg;
+	uint8_t value;
 } SCU_CFG;
 
 //void gpio_int_cb_test(void);
