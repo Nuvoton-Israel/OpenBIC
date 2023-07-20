@@ -18,8 +18,8 @@
 #define HAL_WDT_H
 
 #define WDT_DEVICE_NAME "TWD_0"
-#define WDT_TIMEOUT (8 * 1000) // 8s
-#define WDT_FEED_DELAY_MS (4 * 1000) // 4s
+#define WDT_TIMEOUT (15 * 1000) // 15s
+#define WDT_FEED_DELAY_MS (10 * 1000) // 10s
 
 #define WDT_THREAD_STACK_SIZE 256
 
