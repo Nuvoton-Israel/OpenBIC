@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Meta Platforms, Inc. and affiliates.
+ * Copyright (c) Nuvoton Technology Corporation.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,16 +14,39 @@
  * limitations under the License.
  */
 
-#ifndef PLAT_SDR_TABLE_H
-#define PLAT_SDR_TABLE_H
+#ifndef ADC_H
+#define ADC_H
 
+#include <stdbool.h>
 #include <stdint.h>
 
-#define MAX_SENSOR_SIZE 60
+enum {
+	ADC_PORT0 = 0,
+	ADC_PORT1,
+	ADC_PORT2,
+	ADC_PORT3,
+	ADC_PORT4,
+	ADC_PORT5,
+	ADC_PORT6,
+	ADC_PORT7,
+	ADC_PORT8,
+	ADC_PORT9,
+	ADC_PORT10,
+	ADC_PORT11,
+	ADC_PORT12,
+	ADC_PORT13,
+	ADC_PORT14,
+	ADC_PORT15,
+	ADC_PORT16,
+	ADC_PORT17,
+	ADC_PORT18,
+	ADC_PORT19,
+	ADC_PORT20,
+	ADC_PORT21,
+	ADC_PORT22,
+	ADC_PORT23,
+};
 
-uint8_t plat_get_sdr_size();
-void load_sdr_table(void);
-void pal_extend_full_sdr_table();
-uint8_t pal_get_extend_sdr();
+bool adc_init();
 
 #endif
