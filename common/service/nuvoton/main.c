@@ -20,12 +20,13 @@
 //#include "hal_i3c.h"
 #include "hal_wdt.h"
 #include "ipmi.h"
+#include "hal_peci.h"
 
-#ifdef CONFIG_IPMI_KCS_ASPEED
+#ifdef CONFIG_IPMI_KCS_NPCM4XX
 #include "kcs.h"
 #endif
 
-//#include "sensor.h"
+#include "sensor.h"
 #include "timer.h"
 //#include "usb.h"
 #include <logging/log.h>
@@ -58,6 +59,8 @@ void main(void)
 
 	wdt_init();
 	util_init_timer();
+	sensor_init();
+
 
 	pal_pre_init();
 

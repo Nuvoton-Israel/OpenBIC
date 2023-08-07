@@ -31,7 +31,7 @@ typedef struct _vr_pre_proc_arg {
  * INIT ARGS
 **************************************************************************************************/
 extern pm8702_dimm_init_arg pm8702_dimm_init_args[];
-extern adc_asd_init_arg adc_asd_init_args[];
+extern adc_npcm4xx_init_arg adc_npcm4xx_init_args[];
 extern ina230_init_arg SQ5220x_init_args[];
 extern ina233_init_arg ina233_init_args[];
 extern vr_pre_proc_arg vr_page_select[];
