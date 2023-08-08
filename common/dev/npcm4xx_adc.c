@@ -126,7 +126,23 @@ static bool adc_read_mv(uint8_t sensor_num, uint32_t index, uint32_t channel, in
 	}
 
 	*adc_val = raw_value;
-	adc_raw_to_millivolts(ref_mv, channel_cfg.gain, sequence.resolution, adc_val);
+	if (channel <= ADC_PORT18) {
+		switch (channel) {
+			/* Thermistor channels */
+			case ADC_PORT7:
+			case ADC_PORT9:
+			case ADC_PORT11:
+			case ADC_PORT13:
+			case ADC_PORT15:
+				/* Return raw values when dealing
+				 * with temperature
+				 */
+				break;
+			default:
+				adc_raw_to_millivolts(ref_mv, channel_cfg.gain, sequence.resolution, adc_val);
+				break;
+		}
+	}
 
 	return true;
 }
