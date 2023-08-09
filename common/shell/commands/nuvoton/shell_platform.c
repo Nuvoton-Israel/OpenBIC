@@ -14,15 +14,23 @@
  * limitations under the License.
  */
 
-#include "commands/gpio_shell.h"
-#include "commands/info_shell.h"
-#include "commands/flash_shell.h"
+#include "gpio_shell.h"
+#include "info_shell.h"
+#include "sensor_shell.h"
+#include "flash_shell.h"
+#include "ipmi_shell.h"
+#include "power_shell.h"
+#include "pldm_shell.h"
 
 /* MAIN command */
 SHELL_STATIC_SUBCMD_SET_CREATE(
 	sub_platform_cmds, SHELL_CMD(info, NULL, "Platform info.", cmd_info_print),
 	SHELL_CMD(gpio, &sub_gpio_cmds, "GPIO relative command.", NULL),
+	SHELL_CMD(sensor, &sub_sensor_cmds, "SENSOR relative command.", NULL),
 	SHELL_CMD(flash, &sub_flash_cmds, "FLASH(spi) relative command.", NULL),
+	SHELL_CMD(ipmi, &sub_ipmi_cmds, "IPMI relative command.", NULL),
+	SHELL_CMD(power, &sub_power_cmds, "POWER relative command.", NULL),
+	SHELL_CMD(pldm, &sub_pldm_cmds, "PLDM over MCTP relative command.", NULL),
 	SHELL_SUBCMD_SET_END);
 
 SHELL_CMD_REGISTER(platform, &sub_platform_cmds, "Platform commands", NULL);
