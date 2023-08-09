@@ -223,8 +223,10 @@ void plat_mctp_init()
 		mctp_reg_msg_rx_func(p->mctp_inst, mctp_msg_recv);
 		mctp_start(p->mctp_inst);
 	}
+#if 0
 	/* Only send command to device when DC on */
 	if (gpio_get(FM_POWER_EN) == POWER_ON) {
 		k_timer_start(&send_cmd_timer, K_MSEC(3000), K_NO_WAIT);
 	}
+#endif
 }

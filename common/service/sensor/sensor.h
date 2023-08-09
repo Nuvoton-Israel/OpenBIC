@@ -107,7 +107,9 @@ enum DIMM_RELATED_OFFSET {
 
 enum SENSOR_DEV {
 	sensor_dev_tmp75 = 0,
+#ifdef CONFIG_ADC_ASPEED
 	sensor_dev_ast_adc = 0x01,
+#endif
 	sensor_dev_intel_peci = 0x02,
 	sensor_dev_isl69259 = 0x03,
 	sensor_dev_adm1278 = 0x04,
@@ -156,6 +158,9 @@ enum SENSOR_DEV {
 	sensor_dev_m88rt51632 = 0x2B,
 	sensor_dev_mpro = 0x2C,
 	sensor_dev_bmr351 = 0x2D,
+#ifdef CONFIG_ADC_NPCM4XX
+	sensor_dev_npcm4xx_adc = 0x2E,
+#endif
 	sensor_dev_max
 };
 
@@ -316,6 +321,7 @@ typedef struct _isl28022_init_arg {
 
 } isl28022_init_arg;
 
+#ifdef CONFIG_ADC_ASPEED
 typedef struct _adc_asd_deglitch_arg {
 	uint16_t upper_bound;
 	uint16_t lower_bound;
@@ -326,6 +332,20 @@ typedef struct _adc_asd_init_arg {
 	bool is_init;
 	adc_asd_deglitch_arg deglitch[8]; // 8 channels
 } adc_asd_init_arg;
+#endif
+
+#ifdef CONFIG_ADC_NPCM4XX
+typedef struct _adc_npcm4xx_deglitch_arg {
+	uint16_t upper_bound;
+	uint16_t lower_bound;
+	bool deglitch_en;
+} adc_npcm4xx_deglitch_arg;
+
+typedef struct _adc_npcm4xx_init_arg {
+	bool is_init;
+	//adc_npcm4xx_deglitch_arg deglitch[8]; // 8 channels
+} adc_npcm4xx_init_arg;
+#endif
 
 typedef struct _adm1278_init_arg {
 	/* value to set configuration register */

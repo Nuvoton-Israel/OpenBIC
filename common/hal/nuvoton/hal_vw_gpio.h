@@ -4,7 +4,7 @@
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
@@ -14,13 +14,31 @@
  * limitations under the License.
  */
 
-#ifndef PLAT_I2C_SLAVE_H
-#define PLAT_I2C_SLAVE_H
+#include <drivers/espi.h>
 
-#include <drivers/i2c.h>
-#include "hal_i2c_target.h"
+#define VW_GPIO_ENABLE true
+#define VW_GPIO_DISABLE false
 
-#define TARGET_ENABLE 1
-#define TARGET_DISABLE 0
+enum vw_gpio_direction {
+	VW_GPIO_OUTPUT = 0,
+	VW_GPIO_INPUT,
+};
 
-#endif
+enum vw_gpio_value {
+	VW_GPIO_LOW = 0,
+	VW_GPIO_HIGH,
+	VW_GPIO_UNKNOWN,
+};
+
+typedef struct _vw_gpio_ {
+	uint8_t number;
+	bool is_enabled;
+	uint8_t direction;
+	uint8_t value;
+	void (*int_cb)(uint8_t value);
+} vw_gpio;
+
+bool vw_gpio_get(int number, uint8_t *value);
+bool vw_gpio_set(int number, uint8_t value);
+void vw_gpio_reset(void);
+bool vw_gpio_init(vw_gpio *config, uint8_t size);

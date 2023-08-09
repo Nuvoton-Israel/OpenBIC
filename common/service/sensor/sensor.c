@@ -25,7 +25,12 @@
 #include "hal_i2c.h"
 #include "plat_sensor_table.h"
 #include "plat_sdr_table.h"
+#ifdef CONFIG_ADC_ASPEED
 #include "ast_adc.h"
+#endif
+#ifdef CONFIG_ADC_NPCM4XX
+#include "npcm4xx_adc.h"
+#endif
 #include "intel_peci.h"
 #include "util_sys.h"
 #include "plat_def.h"
@@ -117,11 +122,16 @@ const char *const sensor_type_name[] = {
 	sensor_name_to_num(m88rt51632)
 	sensor_name_to_num(mpro)
 	sensor_name_to_num(bmr351)
+#ifdef CONFIG_ADC_NPCM4XX
+	sensor_name_to_num(npcm4xx_adc)
+#endif
 };
 // clang-format on
 
 SENSOR_DRIVE_INIT_DECLARE(tmp75);
+#ifdef CONFIG_ADC_ASPEED
 SENSOR_DRIVE_INIT_DECLARE(ast_adc);
+#endif
 SENSOR_DRIVE_INIT_DECLARE(isl69259);
 SENSOR_DRIVE_INIT_DECLARE(nvme);
 SENSOR_DRIVE_INIT_DECLARE(mp5990);
@@ -171,13 +181,18 @@ SENSOR_DRIVE_INIT_DECLARE(m88rt51632);
 SENSOR_DRIVE_INIT_DECLARE(mpro);
 #endif
 SENSOR_DRIVE_INIT_DECLARE(bmr351);
+#ifdef CONFIG_ADC_NPCM4XX
+SENSOR_DRIVE_INIT_DECLARE(npcm4xx_adc);
+#endif
 
 struct sensor_drive_api {
 	enum SENSOR_DEV dev;
 	uint8_t (*init)(sensor_cfg *);
 } sensor_drive_tbl[] = {
 	SENSOR_DRIVE_TYPE_INIT_MAP(tmp75),
+#ifdef CONFIG_ADC_ASPEED
 	SENSOR_DRIVE_TYPE_INIT_MAP(ast_adc),
+#endif
 	SENSOR_DRIVE_TYPE_INIT_MAP(isl69259),
 	SENSOR_DRIVE_TYPE_INIT_MAP(nvme),
 	SENSOR_DRIVE_TYPE_INIT_MAP(mp5990),
@@ -227,6 +242,9 @@ struct sensor_drive_api {
 	SENSOR_DRIVE_TYPE_INIT_MAP(mpro),
 #endif
 	SENSOR_DRIVE_TYPE_INIT_MAP(bmr351),
+#ifdef CONFIG_ADC_NPCM4XX
+	SENSOR_DRIVE_TYPE_INIT_MAP(npcm4xx_adc),
+#endif
 };
 
 static void init_sensor_num(void)

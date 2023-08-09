@@ -14,13 +14,29 @@
  * limitations under the License.
  */
 
-#ifndef PLAT_I2C_SLAVE_H
-#define PLAT_I2C_SLAVE_H
+#ifndef POWER_SHELL_H
+#define POWER_SHELL_H
 
-#include <drivers/i2c.h>
-#include "hal_i2c_target.h"
+#include <stdlib.h>
+#include <shell/shell.h>
 
-#define TARGET_ENABLE 1
-#define TARGET_DISABLE 0
+struct device_arr {
+	uint8_t enable;
+	char *name;
+};
+
+enum device_id {
+	DEVICE_HOST,
+	DEVICE_BMC,
+	MAX_DEVICE_COUNT,
+};
+
+void cmd_power_status(const struct shell *shell, size_t argc, char **argv);
+void cmd_power_control(const struct shell *shell, size_t argc, char **argv);
+
+SHELL_STATIC_SUBCMD_SET_CREATE(sub_power_cmds,
+			       SHELL_CMD(status, NULL, "List power status", cmd_power_status),
+			       SHELL_CMD(control, NULL, "Power control", cmd_power_control),
+			       SHELL_SUBCMD_SET_END);
 
 #endif
