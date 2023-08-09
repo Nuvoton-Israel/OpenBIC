@@ -344,7 +344,7 @@ void i2c_scan(uint8_t bus, uint8_t *target_addr, uint8_t *target_addr_len)
 
 void util_init_I2C(void)
 {
-	//int status;
+	int status;
 
 #ifdef DEV_I2C_0
 	dev_i2c[0] = device_get_binding("I2C_0");
@@ -375,72 +375,6 @@ void util_init_I2C(void)
 	status = k_mutex_init(&i2c_mutex[4]);
 	if (status)
 		LOG_ERR("i2c4 mutex init fail");
-#endif
-#ifdef DEV_I2C_5
-	dev_i2c[5] = device_get_binding("I2C_5");
-	status = k_mutex_init(&i2c_mutex[5]);
-	if (status)
-		LOG_ERR("i2c5 mutex init fail");
-#endif
-#ifdef DEV_I2C_6
-	dev_i2c[6] = device_get_binding("I2C_6");
-	status = k_mutex_init(&i2c_mutex[6]);
-	if (status)
-		LOG_ERR("i2c6 mutex init fail");
-#endif
-#ifdef DEV_I2C_7
-	dev_i2c[7] = device_get_binding("I2C_7");
-	status = k_mutex_init(&i2c_mutex[7]);
-	if (status)
-		LOG_ERR("i2c7 mutex init fail");
-#endif
-#ifdef DEV_I2C_8
-	dev_i2c[8] = device_get_binding("I2C_8");
-	status = k_mutex_init(&i2c_mutex[8]);
-	if (status)
-		LOG_ERR("i2c8 mutex init fail");
-#endif
-#ifdef DEV_I2C_9
-	dev_i2c[9] = device_get_binding("I2C_9");
-	status = k_mutex_init(&i2c_mutex[9]);
-	if (status)
-		LOG_ERR("i2c9 mutex init fail");
-#endif
-#ifdef DEV_I2C_10
-	dev_i2c[10] = device_get_binding("I2C_10");
-	status = k_mutex_init(&i2c_mutex[10]);
-	if (status)
-		LOG_ERR("i2c10 mutex init fail");
-#endif
-#ifdef DEV_I2C_11
-	dev_i2c[11] = device_get_binding("I2C_11");
-	status = k_mutex_init(&i2c_mutex[11]);
-	if (status)
-		LOG_ERR("i2c11 mutex init fail");
-#endif
-#ifdef DEV_I2C_12
-	dev_i2c[12] = device_get_binding("I2C_12");
-	status = k_mutex_init(&i2c_mutex[12]);
-	if (status)
-		LOG_ERR("i2c12 mutex init fail");
-#endif
-#ifdef DEV_I2C_13
-	dev_i2c[13] = device_get_binding("I2C_13");
-	status = k_mutex_init(&i2c_mutex[13]);
-	if (status)
-		LOG_ERR("i2c13 mutex init fail");
-#endif
-#ifdef DEV_I2C_14
-	dev_i2c[14] = device_get_binding("I2C_14");
-	status = k_mutex_init(&i2c_mutex[14]);
-	if (status)
-		LOG_ERR("i2c14 mutex init fail");
-#endif
-#ifdef DEV_I2C_15
-	dev_i2c[15] = device_get_binding("I2C_15");
-	status = k_mutex_init(&i2c_mutex[15]);
-	if (status)
-		LOG_ERR("i2c15 mutex init fail");
 #endif
 }
 

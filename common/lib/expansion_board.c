@@ -43,12 +43,12 @@ void init_sys_board_id(uint8_t board_id)
 void init_platform_config()
 {
 	uint8_t board_id = 0;
-
+#if 0
 	board_id = (gpio_get(BOARD_ID3) << 3);
 	board_id |= (gpio_get(BOARD_ID2) << 2);
 	board_id |= (gpio_get(BOARD_ID1) << 1);
 	board_id |= (gpio_get(BOARD_ID0) << 0);
-
+#endif
 	init_sys_board_id(board_id);
 	LOG_DBG("Board id 0x%x", system_board_id);
 	return;

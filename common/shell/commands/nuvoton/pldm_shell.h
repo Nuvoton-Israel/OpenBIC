@@ -14,13 +14,16 @@
  * limitations under the License.
  */
 
-#ifndef PLAT_I2C_SLAVE_H
-#define PLAT_I2C_SLAVE_H
+#ifndef PLDM_SHELL_H
+#define PLDM_SHELL_H
 
-#include <drivers/i2c.h>
-#include "hal_i2c_target.h"
+#include <shell/shell.h>
 
-#define TARGET_ENABLE 1
-#define TARGET_DISABLE 0
+void cmd_pldm_send_req(const struct shell *shell, size_t argc, char **argv);
+
+SHELL_STATIC_SUBCMD_SET_CREATE(sub_pldm_cmds,
+			       SHELL_CMD(sendreq, NULL, "Send out PLDM request.",
+					 cmd_pldm_send_req),
+			       SHELL_SUBCMD_SET_END);
 
 #endif

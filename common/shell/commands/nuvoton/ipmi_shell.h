@@ -14,13 +14,17 @@
  * limitations under the License.
  */
 
-#ifndef PLAT_I2C_SLAVE_H
-#define PLAT_I2C_SLAVE_H
+#ifndef IPMI_SHELL_H
+#define IPMI_SHELL_H
 
-#include <drivers/i2c.h>
-#include "hal_i2c_target.h"
+#include <stdlib.h>
+#include <shell/shell.h>
 
-#define TARGET_ENABLE 1
-#define TARGET_DISABLE 0
+void cmd_ipmi_list(const struct shell *shell, size_t argc, char **argv);
+void cmd_ipmi_raw(const struct shell *shell, size_t argc, char **argv);
+
+SHELL_STATIC_SUBCMD_SET_CREATE(
+	sub_ipmi_cmds, SHELL_CMD(scan, NULL, "Scanning all supported commands", cmd_ipmi_list),
+	SHELL_CMD(raw, NULL, "Send raw command", cmd_ipmi_raw), SHELL_SUBCMD_SET_END);
 
 #endif

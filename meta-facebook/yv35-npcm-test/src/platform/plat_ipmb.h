@@ -19,7 +19,7 @@
 
 #include "plat_i2c.h"
 
-#define IPMB_CL_BIC_BUS I2C_BUS9
+#define IPMB_CL_BIC_BUS I2C_BUS1
 
 #define SELF_I2C_ADDRESS 0x20
 #define CL_BIC_I2C_ADDRESS 0x20

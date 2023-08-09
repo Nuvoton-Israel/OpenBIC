@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#if 0
+
 #include <zephyr.h>
 #include <stdio.h>
 #include "ipmi.h"
@@ -425,3 +427,4 @@ static bool power_off_handler(uint8_t initial_stage)
 		return false;
 	}
 }
+#endif

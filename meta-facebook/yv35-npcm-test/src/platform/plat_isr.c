@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#if 0
+
 #include <zephyr.h>
 #include <stdio.h>
 #include <string.h>
@@ -305,3 +307,4 @@ void ISR_PVDDQ_CD_PMALT()
 
 	add_vr_pmalert_sel(SMB_VR_PVDDQ_CD_ALERT_N, VR_VDDQCD_ADDR, PVDDQ_CD_VR, 1);
 }
+#endif

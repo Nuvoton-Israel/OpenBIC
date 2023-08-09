@@ -14,13 +14,12 @@
  * limitations under the License.
  */
 
-#ifndef PLAT_I2C_SLAVE_H
-#define PLAT_I2C_SLAVE_H
+#ifndef HAL_JTAG_H
+#define HAL_JTAG_H
 
-#include <drivers/i2c.h>
-#include "hal_i2c_target.h"
+#include <drivers/jtag.h>
 
-#define TARGET_ENABLE 1
-#define TARGET_DISABLE 0
+void jtag_set_tap(uint8_t data, uint8_t bitlength);
+void jtag_shift_data(uint16_t Wbit, uint8_t *Wdate, uint16_t Rbit, uint8_t *Rdate, uint8_t lastidx);
 
 #endif
