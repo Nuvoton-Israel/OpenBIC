@@ -1,3 +1,25 @@
 &twd0 {
        status = "okay";
 };
+
+&i2c3a {
+	ipmb1: ipmb@11 {
+		compatible = "zephyr,i2c-ipmb";
+		reg = <0x11>;
+		label = "IPMB_1";
+		size = <5>;
+		status = "okay";
+	};
+};
+
+&spi_spim0_cs0 {
+	status = "okay";
+};
+
+&spi_fiu0_cs1 {
+	status = "okay";
+};
+
+&spi_spip1_cs0 {
+	status = "okay";
+};

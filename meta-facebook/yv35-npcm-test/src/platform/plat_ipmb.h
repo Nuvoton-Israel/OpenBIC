@@ -19,15 +19,19 @@
 
 #include "plat_i2c.h"
 
-#define IPMB_CL_BIC_BUS I2C_BUS1
+/* use i2c1 */
+#define IPMB_BMC_BIC_BUS I2C_BUS2
 
-#define SELF_I2C_ADDRESS 0x20
-#define CL_BIC_I2C_ADDRESS 0x20
+/* bic ipmb address = 0x11 (7-bit) */
+#define SELF_I2C_ADDRESS (34 >> 1)
+
+/* bmc ipmb address = 0x10 (7-bit) */
+#define BMC_I2C_ADDRESS (32 >> 1)
 
 #define MAX_IPMB_IDX 2
 
 enum {
-	CL_BIC_IPMB_IDX,
+	BMC_BIC_IPMB_IDX,
 	RESERVE_IPMB_IDX,
 };
 

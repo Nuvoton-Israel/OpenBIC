@@ -26,6 +26,7 @@
 #include <sys/util.h>
 #include "cmsis_os2.h"
 #include "util_spi.h"
+#include "util_spi_internal.h"
 #include "util_sys.h"
 #include "libutil.h"
 #include "ipmi.h"
@@ -37,9 +38,9 @@ static struct {
 	char *name;
 	bool isinit;
 } flash_device_list[] = {
-	[DEVSPI_FMC_CS0] = { "fmc_cs0", true },	   [DEVSPI_FMC_CS1] = { "fmc_cs1", false },
-	[DEVSPI_SPI1_CS0] = { "spi1_cs0", false }, [DEVSPI_SPI1_CS1] = { "spi1_cs1", false },
-	[DEVSPI_SPI2_CS0] = { "spi2_cs0", false }, [DEVSPI_SPI2_CS1] = { "spi2_cs1", false },
+	[DEVSPI_FMC_CS0] = { FMC_CS0, true },    [DEVSPI_FMC_CS1] = { FMC_CS1, false },
+	[DEVSPI_SPI1_CS0] = { SPI1_CS0, false }, [DEVSPI_SPI1_CS1] = { SPI1_CS1, false },
+	[DEVSPI_SPI2_CS0] = { SPI2_CS0, false }, [DEVSPI_SPI2_CS1] = { SPI2_CS1, false },
 };
 
 static int do_erase_write_verify(const struct device *flash_device, uint32_t op_addr,
@@ -77,7 +78,7 @@ end:
 	return ret;
 }
 
-int do_update(const struct device *flash_device, off_t offset, uint8_t *buf, size_t len)
+__weak int do_update(const struct device *flash_device, off_t offset, uint8_t *buf, size_t len)
 {
 	int ret = 0;
 	uint32_t flash_sz = flash_get_flash_size(flash_device);
