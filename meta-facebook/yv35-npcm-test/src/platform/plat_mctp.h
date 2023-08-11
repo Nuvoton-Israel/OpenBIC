@@ -27,8 +27,8 @@
 #define I2C_ADDR_BIC 0x20
 #define I2C_ADDR_CXL0 0x74
 #define I2C_ADDR_CXL1 0xC2
-/* i2c dev bus */
-#define I2C_BUS_CXL 0x01
+/* i2c dev bus, use i2c0 */
+#define I2C_BUS_CXL 0x00
 /* mctp endpoint */
 #define CXL_EID 0x2E
 

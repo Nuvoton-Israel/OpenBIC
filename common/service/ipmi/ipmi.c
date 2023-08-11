@@ -430,6 +430,7 @@ void IPMI_handler(void *arug0, void *arug1, void *arug2)
 {
 	ipmi_msg_cfg msg_cfg;
 	k_tid_t tid = 0;
+	uint32_t timeout = 1;
 
 	while (1) {
 		memset(&msg_cfg, 0, sizeof(ipmi_msg_cfg));
@@ -442,7 +443,18 @@ void IPMI_handler(void *arug0, void *arug1, void *arug2)
 				      K_THREAD_STACK_SIZEOF(IPMI_handle_thread_stack),
 				      ipmi_cmd_handle, (void *)&msg_cfg, NULL, NULL,
 				      CONFIG_MAIN_THREAD_PRIORITY, 0, K_NO_WAIT);
-		if (k_thread_join(tid, K_SECONDS(1)) == -EAGAIN) { // timeout
+
+		/* According spi flash datasheet, page program(256b) max need 3 ~ 4 ms
+		* and erase 4K max need 400 ~ 500 ms, for openbic platform, spi flash
+		* program per 64k , worst case need 4(256b) * 16 * 16 for write time
+		* 500(4K) * 16 for erase, total worst case need 9024 ms, exclude read
+		* and cpu verify.
+		*/
+		if ((msg_cfg.buffer.netfn == NETFN_OEM_1S_REQ) &&
+				msg_cfg.buffer.cmd == CMD_OEM_1S_FW_UPDATE)
+			timeout = 10;
+
+		if (k_thread_join(tid, K_SECONDS(timeout)) == -EAGAIN) { // timeout
 			k_thread_abort(tid);
 			LOG_ERR("%s(): abort the handler due to timeout. netfn: %x, cmd: %x",
 				__func__, msg_cfg.buffer.netfn, msg_cfg.buffer.cmd);
