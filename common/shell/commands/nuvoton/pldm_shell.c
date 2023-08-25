@@ -44,18 +44,28 @@ void cmd_pldm_send_req(const struct shell *shell, size_t argc, char **argv)
 	pmsg.hdr.cmd = pldm_cmd;
 	pmsg.hdr.rq = PLDM_REQUEST;
 	pmsg.len = pldm_data_len;
-	for (int i = 0; i < pmsg.len; i++)
-		pmsg.buf[i] = strtol(argv[4 + i], NULL, 16);
+	pmsg.buf = malloc(PLDM_MAX_DATA_SIZE * sizeof(uint8_t));
+	if(pmsg.buf) {
+		for (int i = 0; i < pmsg.len; i++) {
+			pmsg.buf[i] = strtol(argv[4 + i], NULL, 16);
+		}
+	}
 
 	mctp *mctp_inst = NULL;
 	if (get_mctp_info_by_eid(mctp_dest_eid, &mctp_inst, &pmsg.ext_params) == false) {
 		shell_error(shell, "Failed to get mctp info by eid 0x%x", mctp_dest_eid);
+		if(pmsg.buf) {
+			free(pmsg.buf);
+		}
 		return;
 	}
 
 	uint16_t resp_len = mctp_pldm_read(mctp_inst, &pmsg, resp_buf, sizeof(resp_buf));
 	if (resp_len == 0) {
 		shell_error(shell, "Failed to get mctp response");
+		if(pmsg.buf) {
+			free(pmsg.buf);
+		}
 		return;
 	}
 
@@ -63,6 +73,9 @@ void cmd_pldm_send_req(const struct shell *shell, size_t argc, char **argv)
 		    pmsg.ext_params.smbus_ext_params.addr, mctp_dest_eid, MCTP_MSG_TYPE_PLDM);
 	shell_print(shell, "  pldm_type: 0x%x pldm cmd: 0x%x", pldm_type, pldm_cmd);
 	shell_hexdump(shell, pmsg.buf, pmsg.len);
+	if(pmsg.buf) {
+		free(pmsg.buf);
+	}
 
 	if (resp_buf[0] != PLDM_SUCCESS)
 		shell_error(shell, "Response with bad cc 0x%x", resp_buf[0]);

@@ -34,6 +34,7 @@
 #include "plat_hook.h"
 #include "plat_mctp.h"
 #include "plat_gpio.h"
+#include "plat_i2c.h"
 #include "cci.h"
 #include "pm8702.h"
 
@@ -43,10 +44,13 @@ K_WORK_DEFINE(send_cmd_work, send_cmd_to_dev_handler);
 
 static mctp_smbus_port smbus_port[] = {
 	{ .conf.smbus_conf.addr = I2C_ADDR_BIC, .conf.smbus_conf.bus = I2C_BUS_CXL },
+	{ .conf.smbus_conf.addr = I2C_ADDR_BIC, .conf.smbus_conf.bus = I2C_BUS_PLDM },
 };
 
 static mctp_route_entry mctp_route_tbl[] = {
 	{ CXL_EID, I2C_BUS_CXL, I2C_ADDR_CXL0 },
+	{ BMC_EID, I2C_BUS_PLDM, I2C_ADDR_BMC },
+	{ BIC_EID, I2C_BUS_PLDM, I2C_ADDR_BIC },
 };
 
 mctp *find_mctp_by_smbus(uint8_t bus)
@@ -126,6 +130,10 @@ static uint8_t mctp_msg_recv(void *mctp_p, uint8_t *buf, uint32_t len, mctp_ext_
 	switch (msg_type) {
 	case MCTP_MSG_TYPE_CTRL:
 		mctp_ctrl_cmd_handler(mctp_p, buf, len, ext_params);
+		break;
+
+	case MCTP_MSG_TYPE_PLDM:
+		mctp_pldm_cmd_handler(mctp_p, buf, len, ext_params);
 		break;
 
 	case MCTP_MSG_TYPE_CCI:
