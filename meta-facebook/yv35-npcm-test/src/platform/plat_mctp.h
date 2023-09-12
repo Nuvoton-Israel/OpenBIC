@@ -32,10 +32,22 @@
 #define I2C_BUS_PLDM I2C_BUS1
 /* i2c dev bus, use i2c2 */
 #define I2C_BUS_CXL I2C_BUS3
+
 /* mctp endpoint */
 #define CXL_EID 0x2E
 #define BMC_EID 0x15
 #define BIC_EID 0x0A
+
+/* i3c 8-bit address */
+#define I3C_STATIC_ADDR_BIC	0x21
+#define I3C_STATIC_ADDR_BMC	0x20
+
+/* i3c dev bus */
+#define I3C_BUS_BMC     0
+
+/* mctp endpoint */
+#define MCTP_EID_BMC 0x01
+#define MCTP_EID_SELF 0x02
 
 typedef struct _mctp_smbus_port {
 	mctp *mctp_inst;
@@ -43,12 +55,19 @@ typedef struct _mctp_smbus_port {
 	uint8_t user_idx;
 } mctp_smbus_port;
 
+typedef struct _mctp_i3c_port {
+	mctp *mctp_inst;
+	mctp_medium_conf conf;
+	uint8_t user_idx;
+} mctp_i3c_port;
+
 /* mctp route entry struct */
 typedef struct _mctp_route_entry {
 	uint8_t endpoint;
 	uint8_t bus; /* TODO: only consider smbus/i3c */
 	uint8_t addr; /* TODO: only consider smbus/i3c */
 	uint8_t dev_present_pin;
+	MCTP_MEDIUM_TYPE medium_type;
 } mctp_route_entry;
 
 typedef struct _mctp_msg_handler {

@@ -12,6 +12,39 @@
 	};
 };
 
+/* disable i2c6a, pin use by i3c */
+&i2c6a {
+	status = "disabled";
+};
+
+/* disable peci0, pin use by i3c */
+&peci0 {
+	status = "disabled";
+};
+
+&i3c0 {
+	bcr = <0x26>;
+	dcr = <0xCC>;
+	part-id = <0x1234>;
+	vendor-def-id = <0x5607>;
+	slave;
+	secondary;
+	status = "okay";
+	i3c0_smq:i3c-slave-mqueue@21 {
+		compatible = "i3c-slave-mqueue";
+		reg = <0x21>;
+		msg-size = <256>;
+		num-of-msgs = <4>;
+		mandatory-data-byte = <0xae>;
+		label = "I3C_SMQ_0";
+		status = "okay";
+	};
+};
+
+&i3c1 {
+	status = "okay";
+};
+
 &spi_spim0_cs0 {
 	status = "okay";
 };
