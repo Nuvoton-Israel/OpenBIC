@@ -59,6 +59,8 @@ static uint16_t mctp_i3c_read_smq(void *mctp_p, uint8_t *buf, uint32_t len,
 				i3c_msg.data[i3c_msg.rx_len - 1]);
 			return 0;
 		}
+
+		i3c_msg.rx_len = i3c_msg.rx_len - 1;
 	}
 
 	extra_data->type = MCTP_MEDIUM_TYPE_I3C;
