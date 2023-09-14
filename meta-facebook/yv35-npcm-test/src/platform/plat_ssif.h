@@ -4,7 +4,7 @@
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
@@ -14,12 +14,15 @@
  * limitations under the License.
  */
 
-#ifndef PLAT_DEF_H
-#define PLAT_DEF_H
+#ifndef PLAT_SSIF_H
+#define PLAT_SSIF_H
 
-#define BMC_USB_PORT "CDC_ACM_0"
-#define ENABLE_CCI
-#define ENABLE_PM8702
-#define ENABLE_SSIF
+#define SSIF_I2C_BUS I2C_BUS4
+
+/* i2c 8 bit address */
+/* use i2c5 */
+#define SSIF_I2C_ADDR 0x20
+
+void ssif_init(void);
 
 #endif

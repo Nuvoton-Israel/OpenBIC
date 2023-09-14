@@ -218,6 +218,143 @@ __weak void APP_MASTER_WRITE_READ(ipmi_msg *msg)
 	return;
 }
 
+__weak void APP_GET_SYSTEM_INTERFACE_CAPABILITIES(ipmi_msg *msg)
+{
+	CHECK_NULL_ARG(msg);
+
+	if (msg->data_len != 1) {
+		msg->completion_code = CC_INVALID_LENGTH;
+		return;
+	}
+
+
+	switch (msg->data[0]) {
+		case 0: // SSIF interface
+			msg->data[0] = 0;
+			msg->data[1] = 0;
+			msg->data[2] = 32;
+			msg->data[3] = 32;
+			msg->data_len = 4;
+			msg->completion_code = CC_SUCCESS;
+			break;
+		default:
+			msg->data_len = 0;
+			msg->completion_code = CC_INVALID_DATA_FIELD;
+			break;
+	}
+
+	return;
+}
+
+__weak void APP_CLEAR_MSG_FLAGS(ipmi_msg *msg)
+{
+	CHECK_NULL_ARG(msg);
+
+	if (msg->data_len != 1) {
+		msg->completion_code = CC_INVALID_LENGTH;
+		return;
+	}
+
+	msg->data_len = 0;
+	msg->completion_code = CC_SUCCESS;
+
+	return;
+}
+
+__weak void APP_GET_BMC_GLOBAL_ENABLES(ipmi_msg *msg)
+{
+	CHECK_NULL_ARG(msg);
+
+	if (msg->data_len != 0) {
+		msg->completion_code = CC_INVALID_LENGTH;
+		return;
+	}
+
+	msg->data[0] = 0x4;
+	msg->data_len = 1;
+	msg->completion_code = CC_SUCCESS;
+
+	return;
+}
+
+__weak void APP_SET_BMC_GLOBAL_ENABLES(ipmi_msg *msg)
+{
+	CHECK_NULL_ARG(msg);
+
+	if (msg->data_len != 1) {
+		msg->completion_code = CC_INVALID_LENGTH;
+		return;
+	}
+
+	msg->data_len = 0;
+	msg->completion_code = CC_SUCCESS;
+
+	return;
+}
+
+__weak void APP_GET_DEVICE_GUID(ipmi_msg *msg)
+{
+	CHECK_NULL_ARG(msg);
+
+	if (msg->data_len != 0) {
+		msg->completion_code = CC_INVALID_LENGTH;
+		return;
+	}
+
+	msg->data_len = 16;
+	msg->data[0] = 0x1;
+	msg->data[1] = 0x0;
+	msg->data[2] = 0x0;
+	msg->data[3] = 0x0;
+	msg->data[4] = 0x0;
+	msg->data[5] = 0x0;
+	msg->data[6] = 0x0;
+	msg->data[7] = 0x0;
+	msg->data[8] = 0x0;
+	msg->data[9] = 0x0;
+	msg->data[10] = 0x0;
+	msg->data[11] = 0x0;
+	msg->data[12] = 0x0;
+	msg->data[13] = 0x0;
+	msg->data[14] = 0x0;
+	msg->data[15] = 0x0;
+	msg->completion_code = CC_SUCCESS;
+
+	return;
+}
+
+__weak void APP_GET_CHANNEL_INFO(ipmi_msg *msg)
+{
+	CHECK_NULL_ARG(msg);
+
+	if (msg->data_len != 1) {
+		msg->completion_code = CC_INVALID_LENGTH;
+		return;
+	}
+
+	switch (msg->data[0]) {
+		case 0:
+			msg->data_len = 9;
+			msg->data[1] = 0x1;
+			msg->data[2] = 0x1;
+			msg->data[3] = 0x0;
+			msg->data[4] = 0xF2;
+			msg->data[5] = 0x1B;
+			msg->data[6] = 0x0;
+			msg->data[7] = 0x00;
+			msg->data[8] = 0x0;
+			msg->completion_code = CC_SUCCESS;
+			break;
+		default:
+			msg->data_len = 0;
+			msg->completion_code = CC_INVALID_DATA_FIELD;
+			break;
+	}
+
+	return;
+}
+
+
 void IPMI_APP_handler(ipmi_msg *msg)
 {
 	CHECK_NULL_ARG(msg);
@@ -240,6 +377,24 @@ void IPMI_APP_handler(ipmi_msg *msg)
 		break;
 	case CMD_APP_GET_SYSTEM_GUID:
 		APP_GET_SYSTEM_GUID(msg);
+		break;
+	case CMD_APP_GET_DEVICE_GUID:
+		APP_GET_DEVICE_GUID(msg);
+		break;
+	case CMD_APP_SET_BMC_GLOBAL_ENABLES:
+		APP_SET_BMC_GLOBAL_ENABLES(msg);
+		break;
+	case CMD_APP_GET_BMC_GLOBAL_ENABLES:
+		APP_GET_BMC_GLOBAL_ENABLES(msg);
+		break;
+	case CMD_APP_CLEAR_MSG_FLAGS:
+		APP_CLEAR_MSG_FLAGS(msg);
+		break;
+	case CMD_APP_GET_CHANNEL_INFO:
+		APP_GET_CHANNEL_INFO(msg);
+		break;
+	case CMD_APP_GET_SYSTEM_INTERFACE_CAPABILITIES:
+		APP_GET_SYSTEM_INTERFACE_CAPABILITIES(msg);
 		break;
 	default:
 		LOG_ERR("Invalid APP msg netfn: %x, cmd: %x", msg->netfn, msg->cmd);
