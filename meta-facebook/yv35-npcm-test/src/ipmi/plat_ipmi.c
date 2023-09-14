@@ -31,6 +31,26 @@
 
 LOG_MODULE_REGISTER(plat_ipmi);
 
+bool pal_request_msg_to_BIC_from_HOST(uint8_t netfn, uint8_t cmd)
+{
+	if (netfn == NETFN_OEM_1S_REQ) {
+		if ((cmd == CMD_OEM_1S_FW_UPDATE) || (cmd == CMD_OEM_1S_RESET_BMC) ||
+		    (cmd == CMD_OEM_1S_GET_BIC_STATUS) || (cmd == CMD_OEM_1S_RESET_BIC) ||
+		    (cmd == CMD_OEM_1S_GET_BIC_FW_INFO))
+			return true;
+	} else if (netfn == NETFN_APP_REQ) {
+		if ((cmd == CMD_APP_GET_SYSTEM_GUID) ||
+		    (cmd == CMD_APP_GET_SYSTEM_INTERFACE_CAPABILITIES) ||
+		    (cmd == CMD_APP_CLEAR_MSG_FLAGS) || (cmd == CMD_APP_SET_BMC_GLOBAL_ENABLES) ||
+		    (cmd == CMD_APP_GET_BMC_GLOBAL_ENABLES) || (cmd == CMD_APP_GET_DEVICE_GUID) ||
+		    (cmd == CMD_APP_GET_DEVICE_ID) || (cmd == CMD_APP_GET_CHANNEL_INFO)) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
 void OEM_1S_GET_BOARD_ID(ipmi_msg *msg)
 {
 	if (msg == NULL) {

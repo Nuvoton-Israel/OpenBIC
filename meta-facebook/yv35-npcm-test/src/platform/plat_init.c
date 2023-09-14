@@ -21,6 +21,7 @@
 #include "ipmi.h"
 #include "pldm.h"
 #include "plat_mctp.h"
+#include "plat_ssif.h"
 
 void pal_pre_init()
 {
@@ -36,6 +37,8 @@ void pal_pre_init()
 void pal_post_init()
 {
 	plat_mctp_init();
+
+	ssif_init();
 }
 
 void pal_device_init()
