@@ -93,6 +93,9 @@ static uint8_t mctp_medium_init(mctp *mctp_inst, mctp_medium_conf medium_conf)
 	case MCTP_MEDIUM_TYPE_I3C:
 		ret = mctp_i3c_init(mctp_inst, medium_conf);
 		break;
+	case MCTP_MEDIUM_TYPE_SERIAL:
+		ret = mctp_serial_init(mctp_inst, medium_conf);
+		break;
 	default:
 		return MCTP_ERROR;
 	}
@@ -110,6 +113,9 @@ static uint8_t mctp_medium_deinit(mctp *mctp_inst)
 		break;
 	case MCTP_MEDIUM_TYPE_I3C:
 		mctp_i3c_deinit(mctp_inst);
+		break;
+	case MCTP_MEDIUM_TYPE_SERIAL:
+		mctp_serial_deinit(mctp_inst);
 		break;
 	default:
 		return MCTP_ERROR;
