@@ -23,6 +23,7 @@
 #include "usb.h"
 #include "plat_def.h"
 #include "ipmb.h"
+#include "mctp.h"
 
 #include <logging/log.h>
 
@@ -33,10 +34,39 @@ LOG_MODULE_REGISTER(usb);
 RING_BUF_DECLARE(ringbuf, RING_BUF_SIZE);
 
 static struct k_sem usbhandle_sem;
+
 static const struct device *dev;
 
 struct k_thread usb_thread;
 K_KERNEL_STACK_MEMBER(usb_handler_stack, USB_HANDLER_STACK_SIZE);
+
+struct k_sem serial_sem;
+uint8_t serial_tx_buf[SERIAL_BUF_SIZE] = {0};
+RING_BUF_DECLARE(serial_rx_buf, SERIAL_BUF_SIZE);
+
+void mctp_serial_read_data(uint8_t *src_buf, int src_len);
+void mctp_serial_write_data(uint8_t *src_buf, int src_len);
+
+
+void mctp_serial_read_data(uint8_t *src_buf, int src_len)
+{
+	int rx_len;
+
+	if(src_buf == NULL) {
+		return;
+	}
+	rx_len = ring_buf_put(&serial_rx_buf, src_buf, src_len);
+	if(rx_len < src_len) {
+		LOG_ERR("MS Drop %u bytes", src_len - rx_len);
+	}
+	k_sem_give(&serial_sem);
+}
+
+void mctp_serial_write_data(uint8_t *src_buf, int src_len)
+{
+	uart_fifo_fill(dev, src_buf,
+		       src_len);
+}
 
 static inline void try_ipmi_message(ipmi_msg_cfg *current_msg, int retry)
 {
@@ -57,6 +87,8 @@ void handle_usb_data(uint8_t *rx_buff, int rx_len)
 	static bool fwupdate_keep_data = false;
 	static uint16_t keep_data_len = 0;
 	static uint16_t fwupdate_data_len = 0;
+	static bool mctp_serial_keep_data = false;
+	static uint16_t tmp_sum_len = 0;
 
 	if (DEBUG_USB) {
 		LOG_DBG("USB: len %d, req: %x %x ID: %x %x %x target: %x offset: %x %x %x %x len: %x %x",
@@ -72,7 +104,19 @@ void handle_usb_data(uint8_t *rx_buff, int rx_len)
 		fwupdate_keep_data = true;
 	}
 
-	if (fwupdate_keep_data) {
+	if(((rx_buff[0] == BYTE_FRAME) && (rx_buff[1] == 0x1)) || mctp_serial_keep_data) {
+		if((!mctp_serial_keep_data) && (rx_buff[0] == BYTE_FRAME) && (rx_buff[1] == 0x1)) {
+			mctp_serial_keep_data = true;
+			tmp_sum_len = rx_buff[2] + 6;
+		}
+		mctp_serial_read_data(rx_buff, rx_len);
+		keep_data_len += rx_len;
+		if(tmp_sum_len == keep_data_len) {
+			mctp_serial_keep_data = false;
+			keep_data_len = 0;
+			tmp_sum_len = 0;
+		}
+	} else if (fwupdate_keep_data) {
 		if ((keep_data_len + rx_len) > IPMI_DATA_MAX_LENGTH) {
 			LOG_ERR("USB FW update recv data over ipmi buff size %d, keep %d, recv %d",
 				IPMI_DATA_MAX_LENGTH, keep_data_len, rx_len);
@@ -169,7 +213,6 @@ static void interrupt_handler(const struct device *dev, void *user_data)
 
 	while (uart_irq_is_pending(dev) && uart_irq_rx_ready(dev)) {
 		recv_len = uart_fifo_read(dev, rx_buff, sizeof(rx_buff));
-
 		if (recv_len) {
 			rx_len = ring_buf_put(&ringbuf, rx_buff, recv_len);
 			if (rx_len < recv_len) {
@@ -208,6 +251,7 @@ void usb_dev_init(void)
 
 	uint8_t init_sem_count = RING_BUF_SIZE / RX_BUFF_SIZE;
 	k_sem_init(&usbhandle_sem, 0, init_sem_count);
+	k_sem_init(&serial_sem, 0, 1);
 }
 
 #endif

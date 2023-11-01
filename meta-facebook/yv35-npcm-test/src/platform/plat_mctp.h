@@ -61,6 +61,12 @@ typedef struct _mctp_i3c_port {
 	uint8_t user_idx;
 } mctp_i3c_port;
 
+typedef struct _mctp_serial_port {
+	mctp *mctp_inst;
+	mctp_medium_conf conf;
+	uint8_t user_idx;
+} mctp_serial_port;
+
 /* mctp route entry struct */
 typedef struct _mctp_route_entry {
 	uint8_t endpoint;

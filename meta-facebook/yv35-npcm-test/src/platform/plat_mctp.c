@@ -51,11 +51,16 @@ static mctp_i3c_port i3c_port[] = {
 	{ .conf.i3c_conf.bus = I3C_BUS_BMC, .conf.i3c_conf.addr = I3C_STATIC_ADDR_BMC},
 };
 
+static mctp_serial_port serial_port[] = {
+	{ .conf.serial_conf.bus = 0 },
+};
+
 static mctp_route_entry mctp_route_tbl[] = {
 	{ CXL_EID, I2C_BUS_CXL, I2C_ADDR_CXL0, 0x0, MCTP_MEDIUM_TYPE_SMBUS},
 	{ BMC_EID, I2C_BUS_PLDM, I2C_ADDR_BMC, 0x0, MCTP_MEDIUM_TYPE_SMBUS},
 	{ BIC_EID, I2C_BUS_PLDM, I2C_ADDR_BIC, 0x0, MCTP_MEDIUM_TYPE_SMBUS},
 	{ MCTP_EID_BMC, I3C_BUS_BMC, I3C_STATIC_ADDR_BMC, 0x0, MCTP_MEDIUM_TYPE_I3C},
+	{ 0xa1, 0x0, 0x0, 0x0, MCTP_MEDIUM_TYPE_SERIAL},
 };
 
 mctp *find_mctp_by_smbus(uint8_t bus)
@@ -80,6 +85,20 @@ static mctp *find_mctp_by_i3c(uint8_t bus)
 		mctp_i3c_port *p = i3c_port + i;
 
 		if (bus == p->conf.i3c_conf.bus) {
+			return p->mctp_inst;
+		}
+	}
+
+	return NULL;
+}
+
+static mctp *find_mctp_by_serial(uint8_t bus)
+{
+	uint8_t i;
+	for (i = 0; i < ARRAY_SIZE(serial_port); i++) {
+		mctp_serial_port *p = serial_port + i;
+
+		if (bus == p->conf.serial_conf.bus) {
 			return p->mctp_inst;
 		}
 	}
@@ -229,6 +248,36 @@ static uint8_t mctp_msg_recv_i3c(void *mctp_p, uint8_t *buf, uint32_t len, mctp_
         return MCTP_SUCCESS;
 }
 
+static uint8_t mctp_msg_recv_serial(void *mctp_p, uint8_t *buf, uint32_t len, mctp_ext_params ext_params)
+{
+        CHECK_NULL_ARG_WITH_RETURN(mctp_p, MCTP_ERROR);
+        CHECK_NULL_ARG_WITH_RETURN(buf, MCTP_ERROR);
+
+        /* first byte is message type and ic */
+        uint8_t msg_type = (buf[0] & MCTP_MSG_TYPE_MASK) >> MCTP_MSG_TYPE_SHIFT;
+
+        switch (msg_type) {
+        case MCTP_MSG_TYPE_CTRL:
+                mctp_ctrl_cmd_handler(mctp_p, buf, len, ext_params);
+                break;
+
+        case MCTP_MSG_TYPE_PLDM:
+                mctp_pldm_cmd_handler(mctp_p, buf, len, ext_params);
+                break;
+
+        case MCTP_MSG_TYPE_CCI:
+                mctp_cci_cmd_handler(mctp_p, buf, len, ext_params);
+                break;
+
+        default:
+                LOG_WRN("Cannot find message receive function!!");
+                return MCTP_ERROR;
+        }
+
+        return MCTP_SUCCESS;
+}
+
+
 uint8_t get_mctp_route_info(uint8_t dest_endpoint, void **mctp_inst, mctp_ext_params *ext_params)
 {
 	CHECK_NULL_ARG_WITH_RETURN(mctp_inst, MCTP_ERROR);
@@ -275,6 +324,33 @@ uint8_t get_mctp_route_info_i3c(uint8_t dest_endpoint, void **mctp_inst, mctp_ex
                         *mctp_inst = find_mctp_by_i3c(p->bus);
                         ext_params->type = MCTP_MEDIUM_TYPE_SMBUS;
                         ext_params->smbus_ext_params.addr = p->addr;
+                        rc = MCTP_SUCCESS;
+                        break;
+                }
+        }
+        return rc;
+}
+
+uint8_t get_mctp_route_info_serial(uint8_t dest_endpoint, void **mctp_inst, mctp_ext_params *ext_params)
+{
+        CHECK_NULL_ARG_WITH_RETURN(mctp_inst, MCTP_ERROR);
+        CHECK_NULL_ARG_WITH_RETURN(ext_params, MCTP_ERROR);
+
+        uint8_t rc = MCTP_ERROR;
+        uint32_t i;
+
+        for (i = 0; i < ARRAY_SIZE(mctp_route_tbl); i++) {
+                mctp_route_entry *p = mctp_route_tbl + i;
+                if (!p) {
+                        return MCTP_ERROR;
+                }
+
+		if (p->medium_type != MCTP_MEDIUM_TYPE_SERIAL)
+			continue;
+
+                if (p->endpoint == dest_endpoint) {
+                        *mctp_inst = find_mctp_by_serial(p->bus);
+                        ext_params->type = MCTP_MEDIUM_TYPE_SERIAL;
                         rc = MCTP_SUCCESS;
                         break;
                 }
@@ -388,6 +464,28 @@ void plat_mctp_init()
 		mctp_reg_endpoint_resolve_func(p->mctp_inst, get_mctp_route_info_i3c);
 
 		mctp_reg_msg_rx_func(p->mctp_inst, mctp_msg_recv_i3c);
+
+		mctp_start(p->mctp_inst);
+	}
+
+	LOG_INF("plat_mctp_init serial");
+	for (uint8_t i = 0; i < ARRAY_SIZE(serial_port); i++) {
+		mctp_serial_port *p = serial_port + i;
+
+		p->mctp_inst = mctp_init();
+		if (!p->mctp_inst) {
+			LOG_ERR("mctp_init failed!!");
+			continue;
+		}
+
+		uint8_t rc = mctp_set_medium_configure(p->mctp_inst, MCTP_MEDIUM_TYPE_SERIAL, p->conf);
+		if (rc != MCTP_SUCCESS) {
+			LOG_INF("mctp set medium configure failed");
+		}
+
+		mctp_reg_endpoint_resolve_func(p->mctp_inst, get_mctp_route_info_serial);
+
+		mctp_reg_msg_rx_func(p->mctp_inst, mctp_msg_recv_serial);
 
 		mctp_start(p->mctp_inst);
 	}
