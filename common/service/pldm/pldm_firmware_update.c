@@ -37,7 +37,7 @@ LOG_MODULE_DECLARE(pldm);
 pldm_fw_update_info_t *comp_config = NULL;
 uint8_t comp_config_count = 0;
 
-k_tid_t fw_update_tid;
+k_tid_t fw_update_tid = NULL;
 struct k_thread pldm_fw_update_thread;
 K_KERNEL_STACK_MEMBER(pldm_fw_update_stack, PLDM_FW_UPDATE_STACK_SIZE);
 
@@ -839,6 +839,12 @@ static uint8_t activate_firmware(void *mctp_inst, uint8_t *buf, uint16_t len, ui
 	if (len != sizeof(struct pldm_activate_firmware_req)) {
 		resp_p->completion_code = PLDM_ERROR_INVALID_LENGTH;
 		goto exit;
+	}
+
+	/* try to wait fw update thread exit */
+	if (fw_update_tid) {
+		if (current_state == STATE_APPLY)
+			k_thread_join(&pldm_fw_update_thread, K_MSEC(2000));
 	}
 
 	if (current_state != STATE_RDY_XFER) {

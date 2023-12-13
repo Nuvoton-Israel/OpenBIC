@@ -125,6 +125,7 @@ uint8_t fw_update_cxl(uint32_t offset, uint16_t msg_len, uint8_t *msg_buf, bool 
 	return ret;
 }
 
+#ifdef CONFIG_XIP
 static void set_update_bitmap(uint32_t op_addr, bool val)
 {
 	uint8_t bitmap_count, bitmap_index, bitmap_offset;
@@ -144,6 +145,7 @@ static void set_update_bitmap(uint32_t op_addr, bool val)
 	else
 		*bitmap_list &= ~BIT(bitmap_offset);
 }
+#endif
 
 static int do_erase_write_verify(const struct device *flash_device, uint32_t op_addr,
 				 uint8_t *write_buf, uint8_t *read_back_buf, uint32_t erase_sz)
@@ -189,9 +191,7 @@ int do_update(const struct device *flash_device, off_t offset, uint8_t *buf, siz
 	uint32_t remain, op_addr = 0, end_sector_addr;
 	uint8_t *update_ptr = buf, *op_buf = NULL, *read_back_buf = NULL;
 	bool update_it = false;
-#ifdef CONFIG_XIP
 	uint32_t direct_addr = 0;
-#endif
 
 	if (flash_sz < flash_offset + len) {
 		LOG_ERR("Update boundary exceeds flash size. (%u, %u, %u)", flash_sz, flash_offset,

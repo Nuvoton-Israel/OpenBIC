@@ -21,6 +21,7 @@
 /* give a chance since we may need upgrade fw before reboot system */
 #define REBOOT_WDT_TIMEOUT (30 * 1000) /* 30s */
 
+#ifdef CONFIG_XIP
 static void pal_wdt_reset(void)
 {
 	const struct device *wdt_dev = NULL;
@@ -55,6 +56,7 @@ static void pal_wdt_reset(void)
 		wdt_feed(wdt_dev, 0);
         }
 }
+#endif
 
 void pal_warm_reset_prepare(void)
 {
