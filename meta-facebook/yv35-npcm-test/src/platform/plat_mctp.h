@@ -43,7 +43,7 @@
 #define I3C_STATIC_ADDR_BMC	0x20
 
 /* i3c dev bus */
-#define I3C_BUS_BMC     0
+#define I3C_BUS_BMC     5
 
 /* mctp endpoint */
 #define MCTP_EID_BMC 0x01

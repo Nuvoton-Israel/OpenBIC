@@ -1,7 +1,7 @@
 manifest:
   remotes:
     - name: nuvoton
-      url-base: https://github.com/Nuvoton-Israel/zephyr
+      url-base: https://github.com/Nuvoton-Israel
 
   # Please add items below based on alphabetical order.
   # These dependencies may need updating if new features are added to the firmware.
