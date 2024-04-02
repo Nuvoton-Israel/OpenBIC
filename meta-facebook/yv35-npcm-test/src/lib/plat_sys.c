@@ -15,11 +15,38 @@
  */
 #include <stdio.h>
 #include <stdlib.h>
+#include <soc.h>
 #include "hal_wdt.h"
+#include "util_sys.h"
 #include <drivers/watchdog.h>
 
 /* give a chance since we may need upgrade fw before reboot system */
 #define REBOOT_WDT_TIMEOUT (30 * 1000) /* 30s */
+
+uint8_t pal_get_reset_reason(void)
+{
+	enum npcm4xx_reset_reason reset_reason;
+	uint8_t reason_value = RESET_REASON_INVALID;
+
+	reset_reason = npcm4xx_get_reset_reason();
+
+	switch(reset_reason) {
+		case NPCM4XX_RESET_REASON_VCC_POWERUP:
+			reason_value = RESET_REASON_POWERUP;
+			break;
+		case NPCM4XX_RESET_REASON_WDT_RST:
+			reason_value = RESET_REASON_WATCHDOG;
+			break;
+		case NPCM4XX_RESET_REASON_DEBUGGER_RST:
+			reason_value = RESET_REASON_SWRST;
+			break;
+		default:
+			reason_value = RESET_REASON_INVALID;
+			break;
+	}
+
+	return reason_value;
+}
 
 #ifdef CONFIG_XIP
 static void pal_wdt_reset(void)
