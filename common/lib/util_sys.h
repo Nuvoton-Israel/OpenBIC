@@ -23,6 +23,11 @@
 
 #define INTEL_IANA 0x000157
 
+#define RESET_REASON_POWERUP            0x0
+#define RESET_REASON_WATCHDOG           0x1
+#define RESET_REASON_SWRST              0x2
+#define RESET_REASON_INVALID            0xff
+
 enum CC_12V_CYCLE_SLOT {
 	SUCCESS_12V_CYCLE_SLOT,
 	NOT_SUPPORT_12V_CYCLE_SLOT,
@@ -93,5 +98,7 @@ void set_sys_ready_pin(uint8_t ready_gpio_name);
 uint8_t get_system_class();
 
 int pal_get_set_add_debug_sel_mode_status(uint8_t options, uint8_t *status);
+
+uint8_t pal_get_reset_reason(void);
 
 #endif

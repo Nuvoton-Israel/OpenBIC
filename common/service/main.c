@@ -29,6 +29,7 @@
 #include "usb.h"
 #include <logging/log.h>
 #include <logging/log_ctrl.h>
+#include <util_sys.h>
 
 __weak void pal_pre_init()
 {
@@ -54,6 +55,8 @@ void main(void)
 {
 	printf("Hello, welcome to %s %s %x%x.%x.%x\n", PLATFORM_NAME, PROJECT_NAME, BIC_FW_YEAR_MSB,
 	       BIC_FW_YEAR_LSB, BIC_FW_WEEK, BIC_FW_VER);
+
+	printf("Reset Reason: %d\n", pal_get_reset_reason());
 
 	wdt_init();
 	util_init_timer();
