@@ -2,7 +2,7 @@
        status = "okay";
 };
 
-&i2c3a {
+&i2c2a {
 	ipmb1: ipmb@11 {
 		compatible = "zephyr,i2c-ipmb";
 		reg = <0x11>;
