@@ -49,43 +49,10 @@
 #define MCTP_EID_BMC 0x01
 #define MCTP_EID_SELF 0x02
 
-typedef struct _mctp_smbus_port {
-	mctp *mctp_inst;
-	mctp_medium_conf conf;
-	uint8_t user_idx;
-} mctp_smbus_port;
-
-typedef struct _mctp_i3c_port {
-	mctp *mctp_inst;
-	mctp_medium_conf conf;
-	uint8_t user_idx;
-} mctp_i3c_port;
-
-typedef struct _mctp_serial_port {
-	mctp *mctp_inst;
-	mctp_medium_conf conf;
-	uint8_t user_idx;
-} mctp_serial_port;
-
-/* mctp route entry struct */
-typedef struct _mctp_route_entry {
-	uint8_t endpoint;
-	uint8_t bus; /* TODO: only consider smbus/i3c */
-	uint8_t addr; /* TODO: only consider smbus/i3c */
-	uint8_t dev_present_pin;
-	MCTP_MEDIUM_TYPE medium_type;
-} mctp_route_entry;
-
-typedef struct _mctp_msg_handler {
-	MCTP_MSG_TYPE type;
-	mctp_fn_cb msg_handler_cb;
-} mctp_msg_handler;
-
 /* init the mctp moduel for platform */
 void send_cmd_to_dev(struct k_timer *timer);
 void send_cmd_to_dev_handler(struct k_work *work);
 void plat_mctp_init(void);
-uint8_t get_mctp_route_info(uint8_t dest_endpoint, void **mctp_inst, mctp_ext_params *ext_params);
 mctp *find_mctp_by_smbus(uint8_t bus);
 mctp *get_mctp_init();
 uint8_t get_mctp_info(uint8_t dest_endpoint, mctp **mctp_inst, mctp_ext_params *ext_params);
