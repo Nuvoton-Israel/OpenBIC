@@ -35,8 +35,8 @@ LOG_MODULE_REGISTER(hal_i2c);
 #define AST_I2CS_ADDR_CTRL 0x40
 #define AST_I2CS_ADDR1_MASK 0x7F
 
-#define NPCM4XX_I2C_BASE 0x40003000
-#define NPCM4XX_I2C_REG_LEN 0x1000
+#define NPCM4XX_I2C_BASE 0x40006000
+#define NPCM4XX_I2C_REG_LEN 0x200
 
 
 #define NPCM4XX_SMBnST 0x02
@@ -85,7 +85,7 @@ int i2c_addr_set(uint8_t i2c_bus, uint8_t i2c_addr)
 	}
 
 	i2c_addr = i2c_addr >> 1; // to 7-bit target address
-	uint32_t base = NPCM4XX_I2C_BASE + ((i2c_bus + 1) * NPCM4XX_I2C_REG_LEN);
+	uint32_t base = NPCM4XX_I2C_BASE + (i2c_bus * NPCM4XX_I2C_REG_LEN);
 
 	//i2c bus index is 0 based.
 	if((i2c_addr == 0)) {
