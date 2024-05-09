@@ -63,7 +63,7 @@ static uint16_t mctp_i3c_read_smq(void *mctp_p, uint8_t *buf, uint32_t len,
 		i3c_msg.rx_len = i3c_msg.rx_len - 1;
 	}
 
-	extra_data->type = MCTP_MEDIUM_TYPE_I3C;
+	extra_data->type = MCTP_MEDIUM_TYPE_TARGET_I3C;
 	memcpy(buf, &i3c_msg.data[0], i3c_msg.rx_len);
 	return i3c_msg.rx_len;
 }
@@ -74,7 +74,7 @@ static uint16_t mctp_i3c_write_smq(void *mctp_p, uint8_t *buf, uint32_t len,
 	CHECK_NULL_ARG_WITH_RETURN(mctp_p, MCTP_ERROR);
 	CHECK_NULL_ARG_WITH_RETURN(buf, MCTP_ERROR);
 
-	if (extra_data.type != MCTP_MEDIUM_TYPE_I3C) {
+	if (extra_data.type != MCTP_MEDIUM_TYPE_TARGET_I3C) {
 		LOG_ERR("mctp medium type incorrect");
 		return MCTP_ERROR;
 	}
@@ -104,7 +104,7 @@ static uint16_t mctp_i3c_write_smq(void *mctp_p, uint8_t *buf, uint32_t len,
 	return MCTP_SUCCESS;
 }
 
-uint8_t mctp_i3c_init(mctp *mctp_instance, mctp_medium_conf medium_conf)
+uint8_t mctp_i3c_target_init(mctp *mctp_instance, mctp_medium_conf medium_conf)
 {
 	CHECK_NULL_ARG_WITH_RETURN(mctp_instance, MCTP_ERROR);
 

@@ -79,7 +79,8 @@ typedef enum {
 typedef enum {
 	MCTP_MEDIUM_TYPE_UNKNOWN = 0,
 	MCTP_MEDIUM_TYPE_SMBUS,
-	MCTP_MEDIUM_TYPE_I3C,
+	MCTP_MEDIUM_TYPE_CONTROLLER_I3C,
+	MCTP_MEDIUM_TYPE_TARGET_I3C,
 	MCTP_MEDIUM_TYPE_SERIAL,
 	MCTP_MEDIUM_TYPE_MAX
 } MCTP_MEDIUM_TYPE;
@@ -132,13 +133,13 @@ typedef uint8_t (*endpoint_resolve)(uint8_t dest_endpoint, void **mctp_inst,
 /* serial config for mctp medium_conf */
 typedef struct _mctp_serial_conf {
 	uint8_t bus;
+	uint8_t addr;
 } mctp_serial_conf;
 
 /* i3c config for mctp medium_conf */
 typedef struct _mctp_i3c_conf {
 	uint8_t bus;
 	uint8_t addr;
-	uint32_t dummy;
 } mctp_i3c_conf;
 
 /* smbus config for mctp medium_conf */
@@ -208,6 +209,27 @@ typedef struct _mctp {
 	uint8_t cci_msg_tag;
 } mctp;
 
+typedef struct _mctp_port {
+	mctp *mctp_inst;
+	uint8_t channel_target;
+	MCTP_MEDIUM_TYPE medium_type;
+	mctp_medium_conf conf;
+} mctp_port;
+
+/* mctp route entry struct */
+typedef struct _mctp_route_entry {
+	uint8_t endpoint;
+	uint8_t bus; /* TODO: only consider smbus/i3c */
+	uint8_t addr; /* TODO: only consider smbus/i3c */
+	uint8_t dev_present_pin;
+	bool set_endpoint;
+} mctp_route_entry;
+
+typedef struct _mctp_msg_handler {
+	MCTP_MSG_TYPE type;
+	mctp_fn_cb msg_handler_cb;
+} mctp_msg_handler;
+
 /* public function */
 mctp *mctp_init(void);
 
@@ -235,7 +257,7 @@ uint8_t mctp_bridge_msg(mctp *mctp_inst, uint8_t *buf, uint16_t len, mctp_ext_pa
 /* medium init/deinit */
 uint8_t mctp_smbus_init(mctp *mctp_inst, mctp_medium_conf medium_conf);
 uint8_t mctp_smbus_deinit(mctp *mctp_inst);
-uint8_t mctp_i3c_init(mctp *mctp_instance, mctp_medium_conf medium_conf);
+uint8_t mctp_i3c_target_init(mctp *mctp_instance, mctp_medium_conf medium_conf);
 uint8_t mctp_i3c_deinit(mctp *mctp_instance);
 uint8_t mctp_serial_init(mctp *mctp_inst, mctp_medium_conf medium_conf);
 uint8_t mctp_serial_deinit(mctp *mctp_inst);
