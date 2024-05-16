@@ -23,6 +23,7 @@
 #include <sys/printk.h>
 #include <zephyr.h>
 #include "libutil.h"
+#include "plat_def.h"
 
 LOG_MODULE_REGISTER(mctp);
 
@@ -62,6 +63,7 @@ static uint8_t set_thread_name(mctp *mctp_inst)
 			 "mctptx_%02x_%02x_%02x", mctp_inst->medium_type, smbus_conf->bus,
 			 smbus_conf->addr);
 		break;
+	case MCTP_MEDIUM_TYPE_CONTROLLER_I3C:
 	case MCTP_MEDIUM_TYPE_TARGET_I3C:
 		LOG_INF("medium_type: i3c");
 		mctp_i3c_conf *i3c_conf = (mctp_i3c_conf *)&mctp_inst->medium_conf;
@@ -90,9 +92,14 @@ static uint8_t mctp_medium_init(mctp *mctp_inst, mctp_medium_conf medium_conf)
 	case MCTP_MEDIUM_TYPE_SMBUS:
 		ret = mctp_smbus_init(mctp_inst, medium_conf);
 		break;
+#ifdef ENABLE_MCTP_I3C
 	case MCTP_MEDIUM_TYPE_TARGET_I3C:
 		ret = mctp_i3c_target_init(mctp_inst, medium_conf);
 		break;
+	case MCTP_MEDIUM_TYPE_CONTROLLER_I3C:
+		ret = mctp_i3c_controller_init(mctp_inst, medium_conf);
+		break;
+#endif
 	case MCTP_MEDIUM_TYPE_SERIAL:
 		ret = mctp_serial_init(mctp_inst, medium_conf);
 		break;
@@ -111,9 +118,12 @@ static uint8_t mctp_medium_deinit(mctp *mctp_inst)
 	case MCTP_MEDIUM_TYPE_SMBUS:
 		mctp_smbus_deinit(mctp_inst);
 		break;
+#ifdef ENABLE_MCTP_I3C
 	case MCTP_MEDIUM_TYPE_TARGET_I3C:
+	case MCTP_MEDIUM_TYPE_CONTROLLER_I3C:
 		mctp_i3c_deinit(mctp_inst);
 		break;
+#endif
 	case MCTP_MEDIUM_TYPE_SERIAL:
 		mctp_serial_deinit(mctp_inst);
 		break;
@@ -370,6 +380,7 @@ static void mctp_tx_task(void *arg, void *dummy0, void *dummy1)
 
 			hdr->dest_ep = mctp_msg.ext_params.ep;
 			hdr->src_ep = mctp_inst->endpoint;
+
 			hdr->hdr_ver = MCTP_HDR_HDR_VER;
 
 			LOG_DBG("i = %d, cp_msg_size = %d", i, cp_msg_size);
@@ -396,6 +407,11 @@ static void mctp_tx_task(void *arg, void *dummy0, void *dummy1)
 	}
 }
 
+__weak uint8_t plat_get_eid()
+{
+	return MCTP_DEFAULT_ENDPOINT;
+}
+
 /* mctp handle initial */
 mctp *mctp_init(void)
 {
@@ -407,7 +423,7 @@ mctp *mctp_init(void)
 	memset(mctp_inst, 0, sizeof(*mctp_inst));
 	mctp_inst->medium_type = MCTP_MEDIUM_TYPE_UNKNOWN;
 	mctp_inst->max_msg_size = MCTP_DEFAULT_MSG_MAX_SIZE;
-	mctp_inst->endpoint = MCTP_DEFAULT_ENDPOINT;
+	mctp_inst->endpoint = plat_get_eid();
 
 	LOG_DBG("mctp_inst = %p", mctp_inst);
 	return mctp_inst;

@@ -43,7 +43,32 @@
 
 &i3c4 {
 	status = "okay";
+	i2c-scl-hz = <100000>;
+	i3c-scl-hz = <12500000>;
 };
+
+/* test for bridge slave mode only, MCTP EID = 0xC
+&i3c4 {
+	status = "okay";
+	bcr = <0x66>;
+	dcr = <0xCC>;
+	part-id = <0x4321>;
+	assigned-address = <0xA>;
+	vendor-def-id = <0x777>;
+	slave;
+	status = "okay";
+	i3c4_smq:i3c-slave-mqueue@A {
+		compatible = "i3c-slave-mqueue";
+		reg = <0xA>;
+		msg-size = <256>;
+		num-of-msgs = <4>;
+		mandatory-data-byte = <0xae>;
+		label = "I3C_SMQ_4";
+		status = "okay";
+	};
+};
+*/
+
 
 &spi_spim0_cs0 {
 	status = "okay";

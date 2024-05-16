@@ -55,13 +55,17 @@ static mctp_port plat_mctp_port[] = {
 	{ .conf.smbus_conf.addr = 0,
 	  .conf.smbus_conf.bus = 0,
 	  .medium_type = MCTP_MEDIUM_TYPE_SERIAL },
+//	{ .conf.i3c_conf.addr = I3C_STATIC_ADDR_BIC,
+//	  .conf.i3c_conf.bus = I3C_BUS_MASTER,
+//	  .medium_type = MCTP_MEDIUM_TYPE_CONTROLLER_I3C },
 };
 
 static mctp_route_entry plat_mctp_route_tbl[] = {
-	{ CXL_EID, I2C_BUS_CXL, I2C_ADDR_CXL0, .set_endpoint = false},
-	{ BMC_EID, I2C_BUS_PLDM, I2C_ADDR_BMC, .set_endpoint = false},
-	{ BIC_EID, I2C_BUS_PLDM, I2C_ADDR_BIC, .set_endpoint = false},
-	{ MCTP_EID_BMC, I3C_BUS_BMC, I3C_STATIC_ADDR_BMC, .set_endpoint = false},
+	{ MCTP_EID_CXL_I2C, I2C_BUS_CXL, I2C_ADDR_CXL0, .set_endpoint = false},
+	{ MCTP_EID_BMC_I2C, I2C_BUS_PLDM, I2C_ADDR_BMC, .set_endpoint = false},
+	{ MCTP_EID_BIC_I2C, I2C_BUS_PLDM, I2C_ADDR_BIC, .set_endpoint = false},
+	{ MCTP_EID_BIC_I3C, I3C_BUS_MASTER, I3C_STATIC_ADDR_BIC, .set_endpoint = false},
+	{ MCTP_EID_BMC_I3C, I3C_BUS_BMC, I3C_STATIC_ADDR_BMC, .set_endpoint = false},
 	{ 0xa1, 0x0, 0x0, .set_endpoint = false},
 };
 
@@ -79,8 +83,16 @@ static mctp *find_mctp_by_bus(uint8_t bus)
 			if (bus == p->conf.i3c_conf.bus) {
 				return p->mctp_inst;
 			}
-		} else {
-			LOG_ERR("Unknown medium type");
+		} else if (p->medium_type == MCTP_MEDIUM_TYPE_CONTROLLER_I3C) {
+			if (bus == p->conf.i3c_conf.bus) {
+				return p->mctp_inst;
+			}
+		} else if (p->medium_type == MCTP_MEDIUM_TYPE_SERIAL) {
+			if (bus == p->conf.serial_conf.bus) {
+				return p->mctp_inst;
+			}
+		}else {
+			LOG_ERR("Unknown medium type:0x%x\n", p->medium_type);
 			return NULL;
 		}
 	}
@@ -183,7 +195,11 @@ static uint8_t get_mctp_route_info(uint8_t dest_endpoint, void **mctp_inst,
 		mctp_route_entry *p = plat_mctp_route_tbl + i;
 		if (p->endpoint == dest_endpoint) {
 			*mctp_inst = find_mctp_by_bus(p->bus);
-			if (p->bus != I3C_BUS_BMC) {
+
+			if (p->bus == I3C_BUS_MASTER) {
+				ext_params->type = MCTP_MEDIUM_TYPE_CONTROLLER_I3C;
+				ext_params->i3c_ext_params.addr = p->addr;
+			} else if (p->bus != I3C_BUS_BMC) {
 				ext_params->type = MCTP_MEDIUM_TYPE_SMBUS;
 				ext_params->smbus_ext_params.addr = p->addr;
 			} else {

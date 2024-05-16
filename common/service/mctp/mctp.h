@@ -257,6 +257,7 @@ uint8_t mctp_bridge_msg(mctp *mctp_inst, uint8_t *buf, uint16_t len, mctp_ext_pa
 /* medium init/deinit */
 uint8_t mctp_smbus_init(mctp *mctp_inst, mctp_medium_conf medium_conf);
 uint8_t mctp_smbus_deinit(mctp *mctp_inst);
+uint8_t mctp_i3c_controller_init(mctp *mctp_instance, mctp_medium_conf medium_conf);
 uint8_t mctp_i3c_target_init(mctp *mctp_instance, mctp_medium_conf medium_conf);
 uint8_t mctp_i3c_deinit(mctp *mctp_instance);
 uint8_t mctp_serial_init(mctp *mctp_inst, mctp_medium_conf medium_conf);

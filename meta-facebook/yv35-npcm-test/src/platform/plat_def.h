@@ -21,5 +21,6 @@
 #define ENABLE_CCI
 #define ENABLE_PM8702
 #define ENABLE_SSIF
+#define ENABLE_MCTP_I3C
 
 #endif
