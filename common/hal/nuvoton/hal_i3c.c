@@ -46,7 +46,7 @@ static struct i3c_dev_desc *find_matching_desc(const struct device *dev, uint8_t
 
 	for (i = 0; i < I3C_MAX_NUM; i++) {
 		desc = &i3c_desc_table[i];
-		if ((desc->master_dev == dev) && (desc->info.dynamic_addr == desc_addr)) {
+		if ((desc->bus == dev) && (desc->info.dynamic_addr == desc_addr)) {
 			if (pos == NULL) {
 				return desc;
 			}
@@ -404,7 +404,7 @@ static int get_bus_id(struct i3c_dev_desc *desc)
 	char *substr = NULL;
 	int bus_id;
 
-	strncpy(i3c_dev_name, desc->master_dev->name, I3C_DEV_STR_LEN);
+	strncpy(i3c_dev_name, desc->bus->name, I3C_DEV_STR_LEN);
 
 	substr = strtok_r(i3c_dev_name, delim, &saveptr);
 	substr = strtok_r(NULL, delim, &saveptr);
