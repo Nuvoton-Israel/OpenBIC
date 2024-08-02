@@ -326,9 +326,27 @@ int i3c_set_pid(I3C_MSG *msg, uint16_t slot_pid)
 {
 	CHECK_NULL_ARG_WITH_RETURN(msg, -EINVAL);
 
-	int ret = i3c_set_pid_extra_info(dev_i3c[msg->bus], slot_pid);
+	const struct device *target = dev_i3c[msg->bus];
+
+	if (!target) {
+		LOG_ERR("i3c_set_pid fail. i3c device not found");
+		return false;
+	}
+
+	if (!device_is_ready(target)) {
+		LOG_ERR("i3c_set_pid fail. i3c device not ready");
+		return false;
+	}
+
+	int ret = i3c_set_pid_extra_info(target, slot_pid);
 	if (ret != 0) {
 		LOG_ERR("Failed to set pid to bus 0x%d, ret: %d", msg->bus, ret);
+		return false;
+	}
+
+	ret = i3c_slave_hj_req(target);
+	if (ret != 0) {
+		LOG_ERR("Failed to sends Hot-join request,ret: %d", ret);
 		return false;
 	}
 
