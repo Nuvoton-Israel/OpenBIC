@@ -9,7 +9,7 @@ manifest:
     - name: zephyr
       remote: nuvoton
       path: zephyr
-      revision: cf327357f28c63969a1ab01bdfb871cd6884f51c
+      revision: d4877e01f6f200ed4ace7e3e2f7c91593f8d9b1a
       import: 
         name-allowlist:
           - cmsis
