@@ -51,25 +51,6 @@ bool pal_request_msg_to_BIC_from_HOST(uint8_t netfn, uint8_t cmd)
 	return false;
 }
 
-void OEM_1S_GET_BOARD_ID(ipmi_msg *msg)
-{
-	if (msg == NULL) {
-		LOG_ERR("Failed due to parameter *msg is NULL");
-		return;
-	}
-
-	if (msg->data_len != 0) {
-		msg->data_len = 0;
-		msg->completion_code = CC_INVALID_LENGTH;
-		return;
-	}
-
-	msg->data_len = 1;
-	msg->data[0] = get_board_id();
-	msg->completion_code = CC_SUCCESS;
-	return;
-}
-
 void OEM_1S_GET_FW_VERSION(ipmi_msg *msg)
 {
 	CHECK_NULL_ARG(msg);

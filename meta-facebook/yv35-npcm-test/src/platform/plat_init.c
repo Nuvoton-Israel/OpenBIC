@@ -22,9 +22,12 @@
 #include "pldm.h"
 #include "plat_mctp.h"
 #include "plat_ssif.h"
+#include "plat_class.h"
 
 void pal_pre_init()
 {
+	init_platform_config();
+
 	/* init i2c target */
 	for (int index = 0; index < MAX_TARGET_NUM; index++) {
 		if (I2C_TARGET_ENABLE_TABLE[index])
