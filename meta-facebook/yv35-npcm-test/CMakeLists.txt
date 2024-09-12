@@ -21,7 +21,6 @@ target_sources(app PRIVATE ${nuvoton_sources})
 target_sources(app PRIVATE ${nuvoton_shell})
 
 # Common Lib
-target_sources(app PRIVATE ${common_path}/lib/expansion_board.c)
 target_sources(app PRIVATE ${common_path}/lib/libutil.c)
 target_sources(app PRIVATE ${common_path}/lib/power_status.c)
 target_sources(app PRIVATE ${common_path}/lib/timer.c)
