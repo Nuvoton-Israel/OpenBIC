@@ -14,13 +14,17 @@
  * limitations under the License.
  */
 
-#ifdef CONFIG_IPMI_KCS_ASPEED
+#if (defined(CONFIG_IPMI_KCS_ASPEED) || defined(CONFIG_IPMI_KCS_NPCM4XX))
 
 #include <zephyr.h>
 #include <string.h>
 #include <stdio.h>
 #include <device.h>
+#if !defined(CONFIG_IPMI_KCS_NPCM4XX)
 #include <drivers/ipmi/kcs_aspeed.h>
+#else
+#include <drivers/ipmi/kcs_nuvoton.h>
+#endif
 #include <stdlib.h>
 #include <logging/log.h>
 #include "ipmi.h"
@@ -45,8 +49,11 @@ static bool proc_kcs_ok = false;
 void kcs_write(uint8_t index, uint8_t *buf, uint32_t buf_sz)
 {
 	int rc;
-
+#if !defined(CONFIG_IPMI_KCS_NPCM4XX)
 	rc = kcs_aspeed_write(kcs[index].dev, buf, buf_sz);
+#else
+	rc = kcs_nuvoton_write(kcs[index].dev, buf, buf_sz);
+#endif
 	if (rc < 0) {
 		LOG_ERR("Failed to write KCS data, rc = %d", rc);
 	}
@@ -226,7 +233,9 @@ static void kcs_read_task(void *arvg0, void *arvg1, void *arvg2)
 	uint8_t ibuf[KCS_BUFF_SIZE];
 #if (!defined(ENABLE_PLDM) || defined(ENABLE_OEM_PLDM))
 	ipmi_msg bridge_msg;
+#if MAX_IPMB_ID
 	ipmb_error status;
+#endif
 #endif
 	ipmi_msg_cfg current_msg;
 	struct kcs_request *req;
@@ -241,8 +250,11 @@ static void kcs_read_task(void *arvg0, void *arvg1, void *arvg2)
 
 	while (1) {
 		k_msleep(KCS_POLLING_INTERVAL);
-
+#if !defined(CONFIG_IPMI_KCS_NPCM4XX)
 		rc = kcs_aspeed_read(kcs_inst->dev, ibuf, sizeof(ibuf));
+#else
+		rc = kcs_nuvoton_read(kcs_inst->dev, ibuf, sizeof(ibuf));
+#endif
 		if (rc < 0) {
 			if (rc != -ENODATA)
 				LOG_ERR("Failed to read KCS data, rc = %d", rc);
@@ -364,9 +376,10 @@ static void kcs_read_task(void *arvg0, void *arvg1, void *arvg2)
 			if (bridge_msg.data_len != 0) {
 				memcpy(&bridge_msg.data[0], &ibuf[2], bridge_msg.data_len);
 			}
-
+#if MAX_IPMB_ID
 			// Check BMC communication interface if use IPMB or not
 			if (!pal_is_interface_use_ipmb(IPMB_inf_index_map[BMC_IPMB])) {
+#endif
 				int ret = 0;
 				// Send request to MCTP/PLDM thread to ask BMC
 				bridge_msg.InF_target = PLDM;
@@ -394,6 +407,7 @@ static void kcs_read_task(void *arvg0, void *arvg1, void *arvg2)
 				}
 
 				SAFE_FREE(kcs_buff);
+#if MAX_IPMB_ID
 			} else {
 				status = ipmb_send_request(&bridge_msg,
 							   IPMB_inf_index_map[BMC_IPMB]);
@@ -402,6 +416,7 @@ static void kcs_read_task(void *arvg0, void *arvg1, void *arvg2)
 						status);
 				}
 			}
+#endif
 #endif
 		}
 	}
