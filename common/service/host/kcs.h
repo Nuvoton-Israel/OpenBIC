@@ -17,7 +17,7 @@
 #ifndef KCS_H
 #define KCS_H
 
-#ifdef CONFIG_IPMI_KCS_ASPEED
+#if (defined(CONFIG_IPMI_KCS_ASPEED) || defined(CONFIG_IPMI_KCS_NPCM4XX))
 
 #include <stdbool.h>
 #include <stdint.h>
