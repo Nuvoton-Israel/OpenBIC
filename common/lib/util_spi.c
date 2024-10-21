@@ -129,7 +129,7 @@ char *get_flash_device_string_by_index(uint8_t flash_index)
 	return flash_device_list[flash_index].name;
 }
 
-int do_update(const struct device *flash_device, off_t offset, uint8_t *buf, size_t len)
+__weak int do_update(const struct device *flash_device, off_t offset, uint8_t *buf, size_t len)
 {
 	int ret = 0;
 	uint32_t flash_sz = flash_get_flash_size(flash_device);
