@@ -80,8 +80,14 @@ typedef enum {
 	MCTP_MEDIUM_TYPE_SMBUS,
 	MCTP_MEDIUM_TYPE_CONTROLLER_I3C,
 	MCTP_MEDIUM_TYPE_TARGET_I3C,
+	MCTP_MEDIUM_TYPE_USB,
 	MCTP_MEDIUM_TYPE_MAX
 } MCTP_MEDIUM_TYPE;
+
+/* serial extra medium data of endpoint */
+typedef struct _mctp_usb_ext_params {
+	uint32_t dummy; // TODO: test only
+} mctp_usb_ext_params;
 
 /* smbus extra medium data of endpoint */
 typedef struct _mctp_i3c_ext_params {
@@ -106,6 +112,7 @@ typedef struct _mctp_ext_params {
 	union {
 		mctp_smbus_ext_params smbus_ext_params;
 		mctp_i3c_ext_params i3c_ext_params;
+		mctp_usb_ext_params usb_ext_params;
 	};
 } mctp_ext_params;
 
@@ -121,6 +128,12 @@ typedef uint16_t (*medium_rx)(void *mctp_p, uint8_t *buf, uint32_t len,
 /* prototype for destitation endpoint resloved */
 typedef uint8_t (*endpoint_resolve)(uint8_t dest_endpoint, void **mctp_inst,
 				    mctp_ext_params *ext_params);
+
+/* usb config for mctp medium_conf */
+typedef struct _mctp_usb_conf {
+	uint8_t bus;
+	uint8_t addr;
+} mctp_usb_conf;
 
 /* i3c config for mctp medium_conf */
 typedef struct _mctp_i3c_conf {
@@ -138,6 +151,7 @@ typedef struct _mctp_smbus_conf {
 typedef union {
 	mctp_smbus_conf smbus_conf;
 	mctp_i3c_conf i3c_conf;
+	mctp_usb_conf usb_conf;
 } mctp_medium_conf;
 
 /* mctp tx message struct */
@@ -255,6 +269,8 @@ uint8_t mctp_smbus_deinit(mctp *mctp_inst);
 uint8_t mctp_i3c_controller_init(mctp *mctp_instance, mctp_medium_conf medium_conf);
 uint8_t mctp_i3c_target_init(mctp *mctp_instance, mctp_medium_conf medium_conf);
 uint8_t mctp_i3c_deinit(mctp *mctp_instance);
+uint8_t mctp_usb_init(mctp *mctp_inst, mctp_medium_conf medium_conf);
+uint8_t mctp_usb_deinit(mctp *mctp_inst);
 
 /* register endpoint resolve function */
 uint8_t mctp_reg_endpoint_resolve_func(mctp *mctp_inst, endpoint_resolve resolve_fn);
