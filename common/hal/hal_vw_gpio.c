@@ -121,6 +121,23 @@ static void vw_handler(const struct device *dev, struct espi_callback *cb, struc
 
 		ast_vw_gpio_scan();
 	}
+#else
+	if (event.evt_type == ESPI_BUS_EVENT_VWIRE_RECEIVED) {
+		uint8_t gpio_num = event.evt_details;
+		uint8_t gpio_value = event.evt_data;
+
+		for (int i = 0; i < vw_gpio_size; i++) {
+			if ((!vw_gpio_cfg[i].is_enabled) || (vw_gpio_cfg[i].number != gpio_num))
+				continue;
+			if (gpio_value != vw_gpio_cfg[i].value) {
+				vw_gpio_cfg[i].value = gpio_value;
+				if (vw_gpio_cfg[i].int_cb) {
+					vw_gpio_cfg[i].int_cb(gpio_value);
+				}
+			}
+		}
+	}
+
 #endif
 }
 
@@ -141,7 +158,11 @@ bool vw_gpio_init(vw_gpio *config, uint8_t size)
 {
 	CHECK_NULL_ARG_WITH_RETURN(config, false);
 
+#ifdef CONFIG_ESPI_ASPEED
 	espi_dev = device_get_binding("ESPI");
+#else
+	espi_dev = device_get_binding("ESPI_0");
+#endif
 	if (!espi_dev) {
 		LOG_ERR("failed to get espi device");
 		return false;
@@ -167,8 +188,9 @@ bool vw_gpio_init(vw_gpio *config, uint8_t size)
 	// Initialize vGPIO status during BIC bootup
 #ifdef CONFIG_ESPI_ASPEED
 	ast_vw_gpio_scan();
-	return true;
 #endif
+	return true;
+
 
 	SAFE_FREE(vw_gpio_cfg);
 	vw_gpio_size = 0;

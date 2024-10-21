@@ -52,6 +52,7 @@ enum cmd_type {
 	EVENT_LOG = 0x05,
 	CRASH_DUMP = 0x06,
 	BOOT_ORDER = 0x07,
+	VW_POST_COMPLETED = 0x08,
 };
 
 enum POWER_CONTROL_OPTION {
