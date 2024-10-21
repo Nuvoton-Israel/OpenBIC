@@ -23,6 +23,11 @@
 
 #define INTEL_IANA 0x000157
 
+#define RESET_REASON_POWERUP            0x0
+#define RESET_REASON_WATCHDOG           0x1
+#define RESET_REASON_SWRST              0x2
+#define RESET_REASON_INVALID            0xff
+
 enum CC_12V_CYCLE_SLOT {
 	SUCCESS_12V_CYCLE_SLOT,
 	NOT_SUPPORT_12V_CYCLE_SLOT,
@@ -51,6 +56,7 @@ enum SYSTEM_RESET_TYPE {
 enum {
 	BMC_INTERFACE_I2C = 0x0,
 	BMC_INTERFACE_I3C = 0x1,
+	BMC_INTERFACE_USB = 0x2,
 };
 
 typedef enum {
