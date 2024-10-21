@@ -53,6 +53,16 @@ static uint8_t set_thread_name(mctp *mctp_inst)
 		return MCTP_ERROR;
 
 	switch (mctp_inst->medium_type) {
+	case MCTP_MEDIUM_TYPE_USB:
+		LOG_DBG("medium_type: usb");
+		mctp_usb_conf *usb_conf = (mctp_usb_conf *)&mctp_inst->medium_conf;
+		snprintf(mctp_inst->mctp_rx_task_name, sizeof(mctp_inst->mctp_rx_task_name),
+			 "mctprx_%02x_%02x_%02x", mctp_inst->medium_type, usb_conf->bus,
+			 usb_conf->addr);
+		snprintf(mctp_inst->mctp_tx_task_name, sizeof(mctp_inst->mctp_tx_task_name),
+			 "mctptx_%02x_%02x_%02x", mctp_inst->medium_type, usb_conf->bus,
+			 usb_conf->addr);
+		break;
 	case MCTP_MEDIUM_TYPE_SMBUS:
 		LOG_DBG("medium_type: smbus");
 		mctp_smbus_conf *smbus_conf = (mctp_smbus_conf *)&mctp_inst->medium_conf;
@@ -100,6 +110,9 @@ static uint8_t mctp_medium_init(mctp *mctp_inst, mctp_medium_conf medium_conf)
 		ret = mctp_i3c_controller_init(mctp_inst, medium_conf);
 		break;
 #endif
+	case MCTP_MEDIUM_TYPE_USB:
+		ret = mctp_usb_init(mctp_inst, medium_conf);
+		break;
 	default:
 		return MCTP_ERROR;
 	}
@@ -121,6 +134,9 @@ static uint8_t mctp_medium_deinit(mctp *mctp_inst)
 		mctp_i3c_deinit(mctp_inst);
 		break;
 #endif
+	case MCTP_MEDIUM_TYPE_USB:
+		mctp_usb_deinit(mctp_inst);
+		break;
 	default:
 		return MCTP_ERROR;
 	}
@@ -230,10 +246,11 @@ static void mctp_rx_task(void *arg, void *dummy0, void *dummy1)
 
 		/* Set the tranport layer extra parameters */
 		ext_params.msg_tag = hdr->msg_tag;
+
 		/*
-* The high-level application won't modify the tag_owner flag, change the
-* tag_owner for response if needs
-*/
+		* The high-level application won't modify the tag_owner flag, change the
+		* tag_owner for response if needs
+		*/
 		ext_params.tag_owner = 0;
 		ext_params.ep = hdr->src_ep;
 
@@ -374,6 +391,7 @@ static void mctp_tx_task(void *arg, void *dummy0, void *dummy1)
 
 			hdr->dest_ep = mctp_msg.ext_params.ep;
 			hdr->src_ep = mctp_inst->endpoint;
+
 			hdr->hdr_ver = MCTP_HDR_HDR_VER;
 
 			LOG_DBG("i = %d, cp_msg_size = %d", i, cp_msg_size);
@@ -647,6 +665,9 @@ __weak int pal_find_bus_in_mctp_port(mctp_port *p)
 	case MCTP_MEDIUM_TYPE_TARGET_I3C:
 	case MCTP_MEDIUM_TYPE_CONTROLLER_I3C:
 		bus = p->conf.i3c_conf.bus;
+		break;
+	case MCTP_MEDIUM_TYPE_USB:
+		bus = p->conf.usb_conf.bus;
 		break;
 	default:
 		LOG_WRN("Cannot find medium type");
