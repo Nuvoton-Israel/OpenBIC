@@ -26,6 +26,8 @@ static struct espi_callback vw_cb;
 static vw_gpio *vw_gpio_cfg;
 static uint8_t vw_gpio_size = 0;
 
+extern void ISR_VW_GPIO(uint8_t gpio_value, uint8_t gpio_index);
+
 bool vw_gpio_get(int number, uint8_t *value)
 {
 	CHECK_NULL_ARG_WITH_RETURN(value, false);
@@ -123,9 +125,10 @@ static void vw_handler(const struct device *dev, struct espi_callback *cb, struc
 	}
 #else
 	if (event.evt_type == ESPI_BUS_EVENT_VWIRE_RECEIVED) {
-		uint8_t gpio_num = event.evt_details;
+		uint8_t gpio_index = event.evt_details;
 		uint8_t gpio_value = event.evt_data;
-
+		ISR_VW_GPIO(gpio_value, gpio_index);
+#if 0
 		for (int i = 0; i < vw_gpio_size; i++) {
 			if ((!vw_gpio_cfg[i].is_enabled) || (vw_gpio_cfg[i].number != gpio_num))
 				continue;
@@ -136,6 +139,7 @@ static void vw_handler(const struct device *dev, struct espi_callback *cb, struc
 				}
 			}
 		}
+#endif
 	}
 
 #endif
