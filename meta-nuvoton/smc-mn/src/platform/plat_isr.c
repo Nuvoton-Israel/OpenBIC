@@ -37,16 +37,15 @@
 
 LOG_MODULE_REGISTER(plat_isr);
 
-static bool is_post_completed;
-
 #ifdef ENABLE_PLDM
-#define post_completed_isr_STACK_SIZE 1024
-K_THREAD_STACK_DEFINE(post_completed_isr_thread, post_completed_isr_STACK_SIZE);
-static struct k_thread post_completed_isr_thread_handler;
+#define vw_gpio_isr_STACK_SIZE 1024
+K_THREAD_STACK_DEFINE(vw_gpio_isr_thread, vw_gpio_isr_STACK_SIZE);
+static struct k_thread vw_gpio_isr_thread_handler;
 static struct k_sem get_isr_sem;
+uint8_t val[2] = {0};
 
 
-bool pldm_send_post_complete_to_bmc(uint16_t value)
+bool pldm_send_post_complete_to_bmc(uint8_t gpio_value, uint8_t gpio_index)
 {
 	pldm_msg msg = { 0 };
 	uint8_t bmc_bus = 0;
@@ -67,18 +66,19 @@ bool pldm_send_post_complete_to_bmc(uint16_t value)
 	msg.hdr.rq = 1;
 
 	struct pldm_oem_write_file_io_req *ptr = (struct pldm_oem_write_file_io_req *)malloc(
-		sizeof(struct pldm_oem_write_file_io_req) + (1 * sizeof(uint8_t)));
+		sizeof(struct pldm_oem_write_file_io_req) + (2 * sizeof(uint8_t)));
 
 	if (ptr == NULL) {
 		LOG_ERR("Memory allocation failed.");
 		return false;
 	}
 
-	ptr->cmd_code = VW_POST_COMPLETED;
-	ptr->data_length = 1;
-	ptr->messages[0] = value;
+	ptr->cmd_code = VW_GPIO;
+	ptr->data_length = 2;
+	ptr->messages[0] = gpio_value;
+	ptr->messages[1] = gpio_index;
 	msg.buf = (uint8_t *)ptr;
-	msg.len = sizeof(struct pldm_oem_write_file_io_req) + 1;
+	msg.len = sizeof(struct pldm_oem_write_file_io_req) + 2;
 
 	uint8_t resp_len = sizeof(struct pldm_oem_write_file_io_resp);
 	uint8_t rbuf[resp_len];
@@ -99,12 +99,12 @@ bool pldm_send_post_complete_to_bmc(uint16_t value)
 }
 
 
-static void post_completed_isr(void *arvg0, void *arvg1, void *arvg2)
+static void vw_gpio_isr(void *arvg0, void *arvg1, void *arvg2)
 {
 	while (1) {
 		k_sem_take(&get_isr_sem, K_FOREVER);
-		pldm_send_post_complete_to_bmc(is_post_completed);
-		k_yield();	
+		pldm_send_post_complete_to_bmc(val[0], val[1]);
+		k_yield();
 	}
 }
 
@@ -115,10 +115,10 @@ void plat_isr_init()
 
 	k_sem_init(&get_isr_sem, 0, 1);
 
-	k_thread_create(&post_completed_isr_thread_handler, post_completed_isr_thread,
-			K_THREAD_STACK_SIZEOF(post_completed_isr_thread), post_completed_isr, NULL,
+	k_thread_create(&vw_gpio_isr_thread_handler, vw_gpio_isr_thread,
+			K_THREAD_STACK_SIZEOF(vw_gpio_isr_thread), vw_gpio_isr, NULL,
 			NULL, NULL, CONFIG_MAIN_THREAD_PRIORITY, 0, K_NO_WAIT);
-	k_thread_name_set(&post_completed_isr_thread_handler, "post_completed_isr_thread");
+	k_thread_name_set(&vw_gpio_isr_thread_handler, "vw_gpio_isr_thread");
 
 	return;
 }
@@ -126,9 +126,12 @@ void plat_isr_init()
 
 void ISR_POST_COMPLETE(uint8_t gpio_value)
 {
+}
 
-	is_post_completed = (gpio_value == VW_GPIO_HIGH) ? true : false;
-	LOG_DBG("is_post_completed %d", is_post_completed);
+void ISR_VW_GPIO(uint8_t gpio_value, uint8_t gpio_index)
+{
+	val[0] = gpio_value;
+	val[1] = gpio_index;
 #ifdef ENABLE_PLDM	
 	k_sem_give(&get_isr_sem);
 #endif

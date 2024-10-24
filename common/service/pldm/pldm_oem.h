@@ -45,7 +45,7 @@ enum cmd_type {
 	HTTP_BOOT = 0X03,
 	APML_ALERT = 0x04,
 	EVENT_LOG = 0x05,
-	VW_POST_COMPLETED = 0x06,
+	VW_GPIO = 0x06,
 };
 
 enum POWER_CONTROL_OPTION {
