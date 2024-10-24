@@ -18,5 +18,6 @@
 #define PLAT_ISR_H
 
 void ISR_POST_COMPLETE(uint8_t gpio_value);
+void ISR_VW_GPIO(uint8_t gpio_value, uint8_t gpio_index);
 void plat_isr_init();
 #endif

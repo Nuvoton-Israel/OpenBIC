@@ -46,7 +46,7 @@ enum cmd_type {
 	APML_ALERT = 0x04,
 	EVENT_LOG = 0x05,
 	CRASH_DUMP = 0x06,
-	VW_POST_COMPLETED = 0x07,
+	VW_GPIO = 0x07,
 };
 
 enum POWER_CONTROL_OPTION {
