@@ -31,47 +31,38 @@
 #include "pldm.h"
 #include "ipmi.h"
 #include "sensor.h"
-//#include "plat_hook.h"
 #include "plat_mctp.h"
 #include "plat_gpio.h"
 #include "plat_i2c.h"
-#include "cci.h"
-#include "pm8702.h"
 #include "util_sys.h"
 
 LOG_MODULE_REGISTER(plat_mctp);
 
 
 static mctp_port plat_mctp_port[] = {
-	 /*{ .channel_target = PLDM,
+	{
+		.channel_target = PLDM,
 		.conf.i3c_conf.addr = I3C_STATIC_ADDR_BMC,
-          .conf.i3c_conf.bus = I3C_BUS_BMC,
-          .medium_type = MCTP_MEDIUM_TYPE_TARGET_I3C },
-       { .conf.smbus_conf.addr = I2C_ADDR_BIC,
-          .conf.smbus_conf.bus = I2C_BUS_CXL,
-          .medium_type = MCTP_MEDIUM_TYPE_SMBUS },
-        { .conf.smbus_conf.addr = I2C_ADDR_BIC,
-          .conf.smbus_conf.bus = I2C_BUS_PLDM,
-          .medium_type = MCTP_MEDIUM_TYPE_SMBUS },
-	{ .conf.smbus_conf.addr = 0,
-	  .conf.smbus_conf.bus = 0,
-	  .medium_type = MCTP_MEDIUM_TYPE_SERIAL },*/
+		.conf.i3c_conf.bus = I3C_BUS_BMC,
+		.medium_type = MCTP_MEDIUM_TYPE_TARGET_I3C
+	},
+	{
+		.channel_target = PLDM,
+		.conf.smbus_conf.addr = I2C_ADDR_BIC,
+		.conf.smbus_conf.bus = I2C_BUS_BMC,
+		.medium_type = MCTP_MEDIUM_TYPE_SMBUS
+	},
 	{
 		.channel_target = PLDM, 
 		.conf.usb_conf.addr = 0,
-	  .conf.usb_conf.bus = 0,
-	  .medium_type = MCTP_MEDIUM_TYPE_USB },
-/*	{ .conf.i3c_conf.addr = I3C_STATIC_ADDR_BIC,
-	  .conf.i3c_conf.bus = I3C_BUS_MASTER,
-	  .medium_type = MCTP_MEDIUM_TYPE_CONTROLLER_I3C },*/
+		.conf.usb_conf.bus = 0,
+		.medium_type = MCTP_MEDIUM_TYPE_USB
+	},
 };
 
 static mctp_route_entry plat_mctp_route_tbl[] = {
-	/*{ MCTP_EID_CXL_I2C, I2C_BUS_CXL, I2C_ADDR_CXL0, .set_endpoint = false},
-	{ MCTP_EID_BMC_I2C, I2C_BUS_PLDM, I2C_ADDR_BMC, .set_endpoint = false},
-	{ MCTP_EID_BIC_I2C, I2C_BUS_PLDM, I2C_ADDR_BIC, .set_endpoint = false},
-	{ MCTP_EID_BIC_I3C, I3C_BUS_MASTER, I3C_STATIC_ADDR_BIC, .set_endpoint = false},
-	{ MCTP_EID_BMC_I3C, I3C_BUS_BMC, I3C_STATIC_ADDR_BMC, .set_endpoint = false},*/
+	{ 0xa1, I2C_BUS_BMC, I2C_ADDR_BMC, .set_endpoint = false},
+	{ 0xa2, I3C_BUS_BMC, I3C_STATIC_ADDR_BMC, .set_endpoint = false},
 	{ 0xa0, 0x0, 0x0, .set_endpoint = false},
 };
 
