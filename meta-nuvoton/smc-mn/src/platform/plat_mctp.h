@@ -28,14 +28,9 @@
 
 /* i2c 8 bit address */
 #define I2C_ADDR_BIC		0x20
-#define I2C_ADDR_CXL0		0x74
-#define I2C_ADDR_CXL1		0xC2
 #define I2C_ADDR_BMC		0x22
 /* use i2c0 */
 #define I2C_BUS_PLDM I2C_BUS1
-/* i2c dev bus, use i2c2 */
-#define I2C_BUS_CXL I2C_BUS3
-
 #define I2C_BUS_BMC I2C_BUS1
 
 /* mctp endpoint */
