@@ -65,13 +65,18 @@ uint8_t mctp_ctrl_cmd_set_endpoint_id(void *mctp_inst, uint8_t *buf, uint16_t le
 
 	struct _set_eid_req *req = (struct _set_eid_req *)buf;
 	struct _set_eid_resp *p = (struct _set_eid_resp *)resp;
+	mctp *inst = (mctp *)mctp_inst;
+
 
 	uint8_t plat_mctp_port_count = plat_get_mctp_port_count();
 	if (plat_mctp_port_count != 0) {
 		for (uint8_t i = 0; i < plat_mctp_port_count; i++) {
 			mctp_port *port = plat_get_mctp_port(i);
 			if (port != NULL) {
-				port->mctp_inst->endpoint = req->eid;
+				if (port->mctp_inst->medium_type == inst->medium_type) {
+					port->mctp_inst->endpoint = req->eid;
+					break;
+				}
 			} else {
 				LOG_ERR("plat_get_mctp_port not implemented");
 				p->completion_code = MCTP_CTRL_CC_ERROR;
@@ -106,14 +111,40 @@ uint8_t mctp_ctrl_cmd_get_endpoint_id(void *mctp_inst, uint8_t *buf, uint16_t le
 	CHECK_NULL_ARG_WITH_RETURN(resp_len, MCTP_ERROR);
 
 	struct _get_eid_resp *p = (struct _get_eid_resp *)resp;
+	mctp *inst = (mctp *)mctp_inst;
 
-	p->eid = plat_get_eid();
-	p->eid_type = STATIC_EID;
-	p->endpoint_type = BRIDGE;
+	uint8_t plat_mctp_port_count = plat_get_mctp_port_count();
+	if (plat_mctp_port_count != 0) {
+		for (uint8_t i = 0; i < plat_mctp_port_count; i++) {
+			mctp_port *port = plat_get_mctp_port(i);
+			if (port != NULL) {
+				if (port->mctp_inst->medium_type == inst->medium_type) {
+					p->eid = port->mctp_inst->endpoint;
+					p->eid_type = DYNAMIC_EID;
+					p->endpoint_type = SIMPLE_ENDPOINT;
+					break;
+				}
+			} else {
+				LOG_ERR("plat_get_mctp_port not implemented");
+				p->completion_code = MCTP_CTRL_CC_ERROR;
+				*resp_len = 1;
+				return MCTP_SUCCESS;
+			}
+		}
+		p->completion_code = MCTP_CTRL_CC_SUCCESS;
+	} else {
+		LOG_ERR("plat_get_mctp_port not implemented");
+		p->completion_code = MCTP_CTRL_CC_ERROR;
+	}
+
+
+//	p->eid = plat_get_eid();
+//	p->eid_type = STATIC_EID;
+//	p->endpoint_type = BRIDGE;
 	/* Not support fairness arbitration */
 	p->medium_specific_info = 0x00;
 
-	p->completion_code = (len != 0) ? MCTP_CTRL_CC_ERROR_INVALID_LENGTH : MCTP_CTRL_CC_SUCCESS;
+	//p->completion_code = (len != 0) ? MCTP_CTRL_CC_ERROR_INVALID_LENGTH : MCTP_CTRL_CC_SUCCESS;
 
 	*resp_len = (p->completion_code == MCTP_CTRL_CC_SUCCESS) ? sizeof(*p) : 1;
 
