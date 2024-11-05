@@ -21,6 +21,7 @@
 #define ENABLE_MCTP_I3C
 #define ENABLE_PLDM
 #define ENABLE_OEM_PLDM
+#define MCTP_I3C_PEC_ENABLE 1
 
 #define DISABLE_AST_ADC
 #define DISABLE_NVME
