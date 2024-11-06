@@ -41,13 +41,11 @@ LOG_MODULE_REGISTER(plat_mctp);
 
 static mctp_port plat_mctp_port[] = {
 	{
-		.channel_target = PLDM,
 		.conf.i3c_conf.addr = I3C_STATIC_ADDR_BMC,
 		.conf.i3c_conf.bus = I3C_BUS_BMC,
 		.medium_type = MCTP_MEDIUM_TYPE_TARGET_I3C
 	},
 	{
-		.channel_target = PLDM,
 		.conf.smbus_conf.addr = I2C_ADDR_BIC,
 		.conf.smbus_conf.bus = I2C_BUS_BMC,
 		.medium_type = MCTP_MEDIUM_TYPE_SMBUS
@@ -61,9 +59,9 @@ static mctp_port plat_mctp_port[] = {
 };
 
 static mctp_route_entry plat_mctp_route_tbl[] = {
-	{ 0xa1, I2C_BUS_BMC, I2C_ADDR_BMC, .set_endpoint = false},
-	{ 0xa2, I3C_BUS_BMC, I3C_STATIC_ADDR_BMC, .set_endpoint = false},
-	{ 0xa3, 0x0, 0x0, .set_endpoint = false},
+	{ MCTP_EID_BMC, I2C_BUS_BMC, I2C_ADDR_BMC, .set_endpoint = false},
+	{ MCTP_EID_BMC, I3C_BUS_BMC, I3C_STATIC_ADDR_BMC, .set_endpoint = false},
+	{ MCTP_EID_BMC, 0x0, 0x0, .set_endpoint = false},
 };
 
 mctp *find_mctp_by_medium_type(uint8_t type)
