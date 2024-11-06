@@ -63,8 +63,20 @@ static mctp_port plat_mctp_port[] = {
 static mctp_route_entry plat_mctp_route_tbl[] = {
 	{ 0xa1, I2C_BUS_BMC, I2C_ADDR_BMC, .set_endpoint = false},
 	{ 0xa2, I3C_BUS_BMC, I3C_STATIC_ADDR_BMC, .set_endpoint = false},
-	{ 0xa0, 0x0, 0x0, .set_endpoint = false},
+	{ 0xa3, 0x0, 0x0, .set_endpoint = false},
 };
+
+mctp *find_mctp_by_medium_type(uint8_t type)
+{
+	uint8_t i;
+	for (i = 0; i < ARRAY_SIZE(plat_mctp_port); i++) {
+		mctp_port *p = plat_mctp_port + i;
+		if (p->medium_type == type)
+			return p->mctp_inst;
+	}
+
+	return NULL;
+}
 
 mctp *find_mctp_by_bus(uint8_t bus)
 {
