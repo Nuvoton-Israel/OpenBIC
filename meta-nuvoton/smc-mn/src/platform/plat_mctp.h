@@ -61,5 +61,6 @@ void plat_mctp_init(void);
 mctp *find_mctp_by_bus(uint8_t bus);
 mctp *get_mctp_init();
 uint8_t get_mctp_info(uint8_t dest_endpoint, mctp **mctp_inst, mctp_ext_params *ext_params);
+mctp *find_mctp_by_medium_type(uint8_t type);
 
 #endif /* _PLAT_MCTP_h */

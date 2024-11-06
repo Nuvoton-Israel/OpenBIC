@@ -83,7 +83,7 @@ bool pldm_send_post_complete_to_bmc(uint8_t gpio_value, uint8_t gpio_index)
 	uint8_t resp_len = sizeof(struct pldm_oem_write_file_io_resp);
 	uint8_t rbuf[resp_len];
 
-	if (!mctp_pldm_read(find_mctp_by_bus(bmc_bus), &msg, rbuf, resp_len)) {
+	if (!mctp_pldm_read(find_mctp_by_medium_type(msg.ext_params.type), &msg, rbuf, resp_len)) {
 		SAFE_FREE(ptr);
 		LOG_ERR("mctp_pldm_read fail");
 		return false;
