@@ -21,6 +21,7 @@
 #include <string.h>
 #include <logging/log.h>
 #include "power_status.h"
+#include "npcm4xx_adc.h"
 #include "sdr.h"
 #include "pdr.h"
 #include "hal_i2c.h"
@@ -146,6 +147,7 @@ const char *const sensor_type_name[] = {
 	sensor_name_to_num(raa228238)
 	sensor_name_to_num(mpc12109)
 	sensor_name_to_num(rtq6056)
+	sensor_name_to_num(npcm4xx_adc)
 };
 // clang-format on
 
@@ -349,6 +351,8 @@ SENSOR_DRIVE_INIT_DECLARE(mpc12109);
 #ifdef ENABLE_RTQ6056
 SENSOR_DRIVE_INIT_DECLARE(rtq6056);
 #endif
+
+SENSOR_DRIVE_INIT_DECLARE(npcm4xx_adc);
 
 // The sequence needs to same with SENSOR_DEV ID
 sensor_drive_api sensor_drive_tbl[] = {
@@ -690,6 +694,7 @@ sensor_drive_api sensor_drive_tbl[] = {
 #else
 	SENSOR_DRIVE_TYPE_UNUSE(rtq6056),
 #endif
+	SENSOR_DRIVE_TYPE_INIT_MAP(npcm4xx_adc),
 
 };
 

@@ -184,6 +184,7 @@ enum SENSOR_DEV {
 	sensor_dev_raa228238 = 0x42,
 	sensor_dev_mpc12109 = 0x43,
 	sensor_dev_rtq6056 = 0x44,
+	sensor_dev_npcm4xx_adc = 0x45,
 	sensor_dev_max
 };
 
