@@ -17,6 +17,7 @@
 #include "hal_gpio.h"
 #include "plat_gpio.h"
 
+#include "plat_class.h"
 #include "plat_isr.h"
 #include "plat_vw_gpio.h"
 #include "plat_i2c_target.h"
@@ -38,6 +39,9 @@ LOG_MODULE_REGISTER(palt_init);
 
 void pal_pre_init()
 {
+	/* Init platform config */
+	init_platform_config();
+
 	/* init i2c target */
 	for (int index = 0; index < MAX_TARGET_NUM; index++) {
 		if (I2C_TARGET_ENABLE_TABLE[index])
