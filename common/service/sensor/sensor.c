@@ -21,6 +21,7 @@
 #include <string.h>
 #include <logging/log.h>
 #include "power_status.h"
+#include "npcm4xx_adc.h"
 #include "sdr.h"
 #include "pdr.h"
 #include "hal_i2c.h"
@@ -148,6 +149,7 @@ const char *const sensor_type_name[] = {
 	sensor_name_to_num(tmp421)
 	sensor_name_to_num(bmr316)
 	sensor_name_to_num(lx6301)
+	sensor_name_to_num(npcm4xx_adc)
 };
 // clang-format on
 
@@ -375,6 +377,8 @@ SENSOR_DRIVE_INIT_DECLARE(bmr316);
 #ifdef ENABLE_LX6301
 SENSOR_DRIVE_INIT_DECLARE(lx6301);
 #endif
+
+SENSOR_DRIVE_INIT_DECLARE(npcm4xx_adc);
 
 // The sequence needs to same with SENSOR_DEV ID
 sensor_drive_api sensor_drive_tbl[] = {
@@ -736,6 +740,7 @@ sensor_drive_api sensor_drive_tbl[] = {
 #else
 	SENSOR_DRIVE_TYPE_UNUSE(emc1413),
 #endif
+
 #ifdef ENABLE_BCM85658
 	SENSOR_DRIVE_TYPE_INIT_MAP(bcm85658),
 #else
@@ -757,6 +762,7 @@ sensor_drive_api sensor_drive_tbl[] = {
 #else
 	SENSOR_DRIVE_TYPE_UNUSE(lx6301),
 #endif
+	SENSOR_DRIVE_TYPE_INIT_MAP(npcm4xx_adc)
 };
 
 static void init_sensor_num(void)
