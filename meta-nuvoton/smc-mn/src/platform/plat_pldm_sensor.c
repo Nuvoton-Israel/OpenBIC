@@ -53,7 +53,7 @@ pldm_sensor_info plat_pldm_sensor_adc_table[] = {
 			PDR_SENSOR_USEINIT_PDR, //uint8_t sensor_init;
 			0x01, //uint8_t sensor_auxiliary_names_pdr;
 			0x05, //uint8_t base_unit;
-			-4, //int8_t unit_modifier;
+			-5, //int8_t unit_modifier;
 			0x00, //uint8_t rate_unit;
 			0x00, //uint8_t base_oem_unit_handle;
 			0x00, //uint8_t aux_unit;
@@ -73,19 +73,19 @@ pldm_sensor_info plat_pldm_sensor_adc_table[] = {
 			0x00, //uint8_t threshold_and_hysteresis_volatility;
 			0, //real32_t state_transition_interval;
 			UPDATE_INTERVAL_1S, //int32_t update_interval;
-			0x00000000, //uint32_t max_readable;
-			0x00000000, //uint32_t min_readable;
+			0x00054984, //uint32_t max_readable;
+			0x0004C89C, //uint32_t min_readable;
 			0x04, //uint8_t range_field_format;
 			0xFF, //uint8_t range_field_support;
 			0x00000000, //uint32_t nominal_value;
 			0x00000000, //uint32_t normal_max;
 			0x00000000, //uint32_t normal_min;
-			0x00000000, //uint32_t warning_high;
-			0x00000000, //uint32_t warning_low;
-			0x00000000, //uint32_t critical_high;
-			0x00000000, //uint32_t critical_low;
-			0x00000000, //uint32_t fatal_high;
-			0x00000000, //uint32_t fatal_low;
+			0x00056496, //uint32_t warning_high;
+			0x0004B01E, //uint32_t warning_low;
+			0x0005721F, //uint32_t critical_high;
+			0x0004A3DF, //uint32_t critical_low;
+			0x000617C4, //uint32_t fatal_high;
+			0x00038658, //uint32_t fatal_low;
 		},
 		.update_time = 0,
 		{
@@ -116,12 +116,12 @@ pldm_sensor_info plat_pldm_sensor_adc_table[] = {
 			0x0000, //uint16_t PLDM_terminus_handle;
 			0x0021, //uint16_t sensor_id;
 			0x0087, //uint16_t entity_type;
-			0x0002, //uint16_t entity_instance_number;
+			0x0003, //uint16_t entity_instance_number;
 			0x0000, //uint16_t container_id;
 			PDR_SENSOR_USEINIT_PDR, //uint8_t sensor_init;
 			0x01, //uint8_t sensor_auxiliary_names_pdr;
 			0x05, //uint8_t base_unit;
-			-4, //int8_t unit_modifier;
+			-5, //int8_t unit_modifier;
 			0x00, //uint8_t rate_unit;
 			0x00, //uint8_t base_oem_unit_handle;
 			0x00, //uint8_t aux_unit;
@@ -141,19 +141,19 @@ pldm_sensor_info plat_pldm_sensor_adc_table[] = {
 			0x00, //uint8_t threshold_and_hysteresis_volatility;
 			0, //real32_t state_transition_interval;
 			UPDATE_INTERVAL_1S, //int32_t update_interval;
-			0x00000000, //uint32_t max_readable;
-			0x00000000, //uint32_t min_readable;
+			0x00054984, //uint32_t max_readable;
+			0x0004C89C, //uint32_t min_readable;
 			0x04, //uint8_t range_field_format;
 			0xFF, //uint8_t range_field_support;
 			0x00000000, //uint32_t nominal_value;
 			0x00000000, //uint32_t normal_max;
 			0x00000000, //uint32_t normal_min;
-			0x00000000, //uint32_t warning_high;
-			0x00000000, //uint32_t warning_low;
-			0x00000000, //uint32_t critical_high;
-			0x00000000, //uint32_t critical_low;
-			0x00000000, //uint32_t fatal_high;
-			0x00000000, //uint32_t fatal_low;
+			0x00056496, //uint32_t warning_high;
+			0x0004B01E, //uint32_t warning_low;
+			0x0005721F, //uint32_t critical_high;
+			0x0004A3DF, //uint32_t critical_low;
+			0x000617C4, //uint32_t fatal_high;
+			0x00038658, //uint32_t fatal_low;
 		},
 		.update_time = 0,
 		{
@@ -184,12 +184,12 @@ pldm_sensor_info plat_pldm_sensor_adc_table[] = {
 			0x0000, //uint16_t PLDM_terminus_handle;
 			0x0022, //uint16_t sensor_id;
 			0x0087, //uint16_t entity_type;
-			0x0002, //uint16_t entity_instance_number;
+			0x0004, //uint16_t entity_instance_number;
 			0x0000, //uint16_t container_id;
 			PDR_SENSOR_USEINIT_PDR, //uint8_t sensor_init;
 			0x01, //uint8_t sensor_auxiliary_names_pdr;
 			0x05, //uint8_t base_unit;
-			-4, //int8_t unit_modifier;
+			-5, //int8_t unit_modifier;
 			0x00, //uint8_t rate_unit;
 			0x00, //uint8_t base_oem_unit_handle;
 			0x00, //uint8_t aux_unit;
@@ -209,19 +209,19 @@ pldm_sensor_info plat_pldm_sensor_adc_table[] = {
 			0x00, //uint8_t threshold_and_hysteresis_volatility;
 			0, //real32_t state_transition_interval;
 			UPDATE_INTERVAL_1S, //int32_t update_interval;
-			0x00000000, //uint32_t max_readable;
-			0x00000000, //uint32_t min_readable;
+			0x00054984, //uint32_t max_readable;
+			0x0004C89C, //uint32_t min_readable;
 			0x04, //uint8_t range_field_format;
 			0xFF, //uint8_t range_field_support;
 			0x00000000, //uint32_t nominal_value;
 			0x00000000, //uint32_t normal_max;
 			0x00000000, //uint32_t normal_min;
-			0x00000000, //uint32_t warning_high;
-			0x00000000, //uint32_t warning_low;
-			0x00000000, //uint32_t critical_high;
-			0x00000000, //uint32_t critical_low;
-			0x00000000, //uint32_t fatal_high;
-			0x00000000, //uint32_t fatal_low;
+			0x00056496, //uint32_t warning_high;
+			0x0004B01E, //uint32_t warning_low;
+			0x0005721F, //uint32_t critical_high;
+			0x0004A3DF, //uint32_t critical_low;
+			0x000617C4, //uint32_t fatal_high;
+			0x00038658, //uint32_t fatal_low;
 		},
 		.update_time = 0,
 		{
@@ -252,12 +252,12 @@ pldm_sensor_info plat_pldm_sensor_adc_table[] = {
 			0x0000, //uint16_t PLDM_terminus_handle;
 			0x0023, //uint16_t sensor_id;
 			0x0087, //uint16_t entity_type;
-			0x0002, //uint16_t entity_instance_number;
+			0x0005, //uint16_t entity_instance_number;
 			0x0000, //uint16_t container_id;
 			PDR_SENSOR_USEINIT_PDR, //uint8_t sensor_init;
 			0x01, //uint8_t sensor_auxiliary_names_pdr;
 			0x05, //uint8_t base_unit;
-			-4, //int8_t unit_modifier;
+			-5, //int8_t unit_modifier;
 			0x00, //uint8_t rate_unit;
 			0x00, //uint8_t base_oem_unit_handle;
 			0x00, //uint8_t aux_unit;
@@ -277,19 +277,19 @@ pldm_sensor_info plat_pldm_sensor_adc_table[] = {
 			0x00, //uint8_t threshold_and_hysteresis_volatility;
 			0, //real32_t state_transition_interval;
 			UPDATE_INTERVAL_1S, //int32_t update_interval;
-			0x00000000, //uint32_t max_readable;
-			0x00000000, //uint32_t min_readable;
+			0x000049D4, //uint32_t max_readable;
+			0x000042CC, //uint32_t min_readable;
 			0x04, //uint8_t range_field_format;
 			0xFF, //uint8_t range_field_support;
 			0x00000000, //uint32_t nominal_value;
 			0x00000000, //uint32_t normal_max;
 			0x00000000, //uint32_t normal_min;
-			0x00000000, //uint32_t warning_high;
-			0x00000000, //uint32_t warning_low;
-			0x00000000, //uint32_t critical_high;
-			0x00000000, //uint32_t critical_low;
-			0x00000000, //uint32_t fatal_high;
-			0x00000000, //uint32_t fatal_low;
+			0x0002E64A, //uint32_t warning_high;
+			0x00029580, //uint32_t warning_low;
+			0x0002ED91, //uint32_t critical_high;
+			0x00028EC0, //uint32_t critical_low;
+			0x00032FA0, //uint32_t fatal_high;
+			0x00023280, //uint32_t fatal_low;
 		},
 		.update_time = 0,
 		{
