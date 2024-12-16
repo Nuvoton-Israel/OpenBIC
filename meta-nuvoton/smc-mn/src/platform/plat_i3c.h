@@ -4,7 +4,7 @@
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
@@ -14,10 +14,18 @@
  * limitations under the License.
  */
 
-#ifndef PLAT_ISR_H
-#define PLAT_ISR_H
+#ifndef PLAT_I3C_H
+#define PLAT_I3C_H
 
-void ISR_POST_COMPLETE(uint8_t gpio_value);
-void ISR_VW_GPIO(uint8_t gpio_value, uint8_t gpio_index);
-void plat_isr_init();
+#define NPCM_I3C_BUS_MAX	6
+
+#define IBI_MDB_SIZE		8
+
+typedef struct _npcm_i3c_ibi_dev {
+	uint8_t data_mdb[IBI_MDB_SIZE];
+	uint8_t data_rx[I3C_MAX_DATA_SIZE];
+	struct i3c_ibi_payload i3c_payload;
+	struct k_sem ibi_complete;
+} npcm_i3c_ibi_dev;
+
 #endif
