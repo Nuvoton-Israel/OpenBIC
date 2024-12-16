@@ -124,17 +124,16 @@ int i3c_smq_write(I3C_MSG *msg);
 int i3c_slave_mqueue_read(const struct device *dev, uint8_t *dest, int budget);
 int i3c_slave_mqueue_write(const struct device *dev, uint8_t *src, int size);
 
-int i3c_attach(I3C_MSG *msg);
-int i3c_detach(I3C_MSG *msg);
+__weak int i3c_attach(I3C_MSG *msg);
+__weak int i3c_detach(I3C_MSG *msg);
 int i3c_transfer(I3C_MSG *msg);
 int i3c_brocast_ccc(I3C_MSG *msg, uint8_t ccc_id, uint8_t ccc_addr);
 int i3c_spd_reg_read(I3C_MSG *msg, bool is_nvm);
 int i3c_set_pid(I3C_MSG *msg, uint16_t slot_pid);
 
-int i3c_controller_write(I3C_MSG *msg);
-int i3c_controller_ibi_init(I3C_MSG *msg);
-int i3c_controller_ibi_read(I3C_MSG *msg);
-int i3c_controller_write(I3C_MSG *msg);
+__weak int i3c_controller_write(I3C_MSG *msg);
+__weak int i3c_controller_ibi_init(I3C_MSG *msg);
+__weak int i3c_controller_ibi_read(I3C_MSG *msg);
 int i3c_target_set_address(I3C_MSG *msg);
 int i3c_target_get_dynamic_address(I3C_MSG *msg, uint8_t *dynamic_addr);
 

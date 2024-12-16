@@ -81,6 +81,16 @@
 	status = "disabled";
 };
 
+#if 0
+/* Use for I3C_5 controller */
+&i3c5 {
+	status = "okay";
+	i2c-scl-hz = <100000>;
+	i3c-scl-hz = <12500000>;
+};
+#endif
+
+#if 1
 &i3c5 {
 	bcr = <0x66>;
 	dcr = <0xCC>;
@@ -99,14 +109,19 @@
 		status = "okay";
 	};
 };
+#endif
 
+#if 1
+/* Use for I3C_4 controller */
 &i3c4 {
 	status = "okay";
 	i2c-scl-hz = <100000>;
 	i3c-scl-hz = <12500000>;
 };
+#endif
 
-/* test for bridge slave mode only, MCTP EID = 0xC
+#if 0
+/* test for bridge slave mode only, MCTP EID = 0x12, use for I3C_4 target */
 &i3c4 {
 	status = "okay";
 	bcr = <0x66>;
@@ -126,8 +141,30 @@
 		status = "okay";
 	};
 };
-*/
+#endif
 
+#if 0
+/* test for bridge slave mode only, MCTP EID = 0x13, use for I3C_4 target */
+&i3c4 {
+	status = "okay";
+	bcr = <0x66>;
+	dcr = <0xCC>;
+	part-id = <0x4321>;
+	assigned-address = <0xB>;
+        vendor-def-id = <0x666>;
+	slave;
+	status = "okay";
+	i3c4_smq:i3c-slave-mqueue@B {
+		compatible = "i3c-slave-mqueue";
+		reg = <0xB>;
+		msg-size = <256>;
+		num-of-msgs = <4>;
+		mandatory-data-byte = <0xae>;
+		label = "I3C_SMQ_4";
+		status = "okay";
+	};
+};
+#endif
 
 &spi_spim0_cs0 {
 	status = "okay";

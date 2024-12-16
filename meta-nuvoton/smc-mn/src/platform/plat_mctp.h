@@ -31,28 +31,30 @@
 #define I2C_ADDR_BMC		0x22
 /* use i2c0 */
 #define I2C_BUS_PLDM I2C_BUS1
-#define I2C_BUS_BMC I2C_BUS1
-
-/* mctp endpoint */
-#define MCTP_EID_BMC 0x08
+#define I2C_BUS_TARGET_TO_BMC	I2C_BUS1
 
 /* mctp endpoint */
 #define MCTP_EID_CXL_I2C	0x2E
 #define MCTP_EID_BMC_I2C	0x15
-#define MCTP_EID_BIC_I2C	0x0A
 #define MCTP_EID_BMC_I3C	0x08
-#define MCTP_EID_BIC_I3C	0x0C
+#define MCTP_EID_BMC_SERIAL	0x08
+
+#define MCTP_EID_BIC_I3C_WF	0x12
+#define MCTP_EID_BIC_I3C_FF	0x13
 
 /* i3c static 8-bit address */
-#define I3C_STATIC_ADDR_BIC	0xA
+#define I3C_STATIC_ADDR_BIC_SD	0x20
+#define I3C_STATIC_ADDR_BIC_WF	0x0A
+#define I3C_STATIC_ADDR_BIC_FF	0x0B
 #define I3C_STATIC_ADDR_BMC	0x20
 
 /* i3c dynamic 8-bit address */
 #define I3C_DYNAMIC_ADDR_BIC	0xA
 
 /* i3c dev bus */
-#define I3C_BUS_MASTER		4
-#define I3C_BUS_BMC		5
+#define I3C_BUS_CONTROLLER_TO_BIC	4
+#define I3C_BUS_TARGET_TO_BMC		5
+#define I3C_BUS_TARGET_TO_BIC		4
 
 /* init the mctp moduel for platform */
 void send_cmd_to_dev(struct k_timer *timer);

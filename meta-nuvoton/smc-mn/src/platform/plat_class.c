@@ -26,6 +26,7 @@
 #include "mctp.h"
 #include "mctp_ctrl.h"
 #include "plat_mctp.h"
+#include "plat_def.h"
 
 LOG_MODULE_REGISTER(plat_class);
 
@@ -46,9 +47,10 @@ bool pal_get_slot_pid(uint16_t *pid)
 
 void init_platform_config(void)
 {
+#ifndef TEST_I3C_TARGET_BIC
 	I3C_MSG i3c_msg;
 
-	i3c_msg.bus = I3C_BUS_BMC;
+	i3c_msg.bus = I3C_BUS_TARGET_TO_BMC;
 
 	slot_eid = plat_get_eid();
 
@@ -91,5 +93,7 @@ void init_platform_config(void)
 
 	LOG_INF("Slot EID = %d, Slot ID = %d Slot PID = 0x%x\n", slot_eid, slot_id, slot_pid);
 
+	/* Only SD BIC need set pid then trigger hot-join to BMC */
 	i3c_set_pid(&i3c_msg, slot_pid);
+#endif
 }
