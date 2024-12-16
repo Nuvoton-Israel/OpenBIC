@@ -25,12 +25,12 @@
 
 LOG_MODULE_REGISTER(hal_i3c);
 
-static const struct device *dev_i3c[I3C_MAX_NUM];
+const struct device *dev_i3c[I3C_MAX_NUM];
 static const struct device *dev_i3c_smq[I3C_MAX_NUM];
-static struct i3c_dev_desc i3c_desc_table[I3C_MAX_NUM];
+struct i3c_dev_desc i3c_desc_table[I3C_MAX_NUM];
 static i3c_ibi_dev i3c_ibi_dev_table[I3C_MAX_NUM];
-static int i3c_desc_count = 0;
-static struct k_mutex mutex_dev[I3C_MAX_NUM];
+int i3c_desc_count = 0;
+struct k_mutex mutex_dev[I3C_MAX_NUM];
 
 int i3c_slave_mqueue_read(const struct device *dev, uint8_t *dest, int budget);
 int i3c_slave_mqueue_write(const struct device *dev, uint8_t *src, int size);
@@ -128,7 +128,7 @@ int i3c_smq_write(I3C_MSG *msg)
 	return ret;
 }
 
-int i3c_attach(I3C_MSG *msg)
+__weak int i3c_attach(I3C_MSG *msg)
 {
 	CHECK_NULL_ARG_WITH_RETURN(msg, -EINVAL);
 
@@ -170,7 +170,7 @@ int i3c_attach(I3C_MSG *msg)
 	return -ret;
 }
 
-int i3c_detach(I3C_MSG *msg)
+__weak int i3c_detach(I3C_MSG *msg)
 {
 	CHECK_NULL_ARG_WITH_RETURN(msg, -EINVAL);
 
@@ -340,7 +340,7 @@ int i3c_spd_reg_read(I3C_MSG *msg, bool is_nvm)
 	return ret;
 }
 
-int i3c_controller_write(I3C_MSG *msg)
+__weak int i3c_controller_write(I3C_MSG *msg)
 {
 	CHECK_NULL_ARG_WITH_RETURN(msg, -EINVAL);
 
@@ -553,7 +553,7 @@ static struct i3c_ibi_callbacks i3c_ibi_def_callbacks = {
 	.write_done = ibi_write_done,
 };
 
-int i3c_controller_ibi_init(I3C_MSG *msg)
+__weak int i3c_controller_ibi_init(I3C_MSG *msg)
 {
 	CHECK_NULL_ARG_WITH_RETURN(msg, -EINVAL);
 
@@ -627,7 +627,7 @@ int i3c_controller_ibi_init(I3C_MSG *msg)
 	return -ret;
 }
 
-int i3c_controller_ibi_read(I3C_MSG *msg)
+__weak int i3c_controller_ibi_read(I3C_MSG *msg)
 {
 	CHECK_NULL_ARG_WITH_RETURN(msg, -EINVAL);
 
