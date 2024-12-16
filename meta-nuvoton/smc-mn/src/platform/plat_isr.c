@@ -52,7 +52,7 @@ bool pldm_send_post_complete_to_bmc(uint8_t gpio_value, uint8_t gpio_index)
 	uint8_t bmc_interface = pal_get_bmc_interface();
 
 	if (bmc_interface == BMC_INTERFACE_I3C) {
-		bmc_bus = I3C_BUS_BMC;
+		bmc_bus = I3C_BUS_TARGET_TO_BMC;
 		msg.ext_params.type = MCTP_MEDIUM_TYPE_TARGET_I3C;
 		msg.ext_params.i3c_ext_params.addr = I3C_STATIC_ADDR_BMC;
 		msg.ext_params.ep = MCTP_EID_BMC_I3C;
