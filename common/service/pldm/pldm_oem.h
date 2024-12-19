@@ -53,6 +53,7 @@ enum cmd_type {
 	CRASH_DUMP = 0x06,
 	BOOT_ORDER = 0x07,
 	VW_GPIO = 0x08,
+	FLASH_ACCESS = 0x09,
 };
 
 enum POWER_CONTROL_OPTION {
@@ -440,6 +441,20 @@ struct _force_update_flag_get_cmd_resp {
 	uint8_t completion_code;
 	uint8_t iana[IANA_LEN];
 	uint8_t get_value;
+} __attribute__((packed));
+struct pldm_oem_meta_write_file_req {
+        uint8_t file_handle;
+        uint32_t length;
+        uint8_t file_data[];
+} __attribute__((packed));
+
+struct pldm_oem_meta_write_file_resp {
+        uint8_t completion_code;
+        uint8_t pkgLen;
+        uint8_t ctype;
+        uint8_t tagLenH;
+        uint8_t lenL;
+        uint8_t data[];
 } __attribute__((packed));
 
 uint8_t check_iana(const uint8_t *iana);
