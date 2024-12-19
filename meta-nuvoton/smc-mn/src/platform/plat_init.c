@@ -29,8 +29,8 @@
 #include <drivers/uart.h>
 #include <usb/usb_device.h>
 
-
 extern void plat_uart_bridge_init(void);
+extern void edaf_npcm_init(void);
 
 #define LOG_LEVEL CONFIG_USB_DEVICE_LOG_LEVEL
 #include <logging/log.h>
@@ -58,6 +58,7 @@ void pal_post_init()
 	snoop_init();
 	kcs_init();
 	plat_isr_init();
+	edaf_npcm_init();
 	plat_uart_bridge_init();
 }
 
