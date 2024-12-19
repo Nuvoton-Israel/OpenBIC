@@ -47,6 +47,7 @@ enum cmd_type {
 	EVENT_LOG = 0x05,
 	CRASH_DUMP = 0x06,
 	VW_GPIO = 0x07,
+	FLASH_ACCESS = 0x08,
 };
 
 enum POWER_CONTROL_OPTION {
@@ -196,6 +197,21 @@ struct pldm_addsel_data {
 	uint8_t event_data_1;
 	uint8_t event_data_2;
 	uint8_t event_data_3;
+} __attribute__((packed));
+
+struct pldm_oem_meta_write_file_req {
+        uint8_t file_handle;
+        uint32_t length;
+        uint8_t file_data[];
+} __attribute__((packed));
+
+struct pldm_oem_meta_write_file_resp {
+        uint8_t completion_code;
+        uint8_t pkgLen;
+        uint8_t ctype;
+        uint8_t tagLenH;
+        uint8_t lenL;
+        uint8_t data[];
 } __attribute__((packed));
 
 uint8_t check_iana(const uint8_t *iana);
