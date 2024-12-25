@@ -18,8 +18,11 @@
 #define PLAT_I3C_H
 
 #define NPCM_I3C_BUS_MAX	6
-
 #define IBI_MDB_SIZE		8
+
+#define LDO_VOLT										\
+	V_LDO_SETTING(rg3mxxb12_ldo_1_8_volt, rg3mxxb12_ldo_1_8_volt, rg3mxxb12_ldo_1_8_volt,	\
+			rg3mxxb12_ldo_1_8_volt)
 
 typedef struct _npcm_i3c_ibi_dev {
 	uint8_t data_mdb[IBI_MDB_SIZE];

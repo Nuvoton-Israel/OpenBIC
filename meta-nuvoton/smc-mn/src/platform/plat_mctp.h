@@ -47,14 +47,22 @@
 #define I3C_STATIC_ADDR_BIC_WF	0x0A
 #define I3C_STATIC_ADDR_BIC_FF	0x0B
 #define I3C_STATIC_ADDR_BMC	0x20
+#define I3C_STATIC_ADDR_HUB	0x70
 
 /* i3c dynamic 8-bit address */
 #define I3C_DYNAMIC_ADDR_BIC	0xA
 
 /* i3c dev bus */
-#define I3C_BUS_CONTROLLER_TO_BIC	4
+/* Normal use bus, BMC (1.8v) <-> BIC (1.8v) */
 #define I3C_BUS_TARGET_TO_BMC		5
+
+/* Test use bus, BIC (3.3v) <-> BIC (3.3v) */
+#define I3C_BUS_CONTROLLER_TO_BIC	4
 #define I3C_BUS_TARGET_TO_BIC		4
+
+/* Test use bus, BIC (1.8v) <-> HUB <-> (1.8v) BIC */
+#define I3C_BUS_CONTROLLER_TO_HUB	5
+#define I3C_BUS_TARGET_TO_HUB		I3C_BUS_TARGET_TO_BMC
 
 /* init the mctp moduel for platform */
 void send_cmd_to_dev(struct k_timer *timer);
