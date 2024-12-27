@@ -78,7 +78,7 @@ bool pldm_send_flashrx_to_bmc(struct espi_npcm4xx_ioc *ioc, struct espi_npcm4xx_
 	msg.len = sizeof(struct pldm_oem_meta_write_file_req) + ioc->pkt_len;
 
 	uint16_t resp_len = sizeof(struct pldm_oem_meta_write_file_resp) +
-				ESPI_FLASH_BUF_SIZE * sizeof(uint8_t);
+		ESPI_FLASH_BUF_SIZE * sizeof(uint8_t);
 
 	uint8_t rbuf[resp_len];
 
@@ -88,22 +88,21 @@ bool pldm_send_flashrx_to_bmc(struct espi_npcm4xx_ioc *ioc, struct espi_npcm4xx_
 		return false;
 	}
 
-	uint8_t *tmp = resp_ioc->pkt;
 	struct pldm_oem_meta_write_file_resp *resp = (struct pldm_oem_meta_write_file_resp *)rbuf;
 
 	if (resp->completion_code != PLDM_SUCCESS) {
 		SAFE_FREE(ptr);
-		LOG_ERR("Check reponse completion code fail %x", resp->completion_code);
+		LOG_ERR("Check response completion code fail %x", resp->completion_code);
 		return false;
 	}
 
 	if (prefetch) {
 		memcpy(prefetch_buf, resp->data, ESPI_FLASH_BUF_SIZE);
-	 } else {
-		*tmp = resp->pkgLen;
-		tmp++;
-		memcpy(tmp, &(resp->ctype), resp->pkgLen);
+	} else {
+		resp_ioc->pkt[0] = resp->pkgLen;
+		memcpy(&resp_ioc->pkt[1], &(resp->ctype), resp->pkgLen);
 	}
+
 	SAFE_FREE(ptr);
 	return true;
 }
@@ -115,7 +114,6 @@ static void safs_isr(void *arvg0, void *arvg1, void *arvg2)
 	struct espi_npcm4xx_ioc resp_ioc = {0};
 	struct espi_flash_rwe *rwe_pkt = (struct espi_flash_rwe *)ioc.pkt;
 	uint32_t cyc, tag, len, addr;
-
 
 	while (1) {
 		k_sem_take(&get_safs_isr_sem, K_FOREVER);
@@ -134,8 +132,7 @@ static void safs_isr(void *arvg0, void *arvg1, void *arvg2)
 		if (prefetch && (rwe_pkt->cyc == ESPI_FLASH_READ_CYCLE_TYPE) && (prefetch_addr > addr))
 			prefetch = false;
 
-		if (prefetch && (rwe_pkt->cyc == ESPI_FLASH_READ_CYCLE_TYPE)  &&  ((addr + len) <= (prefetch_addr + prefetch_len)))
-		{
+		if (prefetch && (rwe_pkt->cyc == ESPI_FLASH_READ_CYCLE_TYPE)  &&  ((addr + len) <= (prefetch_addr + prefetch_len))) {
 			resp_ioc.pkt[0] = ESPI_FLASH_RESP_LEN + len;
 			resp_ioc.pkt[1] = ESPI_FLASH_SUC_CMPLT_D_ONLY;
 			resp_ioc.pkt[2] = tag << 4;
@@ -147,7 +144,7 @@ static void safs_isr(void *arvg0, void *arvg1, void *arvg2)
 				rwe_pkt->len_h = prefetch_len >> 8;
 				rwe_pkt->len_l = prefetch_len & 0xff;
 				prefetch_addr = addr;
-				prefetch= true;
+				prefetch = true;
 			}
 
 			resp_ioc.pkt[0] = ESPI_FLASH_RESP_LEN;
