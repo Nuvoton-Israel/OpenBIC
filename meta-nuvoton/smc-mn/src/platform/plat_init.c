@@ -89,11 +89,11 @@ void pal_pre_init()
 void pal_post_init()
 {
 	plat_mctp_init();
-	snoop_init();
-	kcs_init();
-	plat_isr_init();
-	edaf_npcm_init();
-	plat_uart_bridge_init();
+	//snoop_init();
+	//kcs_init();
+	//plat_isr_init();
+	//edaf_npcm_init();
+	//plat_uart_bridge_init();
 }
 
 void pal_device_init()

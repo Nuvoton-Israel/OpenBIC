@@ -151,6 +151,48 @@ uint8_t mctp_ctrl_cmd_get_endpoint_id(void *mctp_inst, uint8_t *buf, uint16_t le
 	return MCTP_SUCCESS;
 }
 
+uint8_t mctp_ctrl_cmd_prepare_endpoint_discovery(void *mctp_inst, uint8_t *buf, uint16_t len,
+					       uint8_t *resp, uint16_t *resp_len, void *ext_params)
+{
+	ARG_UNUSED(ext_params);
+	CHECK_NULL_ARG_WITH_RETURN(mctp_inst, MCTP_ERROR);
+	CHECK_NULL_ARG_WITH_RETURN(buf, MCTP_ERROR);
+	CHECK_NULL_ARG_WITH_RETURN(resp, MCTP_ERROR);
+	CHECK_NULL_ARG_WITH_RETURN(resp_len, MCTP_ERROR);
+
+	struct _mctp_ctrl_resp *p = (struct _mctp_ctrl_resp *)resp;
+
+	p->completion_code = MCTP_CTRL_CC_SUCCESS;
+
+	*resp = MCTP_CTRL_CC_SUCCESS;
+
+	*resp_len = (p->completion_code == MCTP_CTRL_CC_SUCCESS) ? (sizeof(*p) ) : 1;
+
+	return MCTP_SUCCESS;
+}
+
+uint8_t mctp_ctrl_cmd_endpoint_discovery(void *mctp_inst, uint8_t *buf, uint16_t len,
+					       uint8_t *resp, uint16_t *resp_len, void *ext_params)
+{
+	ARG_UNUSED(ext_params);
+	CHECK_NULL_ARG_WITH_RETURN(mctp_inst, MCTP_ERROR);
+	CHECK_NULL_ARG_WITH_RETURN(buf, MCTP_ERROR);
+	CHECK_NULL_ARG_WITH_RETURN(resp, MCTP_ERROR);
+	CHECK_NULL_ARG_WITH_RETURN(resp_len, MCTP_ERROR);
+
+	struct _mctp_ctrl_resp *p = (struct _mctp_ctrl_resp *)resp;
+
+	p->completion_code = MCTP_CTRL_CC_SUCCESS;
+
+	*resp = MCTP_CTRL_CC_SUCCESS;
+
+	*resp_len = (p->completion_code == MCTP_CTRL_CC_SUCCESS) ? (sizeof(*p) ) : 1;
+
+	return MCTP_SUCCESS;
+}
+
+
+
 uint8_t mctp_ctrl_cmd_get_message_type_support(void *mctp_inst, uint8_t *buf, uint16_t len,
 					       uint8_t *resp, uint16_t *resp_len, void *ext_params)
 {
@@ -282,7 +324,9 @@ static uint8_t mctp_ctrl_cmd_resp_process(mctp *mctp_inst, uint8_t *buf, uint32_
 static mctp_ctrl_cmd_handler_t mctp_ctrl_cmd_tbl[] = {
 	{ MCTP_CTRL_CMD_SET_ENDPOINT_ID, mctp_ctrl_cmd_set_endpoint_id },
 	{ MCTP_CTRL_CMD_GET_ENDPOINT_ID, mctp_ctrl_cmd_get_endpoint_id },
-	{ MCTP_CTRL_CMD_GET_MESSAGE_TYPE_SUPPORT, mctp_ctrl_cmd_get_message_type_support }
+	{ MCTP_CTRL_CMD_GET_MESSAGE_TYPE_SUPPORT, mctp_ctrl_cmd_get_message_type_support },
+	{ MCTP_CTRL_CMD_PREPARE_ENDPOINT_DISCOVERY, mctp_ctrl_cmd_prepare_endpoint_discovery},
+	{ MCTP_CTRL_CMD_ENDPOINT_DISCOVERY, mctp_ctrl_cmd_endpoint_discovery},
 };
 
 uint8_t mctp_ctrl_cmd_handler(void *mctp_p, uint8_t *buf, uint32_t len, mctp_ext_params ext_params)

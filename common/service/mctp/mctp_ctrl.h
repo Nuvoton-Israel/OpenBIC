@@ -38,6 +38,8 @@ typedef struct _mctp_ctrl_cmd_handler {
 #define MCTP_CTRL_CMD_GET_ENDPOINT_ID 0x02
 
 #define MCTP_CTRL_CMD_GET_MESSAGE_TYPE_SUPPORT 0x05
+#define MCTP_CTRL_CMD_PREPARE_ENDPOINT_DISCOVERY 0x0B
+#define MCTP_CTRL_CMD_ENDPOINT_DISCOVERY 0x0c
 
 #define MCTP_CTRL_CMD_GET_ENDPOINT_ID_REQ_LEN 0x00
 
@@ -141,6 +143,11 @@ typedef struct _mctp_ctrl_resp_arg {
 	uint16_t read_len;
 	uint16_t return_len;
 } mctp_ctrl_resp_arg;
+
+struct _mctp_ctrl_resp {
+	uint8_t completion_code;
+} __attribute__((packed));
+
 
 uint8_t mctp_ctrl_cmd_handler(void *mctp_p, uint8_t *buf, uint32_t len, mctp_ext_params ext_params);
 

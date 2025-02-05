@@ -264,7 +264,7 @@ static void mctp_rx_task(void *arg, void *dummy0, void *dummy1)
 		ext_params.tag_owner = 0;
 		ext_params.ep = hdr->src_ep;
 
-		if ((hdr->dest_ep != mctp_inst->endpoint) && (hdr->dest_ep != MCTP_NULL_EID)) {
+		if ((hdr->dest_ep != mctp_inst->endpoint) && (hdr->dest_ep != MCTP_NULL_EID) && (hdr->dest_ep != 0xff)) {
 			/* try to bridge this packet */
 			ret = bridge_msg(mctp_inst, read_buf, read_len);
 			if (ret == MCTP_ERROR)
