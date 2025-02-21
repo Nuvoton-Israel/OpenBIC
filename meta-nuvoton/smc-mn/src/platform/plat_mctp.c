@@ -46,38 +46,11 @@ uint8_t plat_eid = MCTP_DEFAULT_ENDPOINT;
 
 static mctp_port plat_mctp_port[] = {
 	{
-#ifdef TEST_I3C_TARGET_BIC
-		.conf.i3c_conf.addr = I3C_STATIC_ADDR_BIC_SD,
-		.conf.i3c_conf.bus = I3C_BUS_TARGET_TO_BIC,
-#else
-		.conf.i3c_conf.addr = I3C_STATIC_ADDR_BMC,
-		.conf.i3c_conf.bus = I3C_BUS_TARGET_TO_BMC,
-#endif
-		.medium_type = MCTP_MEDIUM_TYPE_TARGET_I3C
-	},
-	{
-		.conf.smbus_conf.addr = I2C_ADDR_BIC,
-		.conf.smbus_conf.bus = I2C_BUS_TARGET_TO_BMC,
-		.medium_type = MCTP_MEDIUM_TYPE_SMBUS
-	},
-	{
 		.channel_target = PLDM, 
 		.conf.usb_conf.addr = 0,
 		.conf.usb_conf.bus = 0,
 		.medium_type = MCTP_MEDIUM_TYPE_USB
 	},
-#ifdef TEST_I3C_CONTROLLER_BIC
-	{
-		.conf.i3c_conf.addr = I3C_STATIC_ADDR_BIC_WF,
-		.conf.i3c_conf.bus = I3C_BUS_CONTROLLER_TO_BIC,
-		.medium_type = MCTP_MEDIUM_TYPE_CONTROLLER_I3C
-	},
-	{
-		.conf.i3c_conf.addr = I3C_STATIC_ADDR_BIC_FF,
-		.conf.i3c_conf.bus = I3C_BUS_CONTROLLER_TO_BIC,
-		.medium_type = MCTP_MEDIUM_TYPE_CONTROLLER_I3C
-	},
-#endif
 };
 
 static mctp_route_entry plat_mctp_route_tbl[] = {

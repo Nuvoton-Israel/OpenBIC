@@ -191,6 +191,119 @@ uint8_t mctp_ctrl_cmd_endpoint_discovery(void *mctp_inst, uint8_t *buf, uint16_t
 	return MCTP_SUCCESS;
 }
 
+uint8_t mctp_get_uuid(void *mctp_inst, uint8_t *buf, uint16_t len,
+					       uint8_t *resp, uint16_t *resp_len, void *ext_params)
+{
+	ARG_UNUSED(ext_params);
+	CHECK_NULL_ARG_WITH_RETURN(mctp_inst, MCTP_ERROR);
+	CHECK_NULL_ARG_WITH_RETURN(buf, MCTP_ERROR);
+	CHECK_NULL_ARG_WITH_RETURN(resp, MCTP_ERROR);
+	CHECK_NULL_ARG_WITH_RETURN(resp_len, MCTP_ERROR);
+
+	struct _get_uuid_resp *p = (struct _get_uuid_resp *)resp;
+
+
+	p->completion_code = MCTP_CTRL_CC_SUCCESS;
+	*resp_len = (p->completion_code == MCTP_CTRL_CC_SUCCESS) ? (sizeof(*p) ) : 1;
+
+	p->uuid[0]=0xf7;
+	p->uuid[1]=0x2d;
+	p->uuid[2]=0x6f;
+	p->uuid[3]=0x50;
+	p->uuid[4]=0x56;
+	p->uuid[5]=0x75;
+	p->uuid[6]=0x11;
+	p->uuid[7]=0xed;
+	p->uuid[8]=0x9b;
+	p->uuid[9]=0x6a;
+	p->uuid[10]=0x02;
+	p->uuid[11]=0x42;
+	p->uuid[12]=0xac;
+	p->uuid[13]=0x12;
+	p->uuid[14]=0x00;
+	p->uuid[15]=0x02;
+
+	return MCTP_SUCCESS;
+
+}
+
+uint8_t mctp_get_routing_table_entries(void *mctp_inst, uint8_t *buf, uint16_t len,
+					       uint8_t *resp, uint16_t *resp_len, void *ext_params)
+{
+	ARG_UNUSED(ext_params);
+	CHECK_NULL_ARG_WITH_RETURN(mctp_inst, MCTP_ERROR);
+	CHECK_NULL_ARG_WITH_RETURN(buf, MCTP_ERROR);
+	CHECK_NULL_ARG_WITH_RETURN(resp, MCTP_ERROR);
+	CHECK_NULL_ARG_WITH_RETURN(resp_len, MCTP_ERROR);
+
+
+	//struct _get_routing_tbl_entry_req *req = (struct _get_routing_tbl_entry_req *)buf;
+	struct _get_routing_tbl_entry_resp *p = (struct _get_routing_tbl_entry_resp *)resp;
+	struct _routing_tbl_entry *entry = &p->routing_tbl_entry;
+
+	uint8_t plat_mctp_port_count = plat_get_mctp_port_count();
+	mctp *inst = (mctp *)mctp_inst;
+	if (plat_mctp_port_count != 0) {
+		for (uint8_t i = 0; i < plat_mctp_port_count; i++) {
+			mctp_port *port = plat_get_mctp_port(i);
+			if (port != NULL) {
+				if (port->mctp_inst->medium_type == inst->medium_type) {
+					entry->starting_eid = port->mctp_inst->endpoint;
+					entry->physical_media_type_identifier = port->mctp_inst->medium_type;
+					entry->physical_address_size = 8;
+					entry->physical_transport_binding = 0x11;
+					break;
+				}
+			} else {
+				LOG_ERR("plat_get_mctp_port not implemented");
+				p->completion_code = MCTP_CTRL_CC_ERROR;
+				*resp_len = 1;
+				return MCTP_SUCCESS;
+			}
+		}
+		p->completion_code = MCTP_CTRL_CC_SUCCESS;
+		p->next_entry_handle = 0xff;
+		p->num_of_entries = 1;
+	} else {
+		LOG_ERR("plat_get_mctp_port not implemented");
+		p->completion_code = MCTP_CTRL_CC_ERROR;
+	}
+
+	*resp_len = (p->completion_code == MCTP_CTRL_CC_SUCCESS) ? (sizeof(*p) ) : 1;
+
+	return MCTP_SUCCESS;
+
+}
+
+uint8_t mctp_ctrl_allocate_endpoint_id(void *mctp_inst, uint8_t *buf, uint16_t len,
+					       uint8_t *resp, uint16_t *resp_len, void *ext_params)
+{
+	ARG_UNUSED(ext_params);
+	CHECK_NULL_ARG_WITH_RETURN(mctp_inst, MCTP_ERROR);
+	CHECK_NULL_ARG_WITH_RETURN(buf, MCTP_ERROR);
+	CHECK_NULL_ARG_WITH_RETURN(resp, MCTP_ERROR);
+	CHECK_NULL_ARG_WITH_RETURN(resp_len, MCTP_ERROR);
+
+
+	struct _alocate_ep_id_req *req = (struct _alocate_ep_id_req *)buf;
+	struct _alocate_ep_id_resp *p = (struct _alocate_ep_id_resp *)resp;
+
+
+	LOG_INF(" req op_flag %d", req->op_flag);
+	LOG_INF(" req num_of_eid %d", req->num_of_eid);
+	LOG_INF(" req starting_eid %d", req->starting_eid);
+
+	p->completion_code = MCTP_CTRL_CC_SUCCESS;
+	p->status = 0;
+	p->fisrt_eid = 0;
+	p->eid_pool_size = 0;
+
+	*resp = MCTP_CTRL_CC_SUCCESS;
+
+	*resp_len = (p->completion_code == MCTP_CTRL_CC_SUCCESS) ? (sizeof(*p) ) : 1;
+
+	return MCTP_SUCCESS;
+}
 
 
 uint8_t mctp_ctrl_cmd_get_message_type_support(void *mctp_inst, uint8_t *buf, uint16_t len,
@@ -327,6 +440,9 @@ static mctp_ctrl_cmd_handler_t mctp_ctrl_cmd_tbl[] = {
 	{ MCTP_CTRL_CMD_GET_MESSAGE_TYPE_SUPPORT, mctp_ctrl_cmd_get_message_type_support },
 	{ MCTP_CTRL_CMD_PREPARE_ENDPOINT_DISCOVERY, mctp_ctrl_cmd_prepare_endpoint_discovery},
 	{ MCTP_CTRL_CMD_ENDPOINT_DISCOVERY, mctp_ctrl_cmd_endpoint_discovery},
+	{ MCTP_CTRL_CMD_ALLOCATE_EP_ID, mctp_ctrl_allocate_endpoint_id},
+	{ MCTP_CTRL_CMD_GET_ROUTING_TABLE_ENTRIES, mctp_get_routing_table_entries},
+	{ MCTP_CTRL_CMD_GET_UUID, mctp_get_uuid},
 };
 
 uint8_t mctp_ctrl_cmd_handler(void *mctp_p, uint8_t *buf, uint32_t len, mctp_ext_params ext_params)
