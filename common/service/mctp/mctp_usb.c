@@ -5,7 +5,6 @@
  */
 
 #include "mctp.h"
-#include "libutil.h"
 #include <usb/class/usb_mctp.h>
 #include <logging/log.h>
 #include <stdint.h>
@@ -16,45 +15,57 @@
 #include <sys/printk.h>
 #include <zephyr.h>
 #include <sys/ring_buffer.h>
-
+#include "libutil.h"
 
 LOG_MODULE_DECLARE(mctp, LOG_LEVEL_DBG);
 
 static const struct device *mctp_dev;
 
 struct k_sem mctp_sem;
-RING_BUF_DECLARE(mctp_ringbuf, MCTP_USB_BTU << 6);
+RING_BUF_DECLARE(mctp_ringbuf, MCTP_USB_XFER_SIZE << 4);
+
+
+uint32_t mctp_ringbuf_space(void)
+{
+	return ring_buf_space_get(&mctp_ringbuf);
+}
 
 static uint16_t mctp_ringbuf_read(uint8_t *buf, uint32_t len, mctp_ext_params *extra_data)
 {
 	uint16_t ret = 0, rx_len, id;
-	uint8_t rx_buff[MCTP_USB_BTU] = { 0 };
+	uint8_t rx_buff[MCTP_USB_XFER_SIZE << 2] = { 0 };
 	struct mctp_usb_hdr *hdr;
 
-	rx_len = ring_buf_get(&mctp_ringbuf, rx_buff, sizeof(rx_buff));
+	rx_len = ring_buf_capacity_get(&mctp_ringbuf) - ring_buf_space_get(&mctp_ringbuf);
+	if (rx_len == 0)
+		return 0;
+	if (rx_len < sizeof(*hdr)) {
+		LOG_ERR("%s: invalid packet received (%d)", __func__, rx_len);
+		return 0;
+	}
+	/* Read mctp_usb hdr */
+	ring_buf_get(&mctp_ringbuf, rx_buff, sizeof(*hdr));
+	hdr = (struct mctp_usb_hdr *)rx_buff;
+	LOG_DBG("mctp packet len: %d", hdr->len);
+	if (hdr->len <= sizeof(*hdr))
+		return 0;
+	if (rx_len < hdr->len) {
+		LOG_ERR("%s: short packet received (%d,%d)", __func__, rx_len, hdr->len);
+		return 0;
+	}
+	/* Read mctp packet */
+	rx_len = ring_buf_get(&mctp_ringbuf, rx_buff + sizeof(*hdr), hdr->len - sizeof(*hdr));
 	if (rx_len) {
-		if (rx_len < sizeof(*hdr)) {
-			LOG_ERR("recv invalid len %d", rx_len);
-			return 0;
-		}
-		
-		LOG_HEXDUMP_DBG(rx_buff, rx_len, "mctp usb receive data");
-
-		hdr = (struct mctp_usb_hdr *)rx_buff;
 		id = sys_le16_to_cpu(hdr->id);
-		
+
 		if (id != MCTP_USB_DMTF_ID) {
-			LOG_ERR("%s: invalid id %04x\n", __func__, id);
+			LOG_ERR("%s: invalid id %04x", __func__, id);
 			return 0;
 		}
 
 		extra_data->type = MCTP_MEDIUM_TYPE_USB;
 		ret = hdr->len - sizeof(*hdr);
-		memcpy(buf, rx_buff + sizeof(*hdr), ret);
-
-
-		if (hdr->len < rx_len)
-			ring_buf_put(&mctp_ringbuf, rx_buff + hdr->len, rx_len - hdr->len);
+		memcpy(buf, rx_buff + sizeof(*hdr), hdr->len - sizeof(*hdr));
 	}
 
 	return ret;
@@ -72,7 +83,7 @@ static uint16_t mctp_usb_read(void *mctp_p, uint8_t *buf, uint32_t len,
 
 	rt_size = mctp_ringbuf_read(buf, len, extra_data);
 
-	while(rt_size == 0) {
+	while(!rt_size) {
 		k_sem_take(&mctp_sem, K_FOREVER);
 		rt_size = mctp_ringbuf_read(buf, len, extra_data);
 	}
@@ -80,8 +91,9 @@ static uint16_t mctp_usb_read(void *mctp_p, uint8_t *buf, uint32_t len,
 	return rt_size;
 }
 
+
 static uint8_t make_send_buf(mctp *mctp_inst, uint8_t *send_buf, uint32_t send_len,
-				 uint8_t *mctp_data, uint32_t mctp_data_len, mctp_ext_params extra_data)
+			     uint8_t *mctp_data, uint32_t mctp_data_len, mctp_ext_params extra_data)
 {
 	CHECK_NULL_ARG_WITH_RETURN(mctp_inst, MCTP_ERROR);
 	CHECK_NULL_ARG_WITH_RETURN(send_buf, MCTP_ERROR);
@@ -97,6 +109,8 @@ static uint8_t make_send_buf(mctp *mctp_inst, uint8_t *send_buf, uint32_t send_l
 
 	return MCTP_SUCCESS;
 }
+
+
 static uint16_t mctp_usb_write(void *mctp_p, uint8_t *buf, uint32_t len,
 				 mctp_ext_params extra_data)
 {
@@ -144,7 +158,7 @@ static int mctp_usb_rx(const struct device *dev, int32_t len,
 			uint8_t *data)
 {
 	
-	ARG_UNUSED(dev);
+    ARG_UNUSED(dev);
 	int wrote;
 
 	wrote = ring_buf_put(&mctp_ringbuf, data, len);
@@ -174,8 +188,9 @@ uint8_t mctp_usb_init(mctp *mctp_inst, mctp_medium_conf medium_conf)
 		return MCTP_ERROR;
 	}
 
-	usb_mctp_register_device(mctp_dev, &mctp_usb_callbacks);
+    usb_mctp_register_device(mctp_dev, &mctp_usb_callbacks);
 	k_sem_init(&mctp_sem, 0, 1);
+
 
 	return MCTP_SUCCESS;
 }
