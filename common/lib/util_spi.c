@@ -422,7 +422,7 @@ uint8_t fw_update(uint32_t offset, uint16_t msg_len, uint8_t *msg_buf, uint8_t f
 		if (ret) {
 			LOG_ERR("Failed to update SPI, status %d", ret);
 		} else {
-			LOG_INF("Update success");
+			LOG_DBG("Update success");
 		}
 		SAFE_FREE(txbuf);
 		k_msleep(10);

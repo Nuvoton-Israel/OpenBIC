@@ -1,0 +1,134 @@
+From e5ee76e61dcc2482e69b55cec31f24a4b013d517 Mon Sep 17 00:00:00 2001
+From: Joseph Liu <kwliu@nuvoton.com>
+Date: Tue, 25 Feb 2025 16:13:40 +0800
+Subject: [PATCH] mctp usb freg
+
+Signed-off-by: Joseph Liu <kwliu@nuvoton.com>
+---
+ common/service/mctp/mctp_usb.c | 93 ++++++++++++++++++++++++----------
+ 1 file changed, 67 insertions(+), 26 deletions(-)
+
+diff --git a/common/service/mctp/mctp_usb.c b/common/service/mctp/mctp_usb.c
+index 29dfbe56..69123418 100644
+--- a/common/service/mctp/mctp_usb.c
++++ b/common/service/mctp/mctp_usb.c
+@@ -24,42 +24,82 @@ static const struct device *mctp_dev;
+ 
+ struct k_sem mctp_sem;
+ RING_BUF_DECLARE(mctp_ringbuf, MCTP_USB_BTU << 6);
++RING_BUF_DECLARE(mctp_rx_ringbuf, MCTP_USB_BTU << 6);
++RING_BUF_DECLARE(mctp_rx_asm_ringbuf, MCTP_USB_BTU);
+ 
+ static uint16_t mctp_ringbuf_read(uint8_t *buf, uint32_t len, mctp_ext_params *extra_data)
+ {
+-	uint16_t ret = 0, rx_len, id;
++	uint16_t ret = 0, rx_len, id, asm_len;
+ 	uint8_t rx_buff[MCTP_USB_BTU] = { 0 };
++	uint8_t asm_rx_buff[MCTP_USB_BTU] = { 0 };
+ 	struct mctp_usb_hdr *hdr;
+-
+-	rx_len = ring_buf_get(&mctp_ringbuf, rx_buff, sizeof(rx_buff));
+-	if (rx_len) {
+-		if (rx_len < sizeof(*hdr)) {
+-			LOG_ERR("recv invalid len %d", rx_len);
+-			return 0;
++	uint8_t asm_data = false;
++	uint8_t asm_size = 0;
++
++	rx_len = ring_buf_get(&mctp_rx_ringbuf, rx_buff, sizeof(rx_buff));	
++	if (!rx_len) {
++
++		asm_len = ring_buf_get(&mctp_rx_asm_ringbuf, asm_rx_buff, sizeof(asm_rx_buff));	
++		if (asm_len) {
++			hdr = (struct mctp_usb_hdr *)asm_rx_buff;
++			id = sys_le16_to_cpu(hdr->id);
++			if (id != MCTP_USB_DMTF_ID) {
++				LOG_ERR("%s: invalid id %04x\n", __func__, id);
++				return 0;
++			}
++
++			ret = hdr->len - sizeof(*hdr);
++			asm_size = hdr->len - asm_len;
++			extra_data->type = MCTP_MEDIUM_TYPE_USB;
++			memcpy(buf, asm_rx_buff + sizeof(*hdr), ret);
++			asm_data = true;
+ 		}
+-		
+-		LOG_HEXDUMP_DBG(rx_buff, rx_len, "mctp usb receive data");
+ 
+-		hdr = (struct mctp_usb_hdr *)rx_buff;
+-		id = sys_le16_to_cpu(hdr->id);
+-
+-		LOG_ERR(" rx_len %d", rx_len);
+-		LOG_ERR(" hdr->id %d", hdr->id);
+-		LOG_ERR(" hdr->len %d", hdr->len);
+-
+-		
+-		if (id != MCTP_USB_DMTF_ID) {
+-			LOG_ERR("%s: invalid id %04x\n", __func__, id);
+-			return 0;
+-		}
++		rx_len = ring_buf_get(&mctp_ringbuf, rx_buff, sizeof(rx_buff));	
++	}
+ 
+-		extra_data->type = MCTP_MEDIUM_TYPE_USB;
+-		ret = hdr->len - sizeof(*hdr);
+-		memcpy(buf, rx_buff + sizeof(*hdr), ret);
+ 
++	if (rx_len) {
+ 
+-		if (hdr->len < rx_len)
+-			ring_buf_put(&mctp_ringbuf, rx_buff + hdr->len, rx_len - hdr->len);
++		if(asm_data) {
++			memcpy(buf + ret, rx_buff, asm_size);
++			ret += asm_size;
++			ring_buf_put(&mctp_rx_ringbuf, rx_buff + asm_size, rx_len - asm_size);
++		} else {
++
++			if (rx_len < sizeof(*hdr)) {
++				LOG_ERR("recv invalid len %d", rx_len);
++				return 0;
++			}
++			
++			LOG_HEXDUMP_DBG(rx_buff, rx_len, "mctp usb receive data");
++
++			hdr = (struct mctp_usb_hdr *)rx_buff;
++			id = sys_le16_to_cpu(hdr->id);
++
++			LOG_DBG(" rx_len %d", rx_len);
++			LOG_DBG(" hdr->id %d", hdr->id);
++			LOG_DBG(" hdr->len %d", hdr->len);
++
++			
++			if (id != MCTP_USB_DMTF_ID) {
++				LOG_ERR("%s: invalid id %04x\n", __func__, id);
++				return 0;
++			}
++
++			if (rx_len < hdr->len) {
++				ring_buf_put(&mctp_rx_asm_ringbuf, rx_buff, rx_len);
++				LOG_ERR("%s: need to reasm\n", __func__);
++				return 0;
++			}
++
++			extra_data->type = MCTP_MEDIUM_TYPE_USB;
++			ret = hdr->len - sizeof(*hdr);
++			memcpy(buf, rx_buff + sizeof(*hdr), ret);
++			if (hdr->len < rx_len)
++				ring_buf_put(&mctp_rx_ringbuf, rx_buff + hdr->len, rx_len - hdr->len);
++		}
++		
+ 	}
+ 
+ 	return ret;
+@@ -153,6 +193,7 @@ static int mctp_usb_rx(const struct device *dev, int32_t len,
+ 	int wrote;
+ 
+ 	wrote = ring_buf_put(&mctp_ringbuf, data, len);
++
+ 	if (wrote < len)
+ 		LOG_WRN("Ring buffer full, drop %zd bytes", len - wrote);
+ 
+-- 
+2.43.0
+

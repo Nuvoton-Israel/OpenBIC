@@ -867,7 +867,7 @@ void req_fw_update_handler(void *mctp_p, void *ext_params, void *arg)
 
 		static uint8_t previous_percent = 0;
 		if (previous_percent != percent)
-			LOG_INF("package loaded: %d%%", percent);
+			LOG_DBG("package loaded: %d%%", percent);
 		previous_percent = percent;
 
 		if (fw_info->update_func(&update_param)) {
@@ -920,7 +920,7 @@ void req_fw_update_handler(void *mctp_p, void *ext_params, void *arg)
 	}
 	state_update(STATE_RDY_XFER);
 
-	cur_aux_state = STATE_AUX_SUCCESS;
+	cur_aux_state = STATE_AUX_NOT_IN_UPDATE;
 
 exit:
 	/* do post-update */
@@ -1270,6 +1270,8 @@ static uint8_t get_status(void *mctp_inst, uint8_t *buf, uint16_t len, uint8_t i
 	resp_p->prog_percent = PLDM_NO_SUPPORT_PROGRESS_PERCENT; //not support
 	resp_p->update_op_flag_en = 0;
 	*resp_len = sizeof(struct pldm_get_status_resp);
+
+
 
 exit:
 	return PLDM_SUCCESS;
