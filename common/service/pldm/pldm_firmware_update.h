@@ -26,7 +26,7 @@ extern "C" {
 #include "hal_i2c.h"
 
 #ifndef MAX_FWUPDATE_RSP_BUF_SIZE
-#define MAX_FWUPDATE_RSP_BUF_SIZE 256
+#define MAX_FWUPDATE_RSP_BUF_SIZE 64
 #endif
 #define MAX_IMAGE_MALLOC_SIZE (1024 * 64)
 #define RETIMER_IMAGE_PACKAGE_SIZE 64

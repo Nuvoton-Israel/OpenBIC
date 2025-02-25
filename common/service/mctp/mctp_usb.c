@@ -42,11 +42,6 @@ static uint16_t mctp_ringbuf_read(uint8_t *buf, uint32_t len, mctp_ext_params *e
 
 		hdr = (struct mctp_usb_hdr *)rx_buff;
 		id = sys_le16_to_cpu(hdr->id);
-
-		LOG_ERR(" rx_len %d", rx_len);
-		LOG_ERR(" hdr->id %d", hdr->id);
-		LOG_ERR(" hdr->len %d", hdr->len);
-
 		
 		if (id != MCTP_USB_DMTF_ID) {
 			LOG_ERR("%s: invalid id %04x\n", __func__, id);
