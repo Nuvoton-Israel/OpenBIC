@@ -23,7 +23,7 @@ LOG_MODULE_DECLARE(mctp, LOG_LEVEL_DBG);
 static const struct device *mctp_dev;
 
 struct k_sem mctp_sem;
-RING_BUF_DECLARE(mctp_ringbuf, MCTP_USB_BTU << 2);
+RING_BUF_DECLARE(mctp_ringbuf, MCTP_USB_BTU << 6);
 
 static uint16_t mctp_ringbuf_read(uint8_t *buf, uint32_t len, mctp_ext_params *extra_data)
 {
@@ -37,10 +37,17 @@ static uint16_t mctp_ringbuf_read(uint8_t *buf, uint32_t len, mctp_ext_params *e
 			LOG_ERR("recv invalid len %d", rx_len);
 			return 0;
 		}
+		
+		LOG_HEXDUMP_DBG(rx_buff, rx_len, "mctp usb receive data");
 
 		hdr = (struct mctp_usb_hdr *)rx_buff;
 		id = sys_le16_to_cpu(hdr->id);
 
+		LOG_ERR(" rx_len %d", rx_len);
+		LOG_ERR(" hdr->id %d", hdr->id);
+		LOG_ERR(" hdr->len %d", hdr->len);
+
+		
 		if (id != MCTP_USB_DMTF_ID) {
 			LOG_ERR("%s: invalid id %04x\n", __func__, id);
 			return 0;
@@ -49,6 +56,7 @@ static uint16_t mctp_ringbuf_read(uint8_t *buf, uint32_t len, mctp_ext_params *e
 		extra_data->type = MCTP_MEDIUM_TYPE_USB;
 		ret = hdr->len - sizeof(*hdr);
 		memcpy(buf, rx_buff + sizeof(*hdr), ret);
+
 
 		if (hdr->len < rx_len)
 			ring_buf_put(&mctp_ringbuf, rx_buff + hdr->len, rx_len - hdr->len);

@@ -21,7 +21,7 @@
 //#define TEST_I3C_TARGET_BIC
 
 #define BMC_USB_PORT "CDC_ACM_0"
-#define ENABLE_MCTP_I3C
+//#define ENABLE_MCTP_I3C
 #define ENABLE_PLDM
 //#define ENABLE_PLDM_SENSOR
 #define ENABLE_OEM_PLDM

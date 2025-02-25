@@ -236,7 +236,7 @@ static void mctp_rx_task(void *arg, void *dummy0, void *dummy1)
 	LOG_INF("mctp_rx_task start %p", mctp_inst);
 
 	while (1) {
-		k_msleep(MCTP_POLL_TIME_MS);
+		//k_msleep(MCTP_POLL_TIME_MS);
 		uint8_t read_buf[256] = { 0 };
 		mctp_ext_params ext_params;
 		uint8_t ret = MCTP_ERROR;
@@ -263,6 +263,9 @@ static void mctp_rx_task(void *arg, void *dummy0, void *dummy1)
 		*/
 		ext_params.tag_owner = 0;
 		ext_params.ep = hdr->src_ep;
+
+		LOG_DBG(" hdr->som(0x%x), hdr->eom(0x%x)", hdr->som, hdr->eom);
+
 
 		if ((hdr->dest_ep != mctp_inst->endpoint) && (hdr->dest_ep != MCTP_NULL_EID) && (hdr->dest_ep != 0xff)) {
 			/* try to bridge this packet */

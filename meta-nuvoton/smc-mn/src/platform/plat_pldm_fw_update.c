@@ -22,11 +22,15 @@
 #include "libutil.h"
 #include "util_spi.h"
 
+#include "plat_version.h"
+
 #include "pldm_firmware_update.h"
 #include "plat_pldm_fw_update.h"
 #include "mctp_ctrl.h"
 
 LOG_MODULE_REGISTER(plat_fwupdate);
+
+//static bool plat_get_bic_fw_version(void *info_p, uint8_t *buf, uint8_t *len);
 
 enum FIRMWARE_COMPONENT {
 	SD_COMPNT_BIC,
@@ -42,8 +46,8 @@ uint8_t MCTP_SUPPORTED_MESSAGES_TYPES[] = {
 pldm_fw_update_info_t PLDMUPDATE_FW_CONFIG_TABLE[] = {
 	{
 		.enable = true,
-		.comp_classification = COMP_CLASS_TYPE_DOWNSTREAM,
-		.comp_identifier = SD_COMPNT_BIC,
+		.comp_classification = 10,
+		.comp_identifier = 65280,
 		.comp_classification_index = 0x00,
 		.pre_update_func = NULL,
 		.update_func = pldm_bic_update,
@@ -147,6 +151,34 @@ uint8_t plat_pldm_query_device_identifiers(const uint8_t *buf, uint16_t len, uin
 }
 
 
+/*
+static bool plat_get_bic_fw_version(void *info_p, uint8_t *buf, uint8_t *len)
+{
+	CHECK_NULL_ARG_WITH_RETURN(info_p, false);
+	CHECK_NULL_ARG_WITH_RETURN(buf, false);
+	CHECK_NULL_ARG_WITH_RETURN(len, false);
+
+	uint8_t tmp_buf[4];
+	uint8_t idx = 0;
+
+	tmp_buf[0] = BIC_FW_YEAR_MSB;
+	tmp_buf[1] = BIC_FW_YEAR_LSB;
+	tmp_buf[2] = BIC_FW_WEEK;
+	tmp_buf[3] = BIC_FW_VER;
+
+	idx += bin2hex(tmp_buf, 2, &buf[idx], 4);
+	buf[idx++] = '.';
+
+	idx += bin2hex(&tmp_buf[2], 1, &buf[idx], 2);
+	buf[idx++] = '.';
+
+	idx += bin2hex(&tmp_buf[3], 1, &buf[idx], 2);
+
+	*len = idx;
+
+	return true;
+}
+*/
 void load_pldmupdate_comp_config(void)
 {
 	if (comp_config) {

@@ -1036,7 +1036,7 @@ static uint8_t pass_component_table(void *mctp_inst, uint8_t *buf, uint16_t len,
 		resp_p->completion_code = PLDM_ERROR_INVALID_DATA;
 		goto exit;
 	}
-
+#if 0
 	/* The classification should be downstream device */
 	if (req_p->comp_classification == PLDM_COMP_DOWNSTREAM_DEVICE) {
 		/**
@@ -1060,7 +1060,7 @@ static uint8_t pass_component_table(void *mctp_inst, uint8_t *buf, uint16_t len,
 		resp_p->completion_code = PLDM_ERROR_INVALID_DATA;
 		goto exit;
 	}
-
+#endif
 	resp_p->comp_resp = 0x00;
 	resp_p->comp_resp_code = verify_comp(req_p->comp_classification, req_p->comp_identifier,
 					     req_p->comp_classification_index);
@@ -1107,7 +1107,7 @@ static uint8_t update_component(void *mctp_inst, uint8_t *buf, uint16_t len, uin
 		resp_p->completion_code = PLDM_FW_UPDATE_CC_NOT_IN_UPDATE_MODE;
 		goto exit;
 	}
-
+#if 0
 	/* The classification should be downstream device */
 	if (req_p->comp_classification == PLDM_COMP_DOWNSTREAM_DEVICE) {
 		/**
@@ -1131,7 +1131,7 @@ static uint8_t update_component(void *mctp_inst, uint8_t *buf, uint16_t len, uin
 		resp_p->completion_code = PLDM_ERROR_INVALID_DATA;
 		goto exit;
 	}
-
+#endif
 	resp_p->comp_compatability_resp = 0x00;
 	resp_p->comp_compatability_resp_code =
 		verify_comp(req_p->comp_classification, req_p->comp_identifier,
@@ -1377,7 +1377,10 @@ static uint8_t get_firmware_parameter(void *mctp_inst, uint8_t *buf, uint16_t le
 	cnt_len += resp_p->active_comp_image_set_ver_str_len;
 	ver_str_p += resp_p->active_comp_image_set_ver_str_len;
 
+	LOG_WRN("get_firmware_parameter comp_config_count %d\n", comp_config_count);
+
 	for (uint8_t i = 0; i < comp_config_count; i++) {
+		if(i > 0)
 		if (!comp_config[i].get_fw_version_fn)
 			continue;
 
@@ -1401,10 +1404,12 @@ static uint8_t get_firmware_parameter(void *mctp_inst, uint8_t *buf, uint16_t le
 		comp_table_p->pending_comp_ver_str_len = 0x00;
 		comp_table_p->comp_activation_methods = comp_config[i].activate_method;
 
+		if(i > 0)
 		if (!comp_config[i].get_fw_version_fn(&comp_config[i], ver_str_p,
 						      &comp_table_p->active_comp_ver_str_len)) {
 			comp_table_p->active_comp_ver_str_len = sizeof(error_code);
 			memcpy(ver_str_p, &error_code, sizeof(error_code));
+			LOG_WRN("error get_fw_version_fn\n");
 		}
 
 		cnt_len += sizeof(struct component_parameter_table) +
@@ -1422,6 +1427,8 @@ static uint8_t get_firmware_parameter(void *mctp_inst, uint8_t *buf, uint16_t le
 
 		resp_p->comp_count++;
 	}
+
+	LOG_WRN("get_firmware_parameter resp_p->comp_count %d\n", resp_p->comp_count);
 
 	resp_p->completion_code = PLDM_SUCCESS;
 
@@ -1494,7 +1501,7 @@ static uint8_t get_downstream_firmware_parameters(void *mctp_inst, uint8_t *buf,
 	uint16_t param_table_len = 0;
 	uint8_t error_code[] = PLDM_CREATE_ERR_STR_ARRAY(PLDM_COMMON_ERR_CODE);
 
-	for (uint8_t i = 1 /* skip BIC itself */; i < comp_config_count; i++) {
+	for (uint8_t i = 0; i < comp_config_count; i++) {
 		if (!comp_config[i].get_fw_version_fn)
 			continue;
 
