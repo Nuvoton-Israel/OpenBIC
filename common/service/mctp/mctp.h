@@ -23,7 +23,9 @@ extern "C" {
 
 #include <stdint.h>
 #include <sys/printk.h>
+#include <sys/slist.h>
 #include <zephyr.h>
+#include "plat_def.h"
 
 #define MCTP_DEBUG 1
 
@@ -63,6 +65,10 @@ extern "C" {
 
 #define MCTP_IC_SHIFT 7
 #define MCTP_IC_MASK 0x80
+
+/* MCTP MESSAGE TYPE: FLASH ACCESS */
+#define MCTP_MSG_TYPE_FLASH	0x5E
+#define FLASH_PAGE_LIST_LEN	5
 
 typedef enum {
 	MCTP_MSG_TYPE_CTRL = 0x00,
@@ -163,6 +169,14 @@ typedef struct __attribute__((aligned(4))) {
 	struct k_msgq *evt_msgq;
 } mctp_tx_msg;
 
+struct flash_page {
+	sys_snode_t node;
+	uint32_t offset;
+	uint16_t len;
+	uint8_t *buf;
+	uint8_t index;
+};
+
 /* mctp main struct */
 typedef struct _mctp {
 	uint8_t is_servcie_start;
@@ -213,6 +227,13 @@ typedef struct _mctp {
 
 	/* for MCTP msg tag */
 	uint8_t msg_tag;
+
+#ifdef ENABLE_EDAF_OVER_MCTP
+	/* for edaf over mctp */
+	struct flash_page page[FLASH_PAGE_LIST_LEN];
+	sys_slist_t flash_page_list;
+	struct k_msgq *mctp_flash_msgq;
+#endif
 } mctp;
 
 typedef struct _mctp_smbus_port {
@@ -291,6 +312,16 @@ mctp_port *pal_find_mctp_port_by_channel_target(uint8_t target);
 
 bool pal_is_need_mctp_interval(mctp *mctp_inst);
 int pal_get_mctp_interval_ms(mctp *mctp_inst);
+
+/* mctp_flash API */
+void mctp_flash_init(mctp *mctp_inst);
+void mctp_flash_free(mctp *mctp_inst);
+int mctp_flash_read(void *mctp_p, uint8_t *buf, uint32_t offset, uint16_t len);
+int mctp_flash_write(void *mctp_p, uint8_t *buf, uint32_t offset, uint16_t len);
+int mctp_flash_erase(void *mctp_p, uint32_t offset, uint16_t len);
+int mctp_flash_msg_handler(void *mctp_p, uint8_t *buf, uint32_t len, mctp_ext_params ext_params);
+void mctp_flash_prefetch(void *mctp_p, uint32_t flash_addr);
+uint32_t mctp_ringbuf_space(void);
 
 #ifdef __cplusplus
 }
