@@ -202,7 +202,11 @@ static uint8_t mctp_msg_recv(void *mctp_p, uint8_t *buf, uint32_t len, mctp_ext_
 	case MCTP_MSG_TYPE_PLDM:
 		mctp_pldm_cmd_handler(mctp_p, buf, len, ext_params);
 		break;
-
+#ifdef ENABLE_EDAF_OVER_MCTP
+	case MCTP_MSG_TYPE_FLASH:
+		mctp_flash_msg_handler(mctp_p, buf, len, ext_params);
+		break;
+#endif
 	default:
 		LOG_WRN("Cannot find message receive function!!");
 		return MCTP_ERROR;
