@@ -183,11 +183,11 @@ __weak int do_update(const struct device *flash_device, off_t offset, uint8_t *b
 	end_sector_addr = (flash_offset + len) / sector_sz * sector_sz;
 	/* handle body */
 	for (; op_addr < end_sector_addr;) {
-		ret = flash_read(flash_device, op_addr, op_buf, sector_sz);
-		if (ret != 0)
-			goto end;
+		//ret = flash_read(flash_device, op_addr, op_buf, sector_sz);
+		//if (ret != 0)
+		//	goto end;
 
-		if (memcmp(op_buf, update_ptr, sector_sz) != 0)
+		//if (memcmp(op_buf, update_ptr, sector_sz) != 0)
 			update_it = true;
 
 		if (update_it) {
@@ -316,11 +316,13 @@ end:
 }
 #endif
 
+static uint8_t txbuf_pre[SECTOR_SZ_64K];
+
 uint8_t fw_update(uint32_t offset, uint16_t msg_len, uint8_t *msg_buf, uint8_t flag,
 		  uint8_t flash_position)
 {
 	static bool is_init = 0;
-	static uint8_t *txbuf = NULL;
+	static uint8_t *txbuf = txbuf_pre;
 	static uint32_t start_offset = 0, buf_offset = 0;
 	static int fw_update_retry = 0;
 	uint32_t ret = 0;
@@ -333,11 +335,11 @@ uint8_t fw_update(uint32_t offset, uint16_t msg_len, uint8_t *msg_buf, uint8_t f
 	}
 
 	if (!is_init) {
-		SAFE_FREE(txbuf);
-		txbuf = (uint8_t *)malloc(SECTOR_SZ_64K);
+		//SAFE_FREE(txbuf);
+		//txbuf = (uint8_t *)malloc(SECTOR_SZ_64K);
 		if (txbuf == NULL) { // Retry alloc
 			k_msleep(100);
-			txbuf = (uint8_t *)malloc(SECTOR_SZ_64K);
+			//txbuf = (uint8_t *)malloc(SECTOR_SZ_64K);
 		}
 		if (txbuf == NULL) {
 			LOG_ERR("SPI index %d, failed to allocate txbuf.", flash_position);
@@ -346,7 +348,7 @@ uint8_t fw_update(uint32_t offset, uint16_t msg_len, uint8_t *msg_buf, uint8_t f
 		is_init = 1;
 		start_offset = offset;
 		buf_offset = 0;
-		k_msleep(10);
+		//k_msleep(10);
 	}
 
 	if (offset != (start_offset + buf_offset)) {
@@ -356,9 +358,9 @@ uint8_t fw_update(uint32_t offset, uint16_t msg_len, uint8_t *msg_buf, uint8_t f
 		if (fw_update_retry < 0) {
 			LOG_ERR("SPI index %d, retry reached max: %d", flash_position,
 				fw_update_retry);
-			SAFE_FREE(txbuf);
-			txbuf = NULL;
-			k_msleep(10);
+		//	SAFE_FREE(txbuf);
+		//	txbuf = NULL;
+			//k_msleep(10);
 			is_init = 0;
 			return FWUPDATE_REPEATED_UPDATED;
 		} else {
@@ -379,9 +381,9 @@ uint8_t fw_update(uint32_t offset, uint16_t msg_len, uint8_t *msg_buf, uint8_t f
 	if ((buf_offset + msg_len) > SECTOR_SZ_64K) {
 		LOG_ERR("SPI index %d, recv data over buffer length(64KB), buf_offset 0x%x, msg_len 0x%x",
 			flash_position, buf_offset, msg_len);
-		SAFE_FREE(txbuf);
-		txbuf = NULL;
-		k_msleep(10);
+	//	SAFE_FREE(txbuf);
+	//	txbuf = NULL;
+		//k_msleep(10);
 		is_init = 0;
 		return FWUPDATE_OVER_LENGTH;
 	}
@@ -404,7 +406,7 @@ uint8_t fw_update(uint32_t offset, uint16_t msg_len, uint8_t *msg_buf, uint8_t f
 
 		ret = ckeck_flash_device_isinit(flash_dev, flash_position);
 		if (ret != 0) {
-			SAFE_FREE(txbuf);
+			//SAFE_FREE(txbuf);
 			is_init = 0;
 			return ret;
 		}
@@ -424,8 +426,8 @@ uint8_t fw_update(uint32_t offset, uint16_t msg_len, uint8_t *msg_buf, uint8_t f
 		} else {
 			LOG_DBG("Update success");
 		}
-		SAFE_FREE(txbuf);
-		k_msleep(10);
+	//	SAFE_FREE(txbuf);
+		//k_msleep(10);
 		is_init = 0;
 
 		LOG_DBG("Update from offset 0x%x, length 0x%x", start_offset, buf_offset);
