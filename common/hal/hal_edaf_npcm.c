@@ -129,6 +129,30 @@ static void safs_isr(void *arvg0, void *arvg1, void *arvg2)
 		tag = rwe_pkt->tag;
 		len = (rwe_pkt->len_h << 8) | (rwe_pkt->len_l & 0xff);
 
+#ifdef ENABLE_EDAF_OVER_MCTP
+		resp_ioc.pkt[2] = tag << 4 | (rwe_pkt->len_h & 0x0F);
+		resp_ioc.pkt[3] = rwe_pkt->len_l & 0xff;
+		if (rwe_pkt->cyc == ESPI_FLASH_READ_CYCLE_TYPE) {
+			mctp_flash_read(find_mctp_by_medium_type(MCTP_MEDIUM_TYPE_USB),
+				&resp_ioc.pkt[4], addr, len);
+			resp_ioc.pkt[0] = ESPI_FLASH_RESP_LEN + len;
+			resp_ioc.pkt[1] = ESPI_FLASH_SUC_CMPLT_D_ONLY;
+		} else if (rwe_pkt->cyc == ESPI_FLASH_WRITE_CYCLE_TYPE){
+			mctp_flash_write(find_mctp_by_medium_type(MCTP_MEDIUM_TYPE_USB),
+				rwe_pkt->data, addr, len);
+			resp_ioc.pkt[0] = ESPI_FLASH_RESP_LEN;
+			resp_ioc.pkt[1] = ESPI_FLASH_SUC_CMPLT;
+		} else if (rwe_pkt->cyc == ESPI_FLASH_ERASE_CYCLE_TYPE){
+			mctp_flash_erase(find_mctp_by_medium_type(MCTP_MEDIUM_TYPE_USB), addr, len);
+			resp_ioc.pkt[0] = ESPI_FLASH_RESP_LEN;
+			resp_ioc.pkt[1] = ESPI_FLASH_SUC_CMPLT;
+		} else {
+			resp_ioc.pkt[0] = ESPI_FLASH_RESP_LEN;
+			resp_ioc.pkt[1] = ESPI_FLASH_UNSUC_CMPLT;
+			resp_ioc.pkt[2] = tag << 4;
+			resp_ioc.pkt[3] = 0;
+		}
+#else
 		if (prefetch && (rwe_pkt->cyc == ESPI_FLASH_READ_CYCLE_TYPE) && (prefetch_addr > addr))
 			prefetch = false;
 
@@ -165,6 +189,7 @@ static void safs_isr(void *arvg0, void *arvg1, void *arvg2)
 				}
 			}
 		}
+#endif
 		rc = espi_npcm4xx_flash_put_tx(espi_dev, &resp_ioc);
 		if (rc) {
 			printk("failed to tx flash packet, rc=%d\n", rc);

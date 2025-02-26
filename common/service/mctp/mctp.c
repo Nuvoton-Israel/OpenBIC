@@ -240,7 +240,6 @@ static void mctp_rx_task(void *arg, void *dummy0, void *dummy1)
 	LOG_INF("mctp_rx_task start %p", mctp_inst);
 
 	while (1) {
-		k_msleep(MCTP_POLL_TIME_MS);
 		uint8_t read_buf[256] = { 0 };
 		mctp_ext_params ext_params;
 		uint8_t ret = MCTP_ERROR;
@@ -249,8 +248,10 @@ static void mctp_rx_task(void *arg, void *dummy0, void *dummy1)
 		uint16_t read_len =
 			mctp_inst->read_data(mctp_inst, read_buf, sizeof(read_buf), &ext_params);
 
-		if (!read_len)
+		if (!read_len) {
+			k_sleep(K_USEC(1));
 			continue;
+		}
 
 		LOG_HEXDUMP_DBG(read_buf, read_len, "mctp receive data");
 
@@ -273,6 +274,7 @@ static void mctp_rx_task(void *arg, void *dummy0, void *dummy1)
 			ret = bridge_msg(mctp_inst, read_buf, read_len);
 			if (ret == MCTP_ERROR)
 				LOG_WRN("Bridge to endpoint 0x%x failed ", hdr->dest_ep);
+			k_yield();
 			continue;
 		}
 
@@ -285,8 +287,10 @@ static void mctp_rx_task(void *arg, void *dummy0, void *dummy1)
 		}
 
 		/* if it is not last packet, waiting for the remain data */
-		if (!hdr->eom)
+		if (!hdr->eom) {
+			k_yield();
 			continue;
+		}
 
 		if (mctp_inst->rx_cb) {
 			/* default process read data buffer directly */
@@ -310,6 +314,8 @@ static void mctp_rx_task(void *arg, void *dummy0, void *dummy1)
 			mctp_inst->temp_msg_buf[hdr->msg_tag][hdr->to].buf = NULL;
 			mctp_inst->temp_msg_buf[hdr->msg_tag][hdr->to].offset = 0;
 		}
+
+		k_yield();
 	}
 }
 
@@ -574,6 +580,9 @@ uint8_t mctp_start(mctp *mctp_inst)
 		goto error;
 	k_thread_name_set(mctp_inst->mctp_tx_task_tid, mctp_inst->mctp_tx_task_name);
 
+#ifdef ENABLE_EDAF_OVER_MCTP
+	mctp_flash_init(mctp_inst);
+#endif
 	mctp_inst->is_servcie_start = 1;
 	return MCTP_SUCCESS;
 
