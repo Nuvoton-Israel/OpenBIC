@@ -827,7 +827,7 @@ void req_fw_update_handler(void *mctp_p, void *ext_params, void *arg)
 		}
 
 		uint8_t resp_buf[req.length + 1];
-		memset(resp_buf, 0, req.length + 1);
+		//memset(resp_buf, 0, req.length + 1);
 
 		uint16_t read_len =
 			pldm_fw_update_read(mctp_p, PLDM_FW_UPDATE_CMD_CODE_REQUEST_FIRMWARE_DATA,
@@ -867,7 +867,7 @@ void req_fw_update_handler(void *mctp_p, void *ext_params, void *arg)
 
 		static uint8_t previous_percent = 0;
 		if (previous_percent != percent)
-			LOG_INF("package loaded: %d%%", percent);
+			LOG_DBG("package loaded: %d%%", percent);
 		previous_percent = percent;
 
 		if (fw_info->update_func(&update_param)) {
