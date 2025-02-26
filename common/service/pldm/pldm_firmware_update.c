@@ -867,7 +867,7 @@ void req_fw_update_handler(void *mctp_p, void *ext_params, void *arg)
 
 		static uint8_t previous_percent = 0;
 		if (previous_percent != percent)
-			LOG_DBG("package loaded: %d%%", percent);
+			LOG_INF("package loaded: %d%%", percent);
 		previous_percent = percent;
 
 		if (fw_info->update_func(&update_param)) {
@@ -918,9 +918,6 @@ void req_fw_update_handler(void *mctp_p, void *ext_params, void *arg)
 		cur_aux_state = STATE_AUX_FAILED;
 		goto exit;
 	}
-	state_update(STATE_RDY_XFER);
-
-	cur_aux_state = STATE_AUX_NOT_IN_UPDATE;
 
 exit:
 	/* do post-update */
@@ -1257,6 +1254,13 @@ static uint8_t get_status(void *mctp_inst, uint8_t *buf, uint16_t len, uint8_t i
 	}
 
 	LOG_INF("Get status");
+
+	if (cur_aux_state == STATE_AUX_SUCCESS) {
+		previous_state = current_state;
+		current_state = STATE_RDY_XFER;
+		cur_aux_state = STATE_AUX_NOT_IN_UPDATE;
+	}
+
 	resp_p->completion_code = PLDM_SUCCESS;
 	resp_p->cur_state = current_state;
 	resp_p->pre_state = previous_state;
@@ -1265,6 +1269,12 @@ static uint8_t get_status(void *mctp_inst, uint8_t *buf, uint16_t len, uint8_t i
 		resp_p->aux_state_status = 0x0A; //generic error
 	else
 		resp_p->aux_state_status = 0;
+
+
+	LOG_DBG("resp_p->cur_state  %d", resp_p->cur_state );
+	LOG_DBG("resp_p->pre_state  %d", resp_p->pre_state );
+	LOG_DBG("resp_p->aux_state  %d", resp_p->aux_state );
+	LOG_DBG("resp_p->aux_state_status  %d", resp_p->cur_state );
 
 	resp_p->reason_code = 0; //not support
 	resp_p->prog_percent = PLDM_NO_SUPPORT_PROGRESS_PERCENT; //not support
