@@ -103,7 +103,7 @@
 		compatible = "i3c-slave-mqueue";
 		reg = <0x21>;
 		msg-size = <256>;
-		num-of-msgs = <4>;
+		num-of-msgs = <8>;
 		mandatory-data-byte = <0xae>;
 		label = "I3C_SMQ_5";
 		status = "okay";
