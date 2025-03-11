@@ -38,8 +38,6 @@ uint8_t MCTP_SUPPORTED_MESSAGES_TYPES[] = {
         TYPE_PLDM,
 };
 
-uint8_t pldm_bios_update(void *fw_update_param);
-
 /* PLDM FW update table */
 pldm_fw_update_info_t PLDMUPDATE_FW_CONFIG_TABLE[] = {
 	{
@@ -69,45 +67,6 @@ pldm_fw_update_info_t PLDMUPDATE_FW_CONFIG_TABLE[] = {
 		.get_fw_version_fn = NULL,
 	},
 };
-
-uint8_t pldm_bios_update(void *fw_update_param)
-{
-	CHECK_NULL_ARG_WITH_RETURN(fw_update_param, 1);
-
-	pldm_fw_update_param_t *p = (pldm_fw_update_param_t *)fw_update_param;
-
-	CHECK_NULL_ARG_WITH_RETURN(p->data, 1);
-
-	uint8_t update_flag = 0;
-
-	/* prepare next data offset and length */
-	p->next_ofs = p->data_ofs + p->data_len;
-	p->next_len = fw_update_cfg.max_buff_size;
-
-	if (p->next_ofs < fw_update_cfg.image_size) {
-		if (p->next_ofs + p->next_len > fw_update_cfg.image_size)
-			p->next_len = fw_update_cfg.image_size - p->next_ofs;
-
-		if (((p->next_ofs % SECTOR_SZ_64K) + p->next_len) > SECTOR_SZ_64K)
-			p->next_len = SECTOR_SZ_64K - (p->next_ofs % SECTOR_SZ_64K);
-	} else {
-		/* current data is the last packet
-		 * set the next data length to 0 to inform the update completely
-		 */
-		p->next_len = 0;
-		update_flag = (SECTOR_END_FLAG | NO_RESET_FLAG);
-	}
-
-	uint8_t ret = fw_update(p->data_ofs, p->data_len, p->data, update_flag, DEVSPI_SPI1_CS1);
-
-	if (ret) {
-		LOG_ERR("Firmware update failed, offset(0x%x), length(0x%x), status(%d)",
-			p->data_ofs, p->data_len, ret);
-		return 1;
-	}
-
-	return 0;
-}
 
 uint8_t plat_pldm_query_device_identifiers(const uint8_t *buf, uint16_t len, uint8_t *resp,
 					   uint16_t *resp_len)
