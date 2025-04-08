@@ -40,6 +40,11 @@ typedef struct pldm_sensor_info {
 	sensor_cfg pldm_sensor_cfg;
 } pldm_sensor_info;
 
+typedef struct pldm_state_sensor_info {
+	PDR_state_sensor pdr_state_sensor;
+	sensor_cfg pldm_sensor_cfg;
+} pldm_state_sensor_info;
+
 typedef struct pldm_sensor_thread {
 	int thread_id;
 	char *thread_name;
@@ -63,5 +68,7 @@ int plat_pldm_sensor_get_sensor_count(int thread_id);
 int pldm_sensor_polling_pre_check(pldm_sensor_info *pldm_snr_list, int sensor_num);
 int pldm_polling_sensor_reading(pldm_sensor_info *pldm_snr_list, int pldm_sensor_count,
 				int thread_id, int sensor_num);
+
+uint8_t plat_pldm_state_sensor_get_reading(uint16_t sensor_id, struct pldm_get_state_sensor_reading_resp *res_p);
 
 #endif

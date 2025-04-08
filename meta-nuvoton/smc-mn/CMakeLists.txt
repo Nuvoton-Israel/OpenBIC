@@ -54,3 +54,5 @@ target_include_directories(app PRIVATE src/platform)
 # Fail build if there are any warnings
 target_compile_options(app PRIVATE -Werror)
 
+add_compile_definitions(PLDM_MONITOR_EVENT_QUEUE_MSG_NUM_MAX=60)
+add_compile_definitions(PLDM_MAX_DATA_SIZE=2048)

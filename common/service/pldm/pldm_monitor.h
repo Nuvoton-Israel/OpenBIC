@@ -38,6 +38,7 @@ typedef enum pldm_platform_monitor_commands {
 } pldm_platform_monitor_commands_t;
 
 /* define size of request */
+#define PLDM_GET_STATE_SENSOR_READING_REQ_BYTES 4
 #define PLDM_GET_SENSOR_READING_REQ_BYTES 3
 #define PLDM_SET_STATE_EFFECTER_REQ_NO_STATE_FIELD_BYTES 3
 
@@ -383,7 +384,7 @@ struct pldm_get_state_sensor_reading_req {
 struct pldm_get_state_sensor_reading_resp {
 	uint8_t completion_code;
 	uint8_t composite_sensor_count;
-	state_sensor_reading_state_field_t field[8];
+	state_sensor_reading_state_field_t field[1];
 } __attribute__((packed));
 
 enum pldm_get_pdr_transfer_flag {
