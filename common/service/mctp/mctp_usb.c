@@ -59,7 +59,7 @@ static uint16_t mctp_ringbuf_read(uint8_t *buf, uint32_t len, mctp_ext_params *e
 	if (rx_len) {
 		id = sys_le16_to_cpu(hdr->id);
 
-		if (id != MCTP_USB_DMTF_ID) {
+		if (sys_be16_to_cpu(id) != MCTP_USB_DMTF_ID) {
 			LOG_ERR("%s: invalid id %04x", __func__, id);
 			return 0;
 		}
@@ -102,7 +102,7 @@ static uint8_t make_send_buf(mctp *mctp_inst, uint8_t *send_buf, uint32_t send_l
 	CHECK_ARG_WITH_RETURN(!mctp_data_len, MCTP_ERROR);
 
 	struct mctp_usb_hdr *hdr = (struct mctp_usb_hdr *)send_buf;
-	hdr->id = sys_cpu_to_le16(MCTP_USB_DMTF_ID);;
+	hdr->id = sys_cpu_to_be16(MCTP_USB_DMTF_ID);;
 	hdr->len = mctp_data_len + sizeof(*hdr);
 
 	memcpy(send_buf + sizeof(*hdr), mctp_data, mctp_data_len);
