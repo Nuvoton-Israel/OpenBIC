@@ -9,7 +9,7 @@
 #include "plat_mctp.h"
 
 #ifdef ENABLE_EDAF_OVER_MCTP
-LOG_MODULE_REGISTER(mctp_flash, LOG_LEVEL_DBG);
+LOG_MODULE_REGISTER(mctp_flash);
 
 /* MCTP flash command */
 #define MCTP_FLASH_READ		0
