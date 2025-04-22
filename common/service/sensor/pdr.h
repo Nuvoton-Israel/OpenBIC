@@ -117,6 +117,46 @@ typedef struct __attribute__((packed)) {
 	int32_t fatal_low;
 } PDR_numeric_sensor;
 
+
+typedef union {
+	uint8_t byte;
+	struct {
+		uint8_t bit0 : 1;
+		uint8_t bit1 : 1;
+		uint8_t bit2 : 1;
+		uint8_t bit3 : 1;
+		uint8_t bit4 : 1;
+		uint8_t bit5 : 1;
+		uint8_t bit6 : 1;
+		uint8_t bit7 : 1;
+	} __attribute__((packed)) bits;
+} bitfield8_t;
+
+
+
+typedef struct __attribute__((packed)){
+	uint16_t state_set_id;
+	uint8_t possible_states_size;
+	bitfield8_t states[1];
+} state_sensor_possible_states;
+
+typedef struct  __attribute__((packed)){
+	/*** PDR common header***/
+	PDR_common_header pdr_common_header;
+
+	/***state sensor format***/
+	uint16_t terminus_handle;
+	uint16_t sensor_id;
+	uint16_t entity_type;
+	uint16_t entity_instance;
+	uint16_t container_id;
+	uint8_t sensor_init;
+	uint8_t sensor_auxiliary_names_pdr;
+	uint8_t composite_sensor_count;
+	state_sensor_possible_states possible_states;
+} PDR_state_sensor;
+
+
 typedef struct __attribute__((packed)) {
 	PDR_common_header pdr_common_header;
 	uint16_t terminus_handle;
@@ -151,6 +191,7 @@ typedef struct __attribute__((packed)) {
 PDR_INFO *get_pdr_info();
 uint32_t get_record_count();
 uint32_t plat_get_pdr_size(uint8_t pdr_type);
+void plat_load_state_sensor_pdr_table(PDR_state_sensor *state_sensor_table);
 void plat_load_numeric_sensor_pdr_table(PDR_numeric_sensor *numeric_sensor_table);
 void plat_load_aux_sensor_names_pdr_table(PDR_sensor_auxiliary_names *aux_sensor_name_table);
 void plat_load_entity_aux_names_pdr_table(PDR_entity_auxiliary_names *entity_aux_name_table);
