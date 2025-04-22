@@ -38,6 +38,7 @@ typedef enum pldm_platform_monitor_commands {
 } pldm_platform_monitor_commands_t;
 
 /* define size of request */
+#define PLDM_GET_STATE_SENSOR_READING_REQ_BYTES 4
 #define PLDM_GET_SENSOR_READING_REQ_BYTES 3
 #define PLDM_SET_STATE_EFFECTER_REQ_NO_STATE_FIELD_BYTES 3
 
