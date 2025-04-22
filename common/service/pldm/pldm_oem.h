@@ -40,6 +40,8 @@ extern "C" {
 #define PLDM_OEM_FORCE_UPDATE_SETTING_CMD 0x06
 #define PLDM_OEM_FORCE_UPDATE_GETTING_CMD 0x07
 #define PLDM_OEM_READ_FLASH_DATA_CMD 0x08
+#define PLDM_OEM_GET_RTC 0xc
+#define PLDM_OEM_SET_RTC 0xd
 
 #define POWER_CONTROL_LEN 0x01
 
@@ -455,6 +457,37 @@ struct pldm_oem_meta_write_file_resp {
         uint8_t tagLenH;
         uint8_t lenL;
         uint8_t data[];
+} __attribute__((packed));
+
+struct _get_rtc_req {
+	uint8_t iana[IANA_LEN];
+} __attribute__((packed));
+
+struct _get_rtc_resp {
+	uint8_t completion_code;
+	uint8_t iana[IANA_LEN];
+	uint8_t length;
+	uint8_t sec;
+	uint8_t min;
+	uint8_t hour;
+	uint8_t mday;
+	uint8_t mon;
+	uint16_t year;
+} __attribute__((packed));
+
+struct _set_rtc_req {
+	uint8_t iana[IANA_LEN];
+	uint8_t sec;
+	uint8_t min;
+	uint8_t hour;
+	uint8_t mday;
+	uint8_t mon;
+	uint16_t year;
+} __attribute__((packed));
+
+struct _set_rtc_resp {
+	uint8_t completion_code;
+	uint8_t iana[IANA_LEN];
 } __attribute__((packed));
 
 uint8_t check_iana(const uint8_t *iana);
