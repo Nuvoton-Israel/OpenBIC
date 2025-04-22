@@ -49,10 +49,10 @@
 	gpio_name_to_num(Reserve_GPIO23) \
 	gpio_name_to_num(Reserve_GPIO24) \
 	gpio_name_to_num(Reserve_GPIO25) \
-	gpio_name_to_num(Reserve_GPIO26) \
+	gpio_name_to_num(ALERT_TEST) \
 	gpio_name_to_num(Reserve_GPIO27)
 
-#define name_gpio3 \
+#define name_gpio3	\
 	gpio_name_to_num(Reserve_GPIO30) \
 	gpio_name_to_num(Reserve_GPIO31) \
 	gpio_name_to_num(Reserve_GPIO32) \
@@ -61,8 +61,7 @@
 	gpio_name_to_num(Reserve_GPIO35) \
 	gpio_name_to_num(Reserve_GPIO36) \
 	gpio_name_to_num(Reserve_GPIO37)
-
-#define name_gpio4 \
+#define name_gpio4	\
 	gpio_name_to_num(Reserve_GPIO40) \
 	gpio_name_to_num(Reserve_GPIO41) \
 	gpio_name_to_num(Reserve_GPIO42) \
@@ -71,8 +70,7 @@
 	gpio_name_to_num(Reserve_GPIO45) \
 	gpio_name_to_num(Reserve_GPIO46) \
 	gpio_name_to_num(Reserve_GPIO47)
-
-#define name_gpio5 \
+#define name_gpio5	\
 	gpio_name_to_num(Reserve_GPIO50) \
 	gpio_name_to_num(Reserve_GPIO51) \
 	gpio_name_to_num(Reserve_GPIO52) \
@@ -81,8 +79,7 @@
 	gpio_name_to_num(Reserve_GPIO55) \
 	gpio_name_to_num(Reserve_GPIO56) \
 	gpio_name_to_num(Reserve_GPIO57)
-
-#define name_gpio6 \
+#define name_gpio6	\
 	gpio_name_to_num(Reserve_GPIO60) \
 	gpio_name_to_num(Reserve_GPIO61) \
 	gpio_name_to_num(Reserve_GPIO62) \
@@ -91,29 +88,25 @@
 	gpio_name_to_num(Reserve_GPIO65) \
 	gpio_name_to_num(Reserve_GPIO66) \
 	gpio_name_to_num(Reserve_GPIO67)
-
-#define name_gpio7 \
+#define name_gpio7	\
 	gpio_name_to_num(Reserve_GPIO70) \
 	gpio_name_to_num(Reserve_GPIO71) \
 	gpio_name_to_num(Reserve_GPIO72) \
 	gpio_name_to_num(Reserve_GPIO73) \
-	gpio_name_to_num(Reserve_GPIO74) \
-	gpio_name_to_num(Reserve_GPIO75) \
+	gpio_name_to_num(GPIO74_Strap_DSW_EN) \
+	gpio_name_to_num(GPIO75_Strap_JEN_N) \
 	gpio_name_to_num(Reserve_GPIO76) \
 	gpio_name_to_num(Reserve_GPIO77)
-
-/* GPIO 84, 85 unused */
-#define name_gpio8 \
+#define name_gpio8	\
 	gpio_name_to_num(Reserve_GPIO80) \
 	gpio_name_to_num(Reserve_GPIO81) \
-	gpio_name_to_num(Reserve_GPIO82) \
+	gpio_name_to_num(LED_NPCM_HEARTBEAT_R) \
 	gpio_name_to_num(Reserve_GPIO83) \
 	gpio_name_to_num(Reserve_GPIO84) \
 	gpio_name_to_num(Reserve_GPIO85) \
 	gpio_name_to_num(Reserve_GPIO86) \
 	gpio_name_to_num(Reserve_GPIO87)
-
-#define name_gpio9 \
+#define name_gpio9	\
 	gpio_name_to_num(Reserve_GPIO90) \
 	gpio_name_to_num(Reserve_GPIO91) \
 	gpio_name_to_num(Reserve_GPIO92) \
@@ -122,8 +115,7 @@
 	gpio_name_to_num(Reserve_GPIO95) \
 	gpio_name_to_num(Reserve_GPIO96) \
 	gpio_name_to_num(Reserve_GPIO97)
-
-#define name_gpioA \
+#define name_gpioA	\
 	gpio_name_to_num(Reserve_GPIOA0) \
 	gpio_name_to_num(Reserve_GPIOA1) \
 	gpio_name_to_num(Reserve_GPIOA2) \
@@ -132,9 +124,8 @@
 	gpio_name_to_num(Reserve_GPIOA5) \
 	gpio_name_to_num(Reserve_GPIOA6) \
 	gpio_name_to_num(Reserve_GPIOA7)
-
-#define name_gpioB \
-	gpio_name_to_num(Reserve_GPIOB0) \
+#define name_gpioB	\
+	gpio_name_to_num(RSVD_GPIO_1_R) \
 	gpio_name_to_num(Reserve_GPIOB1) \
 	gpio_name_to_num(Reserve_GPIOB2) \
 	gpio_name_to_num(Reserve_GPIOB3) \
@@ -142,8 +133,7 @@
 	gpio_name_to_num(Reserve_GPIOB5) \
 	gpio_name_to_num(Reserve_GPIOB6) \
 	gpio_name_to_num(Reserve_GPIOB7)
-
-#define name_gpioC \
+#define name_gpioC	\
 	gpio_name_to_num(Reserve_GPIOC0) \
 	gpio_name_to_num(Reserve_GPIOC1) \
 	gpio_name_to_num(Reserve_GPIOC2) \
@@ -152,19 +142,16 @@
 	gpio_name_to_num(Reserve_GPIOC5) \
 	gpio_name_to_num(Reserve_GPIOC6) \
 	gpio_name_to_num(Reserve_GPIOC7)
-
-#define name_gpioD \
+#define name_gpioD	\
 	gpio_name_to_num(Reserve_GPIOD0) \
 	gpio_name_to_num(Reserve_GPIOD1) \
 	gpio_name_to_num(Reserve_GPIOD2) \
 	gpio_name_to_num(Reserve_GPIOD3) \
-	gpio_name_to_num(Reserve_GPIOO4) \
+	gpio_name_to_num(Reserve_GPIOD4) \
 	gpio_name_to_num(Reserve_GPIOD5) \
 	gpio_name_to_num(Reserve_GPIOD6) \
 	gpio_name_to_num(Reserve_GPIOD7)
-
-/* GPIOE7 unused */
-#define name_gpioE \
+#define name_gpioE	\
 	gpio_name_to_num(Reserve_GPIOE0) \
 	gpio_name_to_num(Reserve_GPIOE1) \
 	gpio_name_to_num(Reserve_GPIOE2) \
@@ -173,17 +160,12 @@
 	gpio_name_to_num(Reserve_GPIOE5) \
 	gpio_name_to_num(Reserve_GPIOE6) \
 	gpio_name_to_num(Reserve_GPIOE7)
-
-/* GPIOF4 ~ GPIOF7 unused */
-#define name_gpioF \
+#define name_gpioF	\
 	gpio_name_to_num(Reserve_GPIOF0) \
 	gpio_name_to_num(Reserve_GPIOF1) \
 	gpio_name_to_num(Reserve_GPIOF2) \
-	gpio_name_to_num(Reserve_GPIOF3) \
-	gpio_name_to_num(Reserve_GPIOF4) \
-	gpio_name_to_num(Reserve_GPIOF5) \
-	gpio_name_to_num(Reserve_GPIOF6) \
-	gpio_name_to_num(Reserve_GPIOF7)
+	gpio_name_to_num(Reserve_GPIOF3)
+
 
 // clang-format on
 

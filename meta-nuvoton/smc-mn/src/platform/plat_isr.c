@@ -22,6 +22,7 @@
 #include <libutil.h>
 #include <logging/log.h>
 #include "hal_gpio.h"
+#include "plat_gpio.h"
 #include "hal_vw_gpio.h"
 #include "plat_isr.h"
 #include "util_worker.h"
@@ -33,6 +34,7 @@
 #ifdef ENABLE_PLDM
 #include "pldm_oem.h"
 #include "plat_mctp.h"
+#include "pldm.h"
 #endif
 
 LOG_MODULE_REGISTER(plat_isr);
@@ -135,4 +137,26 @@ void ISR_VW_GPIO(uint8_t gpio_value, uint8_t gpio_index)
 #ifdef ENABLE_PLDM	
 	k_sem_give(&get_isr_sem);
 #endif
+}
+
+
+void ISR_TEST()
+{
+	struct pldm_sensor_event_state_sensor_state event;
+
+	bool is_alert = !gpio_get(ALERT_TEST);
+
+	event.sensor_offset = 0;
+	event.event_state = is_alert ? PLDM_STATE_SET_PRESENT :
+				       PLDM_STATE_SET_NOT_PRESENT;
+	event.previous_event_state = is_alert ? PLDM_STATE_SET_NOT_PRESENT :
+						PLDM_STATE_SET_PRESENT;
+
+	LOG_DBG("GPIO26 is %s", is_alert ? "alert" : "non-alert");
+
+	if (pldm_send_platform_event(PLDM_SENSOR_EVENT, 0x30,
+				     PLDM_STATE_SENSOR_STATE, (uint8_t *)&event,
+				     sizeof(struct pldm_sensor_event_state_sensor_state))) {
+		LOG_ERR("Send GPIO26 alert event log failed");
+	}
 }
