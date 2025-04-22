@@ -47,7 +47,7 @@ static struct k_sem get_isr_sem;
 uint8_t val[2] = {0};
 
 
-bool pldm_send_post_complete_to_bmc(uint8_t gpio_value, uint8_t gpio_index)
+bool pldm_send_vwgpio_to_bmc(uint8_t gpio_value, uint8_t gpio_index)
 {
 	pldm_msg msg = { 0 };
 	uint8_t bmc_bus = 0;
@@ -105,7 +105,7 @@ static void vw_gpio_isr(void *arvg0, void *arvg1, void *arvg2)
 {
 	while (1) {
 		k_sem_take(&get_isr_sem, K_FOREVER);
-		pldm_send_post_complete_to_bmc(val[0], val[1]);
+		pldm_send_vwgpio_to_bmc(val[0], val[1]);
 		k_yield();
 	}
 }
