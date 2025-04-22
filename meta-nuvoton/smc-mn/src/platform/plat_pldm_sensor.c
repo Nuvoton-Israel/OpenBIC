@@ -27,9 +27,45 @@
 LOG_MODULE_REGISTER(plat_pldm_sensor);
 
 static struct pldm_sensor_thread pal_pldm_sensor_thread[MAX_SENSOR_THREAD_ID] = {
-	// thread id, thread name
 	{ ADC_SENSOR_THREAD_ID, "ADC_PLDM_SENSOR_THREAD" },
 };
+
+pldm_state_sensor_info plat_pldm_state_sensor_table[] = {
+    {
+        {
+            /*** PDR common header ***/
+            {
+                .record_handle = 0x00000000,
+                .PDR_header_version = 0x01,
+				.PDR_type = PLDM_STATE_SENSOR_PDR,
+                .record_change_number = 0x0000,
+                .data_length = 0x0000,
+            },
+
+            /*** state sensor format ***/
+            .terminus_handle = 0x0000,
+            .sensor_id = 0x0030,
+            .entity_type = PLDM_ENTITY_IO_CONTROLLER,
+            .entity_instance = 0x0001,
+            .container_id = 0x0000,
+            .sensor_init = PDR_SENSOR_USEINIT_PDR,
+            .sensor_auxiliary_names_pdr = 0x01,
+            .composite_sensor_count= 0x01,
+
+			/***  state_sensor_possible_states***/
+            {
+				.state_set_id = 13,
+				.possible_states_size = 1,
+				.states[0]= { .byte = 0xf },
+			},
+		},
+        {
+            .port = 26,
+            .access_checker = stby_access,
+        },
+    },
+};
+
 
 pldm_sensor_info plat_pldm_sensor_adc_table[] = {
 	{
@@ -375,6 +411,23 @@ PDR_sensor_auxiliary_names plat_pdr_sensor_aux_names_table[] = {
 		.nameLanguageTag = "en",
 		.sensorName = u"VHIF",
 	},
+	{
+		// GPIO26
+		/*** PDR common header***/
+		{
+			.record_handle = 0x00000000,
+			.PDR_header_version = 0x01,
+			.PDR_type = PLDM_SENSOR_AUXILIARY_NAMES_PDR,
+			.record_change_number = 0x0000,
+			.data_length = 0x0000,
+		},
+		.terminus_handle = 0x0000,
+		.sensor_id = 0x0030,
+		.sensor_count = 0x1,
+		.nameStringCount = 0x1,
+		.nameLanguageTag = "en",
+		.sensorName = u"GPIO26",
+	},
 };
 
 PDR_entity_auxiliary_names plat_pdr_entity_aux_names_table[] = { {
@@ -393,12 +446,14 @@ PDR_entity_auxiliary_names plat_pdr_entity_aux_names_table[] = { {
 	.nameLanguageTag = "en",
 } };
 
-
 uint32_t plat_get_pdr_size(uint8_t pdr_type)
 {
 	int total_size = 0, i = 0;
 
 	switch (pdr_type) {
+	case PLDM_STATE_SENSOR_PDR:
+		total_size += ARRAY_SIZE(plat_pldm_state_sensor_table);
+		break;
 	case PLDM_NUMERIC_SENSOR_PDR:
 		for (i = 0; i < MAX_SENSOR_THREAD_ID; i++) {
 			total_size += plat_pldm_sensor_get_sensor_count(i);
@@ -419,8 +474,8 @@ uint32_t plat_get_pdr_size(uint8_t pdr_type)
 
 void plat_load_aux_sensor_names_pdr_table(PDR_sensor_auxiliary_names *aux_sensor_name_table)
 {
-       memcpy(aux_sensor_name_table, &plat_pdr_sensor_aux_names_table,
-              sizeof(plat_pdr_sensor_aux_names_table));
+	memcpy(aux_sensor_name_table, &plat_pdr_sensor_aux_names_table,
+	       sizeof(plat_pdr_sensor_aux_names_table));
 }
 
 uint16_t plat_pdr_entity_aux_names_table_size = 0;
@@ -492,12 +547,10 @@ void plat_init_entity_aux_names_pdr_table()
 
 void plat_load_entity_aux_names_pdr_table(PDR_entity_auxiliary_names *entity_aux_name_table)
 {
-
 	memcpy(entity_aux_name_table, &plat_pdr_entity_aux_names_table,
 	       plat_pdr_entity_aux_names_table_size - entityName_len * sizeof(char16_t));
 
-	memcpy(entity_aux_name_table->entityName, entityName,
-	       entityName_len * sizeof(char16_t));
+	memcpy(entity_aux_name_table->entityName, entityName, entityName_len * sizeof(char16_t));
 }
 
 uint16_t plat_get_pdr_entity_aux_names_size()
@@ -515,7 +568,6 @@ pldm_sensor_info *plat_pldm_sensor_load(int thread_id)
 	switch (thread_id) {
 	case ADC_SENSOR_THREAD_ID:
 		return plat_pldm_sensor_adc_table;
-
 	default:
 		LOG_ERR("Unknow pldm sensor thread id %d", thread_id);
 		return NULL;
@@ -576,4 +628,72 @@ void plat_load_numeric_sensor_pdr_table(PDR_numeric_sensor *numeric_sensor_table
 			}
 		}
 	}
+}
+
+void plat_load_state_sensor_pdr_table(PDR_state_sensor *state_sensor_table)
+{
+	int sensor_num = 0;
+	int max_sensor_num = 0, current_sensor_size = 0;
+	uint32_t total_size = plat_get_pdr_size(PLDM_STATE_SENSOR_PDR);
+	pldm_state_sensor_info *pdr_table = plat_pldm_state_sensor_table;
+
+	if (pdr_table == NULL) {
+		LOG_ERR("Failed to get state sensor pdr table");
+		return;
+	}
+
+	max_sensor_num = ARRAY_SIZE(plat_pldm_state_sensor_table);
+	if (max_sensor_num < 0) {
+		LOG_ERR("Failed to get state sensor count");
+		return;
+	}
+
+	for (sensor_num = 0; sensor_num < max_sensor_num; sensor_num++) {
+		if (pdr_table[sensor_num].pldm_sensor_cfg.cache_status != PLDM_SENSOR_DISABLED) {
+			if (current_sensor_size >= total_size) {
+				LOG_ERR("Load state sensor pdr exceeded table size, total size: 0x%x, sensor id: 0x%x",
+					total_size,
+					pdr_table[sensor_num].pdr_state_sensor.sensor_id);
+				continue;
+			}
+
+			memcpy(&state_sensor_table[current_sensor_size],
+			       &pdr_table[sensor_num].pdr_state_sensor, sizeof(PDR_state_sensor));
+			current_sensor_size++;
+		}
+	}
+}
+
+uint8_t plat_pldm_state_sensor_get_reading(uint16_t sensor_id, struct pldm_get_state_sensor_reading_resp *res_p)
+{
+	int sensor_num = 0;
+	int max_sensor_num = 0;
+	pldm_state_sensor_info *pdr_table = plat_pldm_state_sensor_table;
+
+	if (pdr_table == NULL) {
+		LOG_ERR("Failed to get state sensor pdr table");
+		return PLDM_ERROR;
+	}
+
+	max_sensor_num = ARRAY_SIZE(plat_pldm_state_sensor_table);
+	if (max_sensor_num < 0) {
+		LOG_ERR("Failed to get state sensor count");
+		return PLDM_ERROR;
+	}
+
+	for (sensor_num = 0; sensor_num < max_sensor_num; sensor_num++) {
+		if (pdr_table[sensor_num].pdr_state_sensor.sensor_id == sensor_id) {
+
+			state_sensor_reading_state_field_t *field = (state_sensor_reading_state_field_t*)res_p->field;
+
+			res_p->composite_sensor_count = pdr_table[sensor_num].pdr_state_sensor.composite_sensor_count;
+			field->sensor_op_state = PLDM_SENSOR_ENABLED;
+			field->previous_state = PLDM_SENSOR_NORMAL;
+			field->present_state = PLDM_SENSOR_NORMAL;
+			field->event_state = PLDM_SENSOR_NORMAL;
+			return PLDM_SUCCESS;
+		}
+	}
+
+	return PLDM_ERROR_INVALID_DATA;
 }
