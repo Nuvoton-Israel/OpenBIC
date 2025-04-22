@@ -26,6 +26,7 @@
 #include <sys/slist.h>
 #include <sys/util.h>
 #include <zephyr.h>
+#include "drivers/rtc.h"
 
 #ifdef ENABLE_EVENT_TO_BMC
 #include "plat_mctp.h"
@@ -210,8 +211,107 @@ uint8_t send_event_log_to_bmc(struct pldm_addsel_data sel_msg)
 #endif
 #endif
 
+static uint8_t get_rtc(void *mctp_inst, uint8_t *buf, uint16_t len, uint8_t instance_id,
+		       uint8_t *resp, uint16_t *resp_len, void *ext_params)
+{
+	CHECK_NULL_ARG_WITH_RETURN(mctp_inst, PLDM_ERROR);
+	CHECK_NULL_ARG_WITH_RETURN(buf, PLDM_ERROR);
+	CHECK_NULL_ARG_WITH_RETURN(resp, PLDM_ERROR);
+	CHECK_NULL_ARG_WITH_RETURN(resp_len, PLDM_ERROR);
+	CHECK_NULL_ARG_WITH_RETURN(ext_params, PLDM_ERROR);
+
+	struct _get_rtc_req *req_p = (struct _get_rtc_req *)buf;
+	struct _get_rtc_resp *resp_p = (struct _get_rtc_resp *)resp;
+
+	if (check_iana(req_p->iana) == PLDM_ERROR) {
+		resp_p->completion_code = PLDM_ERROR_INVALID_DATA;
+		return PLDM_SUCCESS;
+	}
+
+	const struct device *dev = device_get_binding("RTC");
+
+	if (!device_is_ready(dev)) {
+		resp_p->completion_code = PLDM_ERROR_INVALID_DATA;
+		return PLDM_SUCCESS;
+	}
+
+	struct rtc_time rtctime;
+	int res = rtc_get_time(dev, &rtctime);
+	if (-ENODATA == res) {
+		resp_p->completion_code = PLDM_ERROR_INVALID_DATA;
+		return PLDM_SUCCESS;
+	}
+	if (res < 0) {
+		resp_p->completion_code = PLDM_ERROR_INVALID_DATA;
+		return PLDM_SUCCESS;
+	}
+
+	set_iana(resp_p->iana, sizeof(resp_p->iana));
+	resp_p->completion_code = PLDM_SUCCESS;
+	resp_p->length = 7;
+
+	resp_p->sec = rtctime.tm_sec;
+	resp_p->min = rtctime.tm_min;
+	resp_p->hour = rtctime.tm_hour;
+	resp_p->mday = rtctime.tm_mday;
+	resp_p->mon = rtctime.tm_mon + 1;
+	resp_p->year = rtctime.tm_year + 1900;
+
+	*resp_len = len + 7 + 2; /* length + cc */
+
+	return PLDM_SUCCESS;
+}
+
+static uint8_t set_rtc(void *mctp_inst, uint8_t *buf, uint16_t len, uint8_t instance_id,
+		       uint8_t *resp, uint16_t *resp_len, void *ext_params)
+{
+	CHECK_NULL_ARG_WITH_RETURN(mctp_inst, PLDM_ERROR);
+	CHECK_NULL_ARG_WITH_RETURN(buf, PLDM_ERROR);
+	CHECK_NULL_ARG_WITH_RETURN(resp, PLDM_ERROR);
+	CHECK_NULL_ARG_WITH_RETURN(resp_len, PLDM_ERROR);
+	CHECK_NULL_ARG_WITH_RETURN(ext_params, PLDM_ERROR);
+
+	struct _set_rtc_req *req_p = (struct _set_rtc_req *)buf;
+	struct _set_rtc_resp *resp_p = (struct _set_rtc_resp *)resp;
+
+	if (check_iana(req_p->iana) == PLDM_ERROR) {
+		resp_p->completion_code = PLDM_ERROR_INVALID_DATA;
+		return PLDM_SUCCESS;
+	}
+
+	const struct device *dev = device_get_binding("RTC");
+
+	if (!device_is_ready(dev)) {
+		resp_p->completion_code = PLDM_ERROR_INVALID_DATA;
+		return PLDM_SUCCESS;
+	}
+
+	struct rtc_time rtctime = {0};
+	rtctime.tm_sec = req_p->sec;
+	rtctime.tm_min = req_p->min;
+	rtctime.tm_hour = req_p->hour;
+	rtctime.tm_mday = req_p->mday;
+	rtctime.tm_mon = req_p->mon - 1;
+	rtctime.tm_year = req_p->year - 1900;
+
+	int res = rtc_set_time(dev, &rtctime);
+	if (-EINVAL == res) {
+		resp_p->completion_code = PLDM_ERROR_INVALID_DATA;
+		return PLDM_SUCCESS;
+	}
+
+	set_iana(resp_p->iana, sizeof(resp_p->iana));
+	resp_p->completion_code = PLDM_SUCCESS;
+
+	*resp_len = 4;
+
+	return PLDM_SUCCESS;
+}
+
 static pldm_cmd_handler pldm_oem_cmd_tbl[] = { { PLDM_OEM_CMD_ECHO, cmd_echo },
-					       { PLDM_OEM_IPMI_BRIDGE, ipmi_cmd } };
+					       { PLDM_OEM_IPMI_BRIDGE, ipmi_cmd },
+					       { PLDM_OEM_GET_RTC, get_rtc },
+					       { PLDM_OEM_SET_RTC, set_rtc } };
 
 uint8_t pldm_oem_handler_query(uint8_t code, void **ret_fn)
 {
