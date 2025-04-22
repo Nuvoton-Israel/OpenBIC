@@ -13,6 +13,7 @@ LOG_MODULE_REGISTER(pdr);
 uint32_t total_record_count = 0;
 
 PDR_INFO *pdr_info = NULL;
+PDR_state_sensor *state_sensor_table = NULL;
 PDR_numeric_sensor *numeric_sensor_table = NULL;
 PDR_sensor_auxiliary_names *sensor_auxiliary_names_table = NULL;
 PDR_entity_auxiliary_names *entity_auxiliary_names_table = NULL;
@@ -22,6 +23,30 @@ int pdr_init(void)
 	uint32_t pdr_count = 0, record_handle = 0x0, largest_record_size = 0;
 
 	LOG_INF("pldm disable sensors count: 0x%x", plat_get_disabled_sensor_count());
+
+	pdr_count = plat_get_pdr_size(PLDM_STATE_SENSOR_PDR);
+	if (pdr_count != 0) {
+		total_record_count += pdr_count;
+		state_sensor_table =
+			(PDR_state_sensor *)malloc(pdr_count * sizeof(PDR_state_sensor));
+		plat_load_state_sensor_pdr_table(state_sensor_table);
+		if (state_sensor_table == NULL) {
+			LOG_ERR("Failed to malloc state sensor PDR table");
+			return -1;
+		}
+		pdr_info->repository_size += pdr_count * sizeof(PDR_state_sensor);
+
+		for (uint32_t i = 0; i < pdr_count; i++) {
+			state_sensor_table[i].pdr_common_header.record_handle = record_handle;
+			state_sensor_table[i].pdr_common_header.data_length +=
+				(sizeof(PDR_state_sensor) - sizeof(PDR_common_header));
+			record_handle++;
+		}
+
+		if (largest_record_size < sizeof(PDR_state_sensor)) {
+			largest_record_size = sizeof(PDR_state_sensor);
+		}
+	}
 
 	pdr_count = plat_get_pdr_size(PLDM_NUMERIC_SENSOR_PDR);
 	if (pdr_count != 0) {
@@ -222,13 +247,23 @@ int pldm_get_sensor_name_via_sensor_id(uint16_t sensor_id, char *sensor_name, si
 int get_pdr_table_via_record_handle(uint8_t *record_data, uint32_t record_handle)
 {
 	uint32_t numeric_sensor_pdr_count = 0, aux_sensor_name_pdr_count = 0,
-		 entity_aux_name_pdr_count = 0;
+		 entity_aux_name_pdr_count = 0,  state_sensor_pdr_count = 0;
 
+	state_sensor_pdr_count = plat_get_pdr_size(PLDM_STATE_SENSOR_PDR);
 	numeric_sensor_pdr_count = plat_get_pdr_size(PLDM_NUMERIC_SENSOR_PDR);
 	aux_sensor_name_pdr_count = plat_get_pdr_size(PLDM_SENSOR_AUXILIARY_NAMES_PDR);
 	entity_aux_name_pdr_count = plat_get_pdr_size(PLDM_ENTITY_AUXILIARY_NAMES_PDR);
 
-	if (record_handle < numeric_sensor_pdr_count) {
+	if (record_handle < state_sensor_pdr_count) {
+		for (int i = 0; i < state_sensor_pdr_count; i++) {
+			if (state_sensor_table[i].pdr_common_header.record_handle ==
+			    record_handle) {
+				memcpy(record_data, &state_sensor_table[i],
+				       sizeof(PDR_state_sensor));
+				return sizeof(PDR_state_sensor);
+			}
+		}
+	} else if (record_handle < numeric_sensor_pdr_count + state_sensor_pdr_count) {
 		for (int i = 0; i < numeric_sensor_pdr_count; i++) {
 			if (numeric_sensor_table[i].pdr_common_header.record_handle ==
 			    record_handle) {
@@ -237,7 +272,7 @@ int get_pdr_table_via_record_handle(uint8_t *record_data, uint32_t record_handle
 				return sizeof(PDR_numeric_sensor);
 			}
 		}
-	} else if (record_handle < numeric_sensor_pdr_count + aux_sensor_name_pdr_count) {
+	} else if (record_handle < numeric_sensor_pdr_count + aux_sensor_name_pdr_count + state_sensor_pdr_count) {
 		for (int i = 0; i < aux_sensor_name_pdr_count; i++) {
 			if (sensor_auxiliary_names_table[i].pdr_common_header.record_handle ==
 			    record_handle) {
@@ -247,7 +282,7 @@ int get_pdr_table_via_record_handle(uint8_t *record_data, uint32_t record_handle
 			}
 		}
 	} else if (record_handle < numeric_sensor_pdr_count + aux_sensor_name_pdr_count +
-					   entity_aux_name_pdr_count) {
+					   entity_aux_name_pdr_count + state_sensor_pdr_count) {
 		for (int i = 0; i < entity_aux_name_pdr_count; i++) {
 			if (entity_auxiliary_names_table[i].pdr_common_header.record_handle ==
 			    record_handle) {
@@ -280,6 +315,13 @@ __weak void plat_load_numeric_sensor_pdr_table(PDR_numeric_sensor *numeric_senso
 	//implement in platform layer
 	numeric_sensor_table = NULL;
 }
+
+__weak void plat_load_state_sensor_pdr_table(PDR_state_sensor *state_sensor_table)
+{
+	//implement in platform layer
+	state_sensor_table = NULL;
+}
+
 
 __weak void plat_load_aux_sensor_names_pdr_table(PDR_sensor_auxiliary_names *aux_sensor_name_table)
 {

@@ -128,6 +128,39 @@ exit:
 	return val;
 }
 
+uint8_t pldm_get_state_sensor_reading(void *mctp_inst, uint8_t *buf, uint16_t len, uint8_t instance_id,
+				uint8_t *resp, uint16_t *resp_len, void *ext_params)
+{
+	CHECK_NULL_ARG_WITH_RETURN(mctp_inst, PLDM_ERROR);
+	CHECK_NULL_ARG_WITH_RETURN(buf, PLDM_ERROR);
+	CHECK_NULL_ARG_WITH_RETURN(resp, PLDM_ERROR);
+	CHECK_NULL_ARG_WITH_RETURN(resp_len, PLDM_ERROR);
+	CHECK_NULL_ARG_WITH_RETURN(ext_params, PLDM_ERROR);
+
+	struct pldm_get_state_sensor_reading_req *req_p = (struct pldm_get_state_sensor_reading_req *)buf;
+	struct pldm_get_state_sensor_reading_resp *res_p = (struct pldm_get_state_sensor_reading_resp *)resp;
+
+	if (len != PLDM_GET_STATE_SENSOR_READING_REQ_BYTES) {
+		res_p->completion_code = PLDM_PLATFORM_INVALID_SENSOR_ID;
+		goto ret;
+	}
+	/* Only support one byte range of sensor number */
+	if (req_p->sensor_id > PLDM_MONITOR_SENSOR_SUPPORT_MAX) {
+		res_p->completion_code = PLDM_PLATFORM_INVALID_SENSOR_ID;
+		goto ret;
+	}
+
+	uint8_t sensor_number = (uint8_t)req_p->sensor_id;
+	uint8_t status;
+
+	status = plat_pldm_state_sensor_get_reading(sensor_number, res_p);
+	res_p->completion_code = status;
+
+	*resp_len = sizeof(struct pldm_get_state_sensor_reading_resp);
+ret:
+	return PLDM_SUCCESS;
+}
+
 uint8_t pldm_get_sensor_reading(void *mctp_inst, uint8_t *buf, uint16_t len, uint8_t instance_id,
 				uint8_t *resp, uint16_t *resp_len, void *ext_params)
 {
@@ -948,6 +981,7 @@ uint8_t pldm_get_pdr(void *mctp_inst, uint8_t *buf, uint16_t len, uint8_t instan
 
 static pldm_cmd_handler pldm_monitor_cmd_tbl[] = {
 	{ PLDM_MONITOR_CMD_CODE_GET_SENSOR_READING, pldm_get_sensor_reading },
+	{ PLDM_MONITOR_CMD_CODE_GET_STATE_SENSOR_READING, pldm_get_state_sensor_reading},
 	{ PLDM_MONITOR_CMD_CODE_SET_EVENT_RECEIVER, pldm_set_event_receiver },
 	{ PLDM_MONITOR_CMD_CODE_PLATFORM_EVENT_MESSAGE, pldm_platform_event_message },
 	{ PLDM_MONITOR_CMD_CODE_SET_STATE_EFFECTER_STATES, pldm_set_state_effecter_states },
