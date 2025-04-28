@@ -21,7 +21,7 @@ manifest:
       remote: nuvoton
       repo-path: zephyr
       path: zephyr_nuvoton
-      revision: openbic-v2.6.0.0
+      revision: openbic-v2.6
 
   self:
     path: openbic
