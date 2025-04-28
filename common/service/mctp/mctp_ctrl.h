@@ -36,8 +36,15 @@ typedef struct _mctp_ctrl_cmd_handler {
 
 #define MCTP_CTRL_CMD_SET_ENDPOINT_ID 0x01
 #define MCTP_CTRL_CMD_GET_ENDPOINT_ID 0x02
+#define MCTP_CTRL_CMD_GET_UUID 0x03
 
 #define MCTP_CTRL_CMD_GET_MESSAGE_TYPE_SUPPORT 0x05
+#define MCTP_CTRL_CMD_PREPARE_ENDPOINT_DISCOVERY 0x0B
+#define MCTP_CTRL_CMD_ENDPOINT_DISCOVERY 0x0c
+#define MCTP_CTRL_CMD_ALLOCATE_EP_ID 0x08
+
+#define MCTP_CTRL_CMD_GET_ROUTING_TABLE_ENTRIES 0x0A
+
 
 #define MCTP_CTRL_CMD_GET_ENDPOINT_ID_REQ_LEN 0x00
 
@@ -58,6 +65,44 @@ typedef struct _mctp_ctrl_cmd_handler {
 
 #define SET_EID_REQ_OP_SET_EID 0x00
 #define SET_EID_REQ_OP_FORCE_EID 0x01
+
+struct _get_uuid_resp {
+	uint8_t completion_code;
+	uint8_t uuid[16];
+} __attribute__((packed));
+
+struct _routing_tbl_entry {
+	uint8_t sizeof_eid;
+	uint8_t starting_eid;
+	uint8_t physical_transport_binding;
+	uint8_t physical_media_type_identifier;
+	uint8_t physical_address_size;
+	uint8_t physical_address[8]; /* variable length */
+} __attribute__((packed));
+
+struct _get_routing_tbl_entry_req {
+	uint8_t entry_handle;
+} __attribute__((packed));
+
+struct _get_routing_tbl_entry_resp {
+	uint8_t completion_code;
+	uint8_t next_entry_handle;
+	uint8_t num_of_entries;
+	struct _routing_tbl_entry routing_tbl_entry; /* variable length */
+} __attribute__((packed));
+
+struct _alocate_ep_id_req {
+	uint8_t op_flag;
+	uint8_t num_of_eid;
+	uint8_t starting_eid;
+} __attribute__((packed));
+
+struct _alocate_ep_id_resp {
+	uint8_t completion_code;
+	uint8_t status;
+	uint8_t eid_pool_size;
+	uint8_t fisrt_eid;
+} __attribute__((packed));
 
 struct _set_eid_req {
 	uint8_t op;
@@ -141,6 +186,11 @@ typedef struct _mctp_ctrl_resp_arg {
 	uint16_t read_len;
 	uint16_t return_len;
 } mctp_ctrl_resp_arg;
+
+struct _mctp_ctrl_resp {
+	uint8_t completion_code;
+} __attribute__((packed));
+
 
 uint8_t mctp_ctrl_cmd_handler(void *mctp_p, uint8_t *buf, uint32_t len, mctp_ext_params ext_params);
 
