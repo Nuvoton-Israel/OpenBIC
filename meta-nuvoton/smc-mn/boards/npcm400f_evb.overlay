@@ -81,7 +81,7 @@
 	status = "disabled";
 };
 
-#if 0
+#if 1
 /* Use for I3C_5 controller */
 &i3c5 {
 	status = "okay";
@@ -90,7 +90,7 @@
 };
 #endif
 
-#if 1
+#if 0
 &i3c5 {
 	bcr = <0x66>;
 	dcr = <0xCC>;

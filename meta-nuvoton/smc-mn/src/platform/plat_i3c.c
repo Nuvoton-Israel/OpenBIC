@@ -37,6 +37,40 @@ npcm_i3c_ibi_dev npcm_i3c_ibi_dev_table[I3C_MAX_NUM];
 
 bool npcm_i3c_bus_rstdaa[NPCM_I3C_BUS_MAX] = {false};
 
+void init_i3c_hub()
+{
+	I3C_MSG i3c_msg = { 0 };
+	i3c_msg.bus = I3C_BUS5;
+
+	int ret = 0;
+	int i;
+	for (i = 0; i < RSTDAA_COUNT; i++) {
+		ret = i3c_brocast_ccc(&i3c_msg, I3C_CCC_RSTDAA, I3C_BROADCAST_ADDR);
+		if (ret != 0) {
+			LOG_ERR("Error to reset daa. count = %d", i);
+		} else {
+			npcm_i3c_bus_rstdaa[i3c_msg.bus] = true;
+		}
+	}
+
+	ret = i3c_brocast_ccc(&i3c_msg, I3C_CCC_SETAASA, I3C_BROADCAST_ADDR);
+	if (ret != 0) {
+		LOG_ERR("Error to set daa");
+	}
+
+	i3c_msg.target_addr = RG3MXXB12_DEFAULT_STATIC_ADDRESS;
+	i3c_attach(&i3c_msg);
+
+	if (!rg3mxxb12_i3c_mode_only_init(&i3c_msg, LDO_VOLT, 0xFF)) {
+		LOG_ERR("Failed to initialize i3c hub");
+	}
+
+	if (!rg3mxxb12_set_slave_port(I3C_BUS5, RG3MXXB12_DEFAULT_STATIC_ADDRESS,
+				      DEFAULT_SLAVE_PORT_SETTING)) {
+		LOG_ERR("Error to set slave port");
+	}
+}
+
 static int npcm_get_bus_id(struct i3c_dev_desc *desc)
 {
 	char i3c_dev_name[I3C_DEV_STR_LEN] = { 0 };
@@ -144,6 +178,12 @@ int i3c_attach(I3C_MSG *msg)
 		desc->info.assigned_dynamic_addr = msg->target_addr;
 		desc->info.static_addr = desc->info.assigned_dynamic_addr;
 		desc->info.i2c_mode = 0;
+	}
+
+	if (msg->target_addr == 0x9) {
+		desc->info.pid = 0x20A0000000F;
+		desc->info.bcr = 0xE;
+		desc->info.dcr = 0xC9;
 	}
 
 	ret = i3c_master_attach_device(dev_i3c[msg->bus], desc);
@@ -334,12 +374,12 @@ int i3c_controller_ibi_init(I3C_MSG *msg)
 
 	ret = i3c_master_request_ibi(target, &npcm_i3c_ibi_def_callbacks);
 	if (ret != 0) {
-		LOG_ERR("Failed to request SIR, bus = %x, addr = %u", msg->target_addr, msg->bus);
+		LOG_ERR("Failed to request SIR, addr = %x, bus = %u", msg->target_addr, msg->bus);
 	}
 
 	ret = i3c_master_enable_ibi(target);
 	if (ret != 0) {
-		LOG_ERR("Failed to enable SIR, bus = %x, addr = %u", msg->target_addr, msg->bus);
+		LOG_ERR("Failed to enable SIR, addr = %x, bus = %u", msg->target_addr, msg->bus);
 	}
 
 	k_mutex_unlock(&mutex_dev[msg->bus]);

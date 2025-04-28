@@ -21,6 +21,7 @@
 #include "plat_isr.h"
 #include "plat_vw_gpio.h"
 #include "plat_i2c_target.h"
+#include "plat_i3c.h"
 #include "ipmi.h"
 #include "pldm.h"
 #include "rg3mxxb12.h"
@@ -43,6 +44,7 @@ void pal_pre_init()
 {
 	/* Init platform config */
 	init_platform_config();
+	init_i3c_hub();
 
 	/* init i2c target */
 	for (int index = 0; index < MAX_TARGET_NUM; index++) {

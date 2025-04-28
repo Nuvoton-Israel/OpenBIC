@@ -41,6 +41,7 @@
 
 #define MCTP_EID_BIC_I3C_WF	0x12
 #define MCTP_EID_BIC_I3C_FF	0x13
+#define MCTP_EID_MNG_I3C	0x1D
 
 /* i3c static 8-bit address */
 #define I3C_STATIC_ADDR_BIC_SD	0x20
@@ -48,6 +49,7 @@
 #define I3C_STATIC_ADDR_BIC_FF	0x0B
 #define I3C_STATIC_ADDR_BMC	0x20
 #define I3C_STATIC_ADDR_HUB	0x70
+#define I3C_MNG_ADDR		0x9
 
 /* i3c dynamic 8-bit address */
 #define I3C_DYNAMIC_ADDR_BIC	0xA

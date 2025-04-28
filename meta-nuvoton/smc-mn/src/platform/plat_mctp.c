@@ -45,7 +45,7 @@ K_WORK_DEFINE(send_cmd_work, send_cmd_to_dev_handler);
 uint8_t plat_eid = MCTP_DEFAULT_ENDPOINT;
 
 static mctp_port plat_mctp_port[] = {
-	{
+	/*{
 #ifdef TEST_I3C_TARGET_BIC
 		.conf.i3c_conf.addr = I3C_STATIC_ADDR_BIC_SD,
 		.conf.i3c_conf.bus = I3C_BUS_TARGET_TO_BIC,
@@ -54,6 +54,11 @@ static mctp_port plat_mctp_port[] = {
 		.conf.i3c_conf.bus = I3C_BUS_TARGET_TO_BMC,
 #endif
 		.medium_type = MCTP_MEDIUM_TYPE_TARGET_I3C
+	},*/
+	{
+		.conf.i3c_conf.addr = I3C_MNG_ADDR,
+		.conf.i3c_conf.bus = I3C_BUS_TARGET_TO_BMC,
+		.medium_type = MCTP_MEDIUM_TYPE_CONTROLLER_I3C
 	},
 	{
 		.conf.smbus_conf.addr = I2C_ADDR_BIC,
@@ -66,6 +71,7 @@ static mctp_port plat_mctp_port[] = {
 		.conf.usb_conf.bus = 0,
 		.medium_type = MCTP_MEDIUM_TYPE_USB
 	},
+/*
 #ifdef TEST_I3C_CONTROLLER_BIC
 	{
 		.conf.i3c_conf.addr = I3C_STATIC_ADDR_BIC_WF,
@@ -78,16 +84,20 @@ static mctp_port plat_mctp_port[] = {
 		.medium_type = MCTP_MEDIUM_TYPE_CONTROLLER_I3C
 	},
 #endif
+*/
 };
 
 static mctp_route_entry plat_mctp_route_tbl[] = {
 	{ MCTP_EID_BMC_I2C, I2C_BUS_TARGET_TO_BMC, I2C_ADDR_BMC, .set_endpoint = false},
-	{ MCTP_EID_BMC_I3C, I3C_BUS_TARGET_TO_BMC, I3C_STATIC_ADDR_BMC, .set_endpoint = false},
+	//{ MCTP_EID_BMC_I3C, I3C_BUS_TARGET_TO_BMC, I3C_STATIC_ADDR_BMC, .set_endpoint = false},
 	{ MCTP_EID_BMC_SERIAL, 0x0, 0x0, .set_endpoint = false},
+/*
 #ifdef TEST_I3C_CONTROLLER_BIC
 	{ MCTP_EID_BIC_I3C_WF, I3C_BUS_CONTROLLER_TO_BIC, I3C_STATIC_ADDR_BIC_WF, .set_endpoint = true},
 	{ MCTP_EID_BIC_I3C_FF, I3C_BUS_CONTROLLER_TO_BIC, I3C_STATIC_ADDR_BIC_FF, .set_endpoint = true},
 #endif
+*/
+	{ MCTP_EID_MNG_I3C, I3C_BUS_TARGET_TO_BMC, I3C_MNG_ADDR, .set_endpoint = false},
 };
 
 mctp *find_mctp_by_medium_type(uint8_t type)

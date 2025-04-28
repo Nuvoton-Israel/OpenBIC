@@ -17,12 +17,21 @@
 #ifndef PLAT_I3C_H
 #define PLAT_I3C_H
 
+#include "rg3mxxb12.h"
+
 #define NPCM_I3C_BUS_MAX	6
 #define IBI_MDB_SIZE		8
-
+/*
 #define LDO_VOLT										\
 	V_LDO_SETTING(rg3mxxb12_ldo_1_8_volt, rg3mxxb12_ldo_1_8_volt, rg3mxxb12_ldo_1_8_volt,	\
 			rg3mxxb12_ldo_1_8_volt)
+*/
+#define I3C_BUS5 5
+#define RSTDAA_COUNT 2
+#define DEFAULT_SLAVE_PORT_SETTING 0x1
+#define LDO_VOLT	\
+	V_LDO_SETTING(rg3mxxb12_ldo_1_0_volt, rg3mxxb12_ldo_1_0_volt, \
+			rg3mxxb12_ldo_1_0_volt, rg3mxxb12_ldo_1_0_volt)
 
 typedef struct _npcm_i3c_ibi_dev {
 	uint8_t data_mdb[IBI_MDB_SIZE];
@@ -30,5 +39,7 @@ typedef struct _npcm_i3c_ibi_dev {
 	struct i3c_ibi_payload i3c_payload;
 	struct k_sem ibi_complete;
 } npcm_i3c_ibi_dev;
+
+void init_i3c_hub();
 
 #endif
