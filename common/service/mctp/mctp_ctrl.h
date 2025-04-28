@@ -41,6 +41,7 @@ typedef struct _mctp_ctrl_cmd_handler {
 #define MCTP_CTRL_CMD_GET_MESSAGE_TYPE_SUPPORT 0x05
 #define MCTP_CTRL_CMD_PREPARE_ENDPOINT_DISCOVERY 0x0B
 #define MCTP_CTRL_CMD_ENDPOINT_DISCOVERY 0x0c
+#define MCTP_CTRL_CMD_ENDPOINT_DISCOVERY_NOTIFY 0x0D
 #define MCTP_CTRL_CMD_ALLOCATE_EP_ID 0x08
 
 #define MCTP_CTRL_CMD_GET_ROUTING_TABLE_ENTRIES 0x0A
@@ -91,11 +92,23 @@ struct _get_routing_tbl_entry_resp {
 	struct _routing_tbl_entry routing_tbl_entry; /* variable length */
 } __attribute__((packed));
 
+typedef enum {
+	allocate_eids,
+	force_allocation,
+	get_allocation_info,
+	reserved
+} allocate_eids_req_op;
+
 struct _alocate_ep_id_req {
 	uint8_t op_flag;
 	uint8_t num_of_eid;
 	uint8_t starting_eid;
 } __attribute__((packed));
+
+typedef enum {
+	allocation_accepted,
+	allocation_rejected,
+} allocate_eids_resp_status;
 
 struct _alocate_ep_id_resp {
 	uint8_t completion_code;
@@ -118,13 +131,26 @@ struct _set_eid_resp {
 
 enum endpoint_type {
 	SIMPLE_ENDPOINT,
-	BRIDGE,
+	BUS_OWNER_BRIDGE,
 };
 
 enum eid_type {
 	DYNAMIC_EID,
 	STATIC_EID,
 };
+
+struct _mctp_ver_fields
+{
+	uint8_t major;
+	uint8_t minor;
+	uint8_t update;
+	uint8_t alpha;
+} __attribute__((packed));
+
+struct _get_mctp_ver_support_resp {
+	uint8_t completion_code;
+	uint8_t ver_num_entry_count;
+} __attribute__((packed));
 
 /*
 Reference from DSP0239_1.3.0 Table 1

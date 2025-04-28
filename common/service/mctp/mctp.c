@@ -25,7 +25,7 @@
 #include "libutil.h"
 #include "plat_def.h"
 
-LOG_MODULE_REGISTER(mctp);
+LOG_MODULE_REGISTER(mctp, LOG_LEVEL_DBG);
 
 typedef struct __attribute__((packed)) {
 	uint8_t hdr_ver;

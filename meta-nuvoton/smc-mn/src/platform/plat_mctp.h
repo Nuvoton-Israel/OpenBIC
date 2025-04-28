@@ -69,10 +69,13 @@
 /* init the mctp moduel for platform */
 void send_cmd_to_dev(struct k_timer *timer);
 void send_cmd_to_dev_handler(struct k_work *work);
+void send_discovery_notify_cmd(struct k_timer *timer);
+void send_discovery_notify_cmd_handler(struct k_work *work);
 void plat_mctp_init(void);
 mctp *find_mctp_by_bus(uint8_t bus);
 mctp *get_mctp_init();
 uint8_t get_mctp_info(uint8_t dest_endpoint, mctp **mctp_inst, mctp_ext_params *ext_params);
+mctp_port *find_port_by_mctp_inst(mctp *mctp_inst);
 mctp *find_mctp_by_medium_type(uint8_t type);
 
 #endif /* _PLAT_MCTP_h */

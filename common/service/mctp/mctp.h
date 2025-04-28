@@ -177,6 +177,15 @@ struct flash_page {
 	uint8_t index;
 };
 
+typedef struct _mctp_eid_pool_alloc_info {
+	uint8_t start;
+	uint8_t size;
+	bool allocated;
+//	bool is_in_progress;
+
+	bool eid_used[256];
+} mctp_eid_pool_alloc_info;
+
 /* mctp main struct */
 typedef struct _mctp {
 	uint8_t is_servcie_start;
@@ -234,6 +243,10 @@ typedef struct _mctp {
 	sys_slist_t flash_page_list;
 	struct k_msgq *mctp_flash_msgq;
 #endif
+
+	/* Flag for endpoint discovery process */
+	bool discovered;
+	mctp_eid_pool_alloc_info eid_pool_alloc_info;
 } mctp;
 
 typedef struct _mctp_smbus_port {
@@ -241,6 +254,14 @@ typedef struct _mctp_smbus_port {
 	uint8_t channel_target;
 	MCTP_MEDIUM_TYPE medium_type;
 	mctp_medium_conf conf;
+
+	bool support_bridge;
+	/* Whether we are running as the bus owner */
+	bool bus_owner;
+//	bool downstream_bus; /* Bus owner on the bridge */
+	uint8_t eid_pool_size;
+	uint8_t eid_pool_first_eid ;
+	uint8_t required_eid_pool_from_BO;
 } mctp_port;
 
 /* mctp route entry struct */

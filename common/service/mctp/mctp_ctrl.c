@@ -24,6 +24,7 @@
 #include <sys/printk.h>
 #include <zephyr.h>
 #include "libutil.h"
+#include "plat_mctp.h"
 
 LOG_MODULE_DECLARE(mctp);
 
@@ -75,6 +76,10 @@ uint8_t mctp_ctrl_cmd_set_endpoint_id(void *mctp_inst, uint8_t *buf, uint16_t le
 			if (port != NULL) {
 				if (port->mctp_inst->medium_type == inst->medium_type) {
 					port->mctp_inst->endpoint = req->eid;
+					if (port->required_eid_pool_from_BO != 0) {
+						p->status |= 1;
+						p->eid_pool_size = port->required_eid_pool_from_BO;
+					}
 					break;
 				}
 			} else {
@@ -85,6 +90,7 @@ uint8_t mctp_ctrl_cmd_set_endpoint_id(void *mctp_inst, uint8_t *buf, uint16_t le
 			}
 		}
 		p->completion_code = MCTP_CTRL_CC_SUCCESS;
+		inst->discovered = true;
 	} else {
 		LOG_ERR("plat_get_mctp_port not implemented");
 		p->completion_code = MCTP_CTRL_CC_ERROR;
@@ -92,9 +98,9 @@ uint8_t mctp_ctrl_cmd_set_endpoint_id(void *mctp_inst, uint8_t *buf, uint16_t le
 
 	plat_update_mctp_routing_table(req->eid);
 
-	p->status = 0; // Assignment accepted. Device does not use an EID pool.
+	//p->status = 0; // Assignment accepted. Device does not use an EID pool.
 	p->eid = req->eid;
-	p->eid_pool_size = 0;
+	//p->eid_pool_size = 0;
 
 	*resp_len = (p->completion_code == MCTP_CTRL_CC_SUCCESS) ? sizeof(*p) : 1;
 
@@ -120,8 +126,15 @@ uint8_t mctp_ctrl_cmd_get_endpoint_id(void *mctp_inst, uint8_t *buf, uint16_t le
 			if (port != NULL) {
 				if (port->mctp_inst->medium_type == inst->medium_type) {
 					p->eid = port->mctp_inst->endpoint;
-					p->eid_type = DYNAMIC_EID;
-					p->endpoint_type = SIMPLE_ENDPOINT;
+					/* Endpoint ID Type 0x00 = dynamic EID, 0x01 = static EID */
+					if (p->eid == 0) {
+						p->eid_type = DYNAMIC_EID;
+					} else {
+						p->eid_type = STATIC_EID;
+					}
+
+					/* Endpoint type: 0x00 = Simple endpoint, 0x01 = Bus owner bridge */
+					p->endpoint_type = BUS_OWNER_BRIDGE; /* Support bridge mode */
 					break;
 				}
 			} else {
@@ -137,10 +150,6 @@ uint8_t mctp_ctrl_cmd_get_endpoint_id(void *mctp_inst, uint8_t *buf, uint16_t le
 		p->completion_code = MCTP_CTRL_CC_ERROR;
 	}
 
-
-//	p->eid = plat_get_eid();
-//	p->eid_type = STATIC_EID;
-//	p->endpoint_type = BRIDGE;
 	/* Not support fairness arbitration */
 	p->medium_specific_info = 0x00;
 
@@ -168,6 +177,10 @@ uint8_t mctp_ctrl_cmd_prepare_endpoint_discovery(void *mctp_inst, uint8_t *buf, 
 
 	*resp_len = (p->completion_code == MCTP_CTRL_CC_SUCCESS) ? (sizeof(*p) ) : 1;
 
+	/* Clearing discovered flag */
+	mctp *inst = (mctp *)mctp_inst;
+	inst->discovered = false;
+
 	return MCTP_SUCCESS;
 }
 
@@ -180,6 +193,11 @@ uint8_t mctp_ctrl_cmd_endpoint_discovery(void *mctp_inst, uint8_t *buf, uint16_t
 	CHECK_NULL_ARG_WITH_RETURN(resp, MCTP_ERROR);
 	CHECK_NULL_ARG_WITH_RETURN(resp_len, MCTP_ERROR);
 
+	mctp *inst = (mctp *)mctp_inst;
+	if (inst->discovered) {
+		return MCTP_ERROR;
+	}
+
 	struct _mctp_ctrl_resp *p = (struct _mctp_ctrl_resp *)resp;
 
 	p->completion_code = MCTP_CTRL_CC_SUCCESS;
@@ -189,6 +207,35 @@ uint8_t mctp_ctrl_cmd_endpoint_discovery(void *mctp_inst, uint8_t *buf, uint16_t
 	*resp_len = (p->completion_code == MCTP_CTRL_CC_SUCCESS) ? (sizeof(*p) ) : 1;
 
 	return MCTP_SUCCESS;
+}
+
+uint8_t mctp_ctrl_cmd_endpoint_discovery_notify(void *mctp_inst, uint8_t *buf, uint16_t len,
+						uint8_t *resp, uint16_t *resp_len, void *ext_params)
+{
+	ARG_UNUSED(ext_params);
+	CHECK_NULL_ARG_WITH_RETURN(mctp_inst, MCTP_ERROR);
+	CHECK_NULL_ARG_WITH_RETURN(buf, MCTP_ERROR);
+	CHECK_NULL_ARG_WITH_RETURN(resp, MCTP_ERROR);
+	CHECK_NULL_ARG_WITH_RETURN(resp_len, MCTP_ERROR);
+
+	mctp_port *port = find_port_by_mctp_inst(mctp_inst);
+	if (port != NULL) {
+		if (port->bus_owner) {
+			struct _mctp_ctrl_resp *p = (struct _mctp_ctrl_resp *)resp;
+
+			p->completion_code = MCTP_CTRL_CC_SUCCESS;
+			*resp_len = (p->completion_code == MCTP_CTRL_CC_SUCCESS) ? (sizeof(*p) ) : 1;
+
+			/* If PCIe, send prepare discovery cmd to clean discoveried flag */
+
+			/* Register endpoint */
+			//register_endpoint(mctp_inst, eid);
+
+			return MCTP_SUCCESS;
+		}
+	}
+
+	return MCTP_ERROR;
 }
 
 uint8_t mctp_get_uuid(void *mctp_inst, uint8_t *buf, uint16_t len,
@@ -275,6 +322,63 @@ uint8_t mctp_get_routing_table_entries(void *mctp_inst, uint8_t *buf, uint16_t l
 
 }
 
+void set_downstream_eid_pool(mctp *mctp_inst, uint8_t eid_pool_size, uint8_t first_eid)
+{
+	CHECK_NULL_ARG(mctp_inst);
+
+	if ((eid_pool_size == 0) || (first_eid == 0)) {
+		LOG_WRN("Invalid EID pool size or first EID");
+		return;
+	}
+
+	uint8_t remaining_pool_size = eid_pool_size;
+	uint8_t start_eid = first_eid;
+
+	uint8_t plat_mctp_port_count = plat_get_mctp_port_count();
+	if (plat_mctp_port_count != 0) {
+		for (uint8_t i = 0; i < plat_mctp_port_count; i++) {
+			mctp_port *port = plat_get_mctp_port(i);
+			if (port != NULL) {
+				if ((port->mctp_inst->medium_type != mctp_inst->medium_type) &&
+					port->bus_owner && (port->required_eid_pool_from_BO != 0)) { //downstream bus owner
+
+					/* Check if first_eid + eid_pool_size overruns 255 EID */
+					if (first_eid > (0xFF - port->required_eid_pool_from_BO)) {
+						LOG_WRN("EID pool crossing EID range");
+						continue;
+					}
+
+					if (remaining_pool_size < port->required_eid_pool_from_BO)
+					{
+						LOG_WRN("Running out of eid pool");
+						// Check if remaining pool can be distributed
+						continue;
+					}
+
+					if (port->mctp_inst->eid_pool_alloc_info.allocated &&
+						port->mctp_inst->eid_pool_alloc_info.start == start_eid) {
+						LOG_WRN("Same pool is already allocated");
+						continue;
+					}
+
+					/* Set downstream BO EID pool */
+					port->mctp_inst->eid_pool_alloc_info.size = port->required_eid_pool_from_BO;
+					port->mctp_inst->eid_pool_alloc_info.start = first_eid;
+					port->mctp_inst->eid_pool_alloc_info.allocated = true;
+
+					start_eid += port->required_eid_pool_from_BO;
+					remaining_pool_size -= port->required_eid_pool_from_BO;
+				}
+			} else {
+				LOG_ERR("plat_get_mctp_port not implemented");
+			}
+		}
+	} else {
+		LOG_ERR("plat_get_mctp_port not implemented");
+	}
+	LOG_INF("Set downstream EID pool size %d, starting EID %d", eid_pool_size, first_eid);
+}
+
 uint8_t mctp_ctrl_allocate_endpoint_id(void *mctp_inst, uint8_t *buf, uint16_t len,
 					       uint8_t *resp, uint16_t *resp_len, void *ext_params)
 {
@@ -284,27 +388,70 @@ uint8_t mctp_ctrl_allocate_endpoint_id(void *mctp_inst, uint8_t *buf, uint16_t l
 	CHECK_NULL_ARG_WITH_RETURN(resp, MCTP_ERROR);
 	CHECK_NULL_ARG_WITH_RETURN(resp_len, MCTP_ERROR);
 
-
 	struct _alocate_ep_id_req *req = (struct _alocate_ep_id_req *)buf;
 	struct _alocate_ep_id_resp *p = (struct _alocate_ep_id_resp *)resp;
-
 
 	LOG_INF(" req op_flag %d", req->op_flag);
 	LOG_INF(" req num_of_eid %d", req->num_of_eid);
 	LOG_INF(" req starting_eid %d", req->starting_eid);
 
-	p->completion_code = MCTP_CTRL_CC_SUCCESS;
-	p->status = 0;
-	p->fisrt_eid = 0;
-	p->eid_pool_size = 0;
-
-	*resp = MCTP_CTRL_CC_SUCCESS;
+	uint8_t plat_mctp_port_count = plat_get_mctp_port_count();
+	mctp *inst = (mctp *)mctp_inst;
+	if (plat_mctp_port_count != 0) {
+		for (uint8_t i = 0; i < plat_mctp_port_count; i++) {
+			mctp_port *port = plat_get_mctp_port(i);
+			if (port != NULL) {
+				if (port->mctp_inst->medium_type == inst->medium_type){
+					if (port->required_eid_pool_from_BO != 0) {
+						switch (req->op_flag) {
+							case allocate_eids:
+							case force_allocation: {
+								if (req->num_of_eid > port->required_eid_pool_from_BO) {
+									p->completion_code = MCTP_CTRL_CC_ERROR_INVALID_DATA;
+									p->status = allocation_rejected;
+									*resp_len = 2;
+									return MCTP_SUCCESS;
+								} else {
+									p->completion_code = MCTP_CTRL_CC_SUCCESS;
+									p->status = allocation_accepted;
+									p->eid_pool_size = req->num_of_eid;
+									p->fisrt_eid = req->starting_eid;
+									/* Set the dowmstream endpoint ID pool */
+									set_downstream_eid_pool(port->mctp_inst, req->num_of_eid, req->starting_eid);
+									port->eid_pool_size = req->num_of_eid;
+									port->eid_pool_first_eid = req->starting_eid;
+								}
+								break;
+							}
+							case get_allocation_info: {
+								p->completion_code = MCTP_CTRL_CC_SUCCESS;
+								p->status = allocation_accepted;
+								p->eid_pool_size = port->eid_pool_size;
+								p->fisrt_eid = port->eid_pool_first_eid;
+								break;
+							}
+							default:
+								p->completion_code = MCTP_CTRL_CC_ERROR_INVALID_DATA;
+						}
+					} else {
+						LOG_DBG("Allocate EID is not supported for this simple endpoint");
+						p->completion_code = MCTP_CTRL_CC_ERROR_UNSUPPORTED_CMD;
+					}
+				}
+			} else {
+				LOG_ERR("plat_get_mctp_port not implemented");
+				p->completion_code = MCTP_CTRL_CC_ERROR_UNSUPPORTED_CMD;
+			}
+		}
+	} else {
+		LOG_ERR("plat_get_mctp_port not implemented");
+		p->completion_code = MCTP_CTRL_CC_ERROR_UNSUPPORTED_CMD;
+	}
 
 	*resp_len = (p->completion_code == MCTP_CTRL_CC_SUCCESS) ? (sizeof(*p) ) : 1;
 
 	return MCTP_SUCCESS;
 }
-
 
 uint8_t mctp_ctrl_cmd_get_message_type_support(void *mctp_inst, uint8_t *buf, uint16_t len,
 					       uint8_t *resp, uint16_t *resp_len, void *ext_params)
@@ -325,7 +472,7 @@ uint8_t mctp_ctrl_cmd_get_message_type_support(void *mctp_inst, uint8_t *buf, ui
 
 	if (ret < 0) {
 		LOG_ERR("Command not supported, %d", ret);
-		p->completion_code = MCTP_ERROR;
+		p->completion_code = MCTP_CTRL_CC_ERROR;
 	} else {
 		p->completion_code = MCTP_CTRL_CC_SUCCESS;
 		p->type_count = type_len;
@@ -440,6 +587,7 @@ static mctp_ctrl_cmd_handler_t mctp_ctrl_cmd_tbl[] = {
 	{ MCTP_CTRL_CMD_GET_MESSAGE_TYPE_SUPPORT, mctp_ctrl_cmd_get_message_type_support },
 	{ MCTP_CTRL_CMD_PREPARE_ENDPOINT_DISCOVERY, mctp_ctrl_cmd_prepare_endpoint_discovery},
 	{ MCTP_CTRL_CMD_ENDPOINT_DISCOVERY, mctp_ctrl_cmd_endpoint_discovery},
+	{ MCTP_CTRL_CMD_ENDPOINT_DISCOVERY_NOTIFY, mctp_ctrl_cmd_endpoint_discovery_notify},
 	{ MCTP_CTRL_CMD_ALLOCATE_EP_ID, mctp_ctrl_allocate_endpoint_id},
 	{ MCTP_CTRL_CMD_GET_ROUTING_TABLE_ENTRIES, mctp_get_routing_table_entries},
 	{ MCTP_CTRL_CMD_GET_UUID, mctp_get_uuid},
@@ -504,7 +652,7 @@ uint8_t mctp_ctrl_cmd_handler(void *mctp_p, uint8_t *buf, uint32_t len, mctp_ext
 * by code, like using a NULL pointer or zero response length by argument.
 */
 	if (rc == MCTP_ERROR)
-		*comp_code = MCTP_CTRL_CC_ERROR;
+		return rc;
 
 send_msg:
 	/* Send the mctp control response data */

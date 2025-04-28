@@ -42,6 +42,11 @@ LOG_MODULE_REGISTER(plat_mctp);
 K_TIMER_DEFINE(send_cmd_timer, send_cmd_to_dev, NULL);
 K_WORK_DEFINE(send_cmd_work, send_cmd_to_dev_handler);
 
+#if 1 //[Mia] Support discovery notify cmd
+K_TIMER_DEFINE(send_discovery_notify_cmd_timer, send_discovery_notify_cmd, NULL);
+K_WORK_DEFINE(send_discovery_notify_cmd_work, send_discovery_notify_cmd_handler);
+#endif
+
 uint8_t plat_eid = MCTP_DEFAULT_ENDPOINT;
 
 static mctp_port plat_mctp_port[] = {
@@ -53,35 +58,65 @@ static mctp_port plat_mctp_port[] = {
 		.conf.i3c_conf.addr = I3C_STATIC_ADDR_BMC,
 		.conf.i3c_conf.bus = I3C_BUS_TARGET_TO_BMC,
 #endif
-		.medium_type = MCTP_MEDIUM_TYPE_TARGET_I3C
+		.medium_type = MCTP_MEDIUM_TYPE_TARGET_I3C,
+		.support_bridge = true,
+		.bus_owner = true,
+		.eid_pool_size = 0,
+		.eid_pool_first_eid = 0,
+		.required_eid_pool_from_BO = 0,
 	},*/
 	{
 		.conf.i3c_conf.addr = I3C_MNG_ADDR,
-		.conf.i3c_conf.bus = I3C_BUS_TARGET_TO_BMC,
-		.medium_type = MCTP_MEDIUM_TYPE_CONTROLLER_I3C
+		.conf.i3c_conf.bus = I3C_BUS_TARGET_TO_BMC, //i3c5 is as a controller
+		.medium_type = MCTP_MEDIUM_TYPE_CONTROLLER_I3C,
+		.support_bridge = true,
+		.bus_owner = false, //true,
+		.eid_pool_size = 0,
+		.eid_pool_first_eid = 0,
+		.required_eid_pool_from_BO = 3,
 	},
 	{
 		.conf.smbus_conf.addr = I2C_ADDR_BIC,
 		.conf.smbus_conf.bus = I2C_BUS_TARGET_TO_BMC,
-		.medium_type = MCTP_MEDIUM_TYPE_SMBUS
+		.medium_type = MCTP_MEDIUM_TYPE_SMBUS,
+		.support_bridge = true,
+		.bus_owner = true,
+		.eid_pool_size = 0,
+		.eid_pool_first_eid = 0,
+		.required_eid_pool_from_BO = 0,
 	},
 	{
 		.channel_target = PLDM, 
 		.conf.usb_conf.addr = 0,
 		.conf.usb_conf.bus = 0,
-		.medium_type = MCTP_MEDIUM_TYPE_USB
+		.medium_type = MCTP_MEDIUM_TYPE_USB,
+		.support_bridge = true,
+		.bus_owner = true,
+		.eid_pool_size = 0,
+		.eid_pool_first_eid = 0,
+		.required_eid_pool_from_BO = 0,
 	},
 /*
 #ifdef TEST_I3C_CONTROLLER_BIC
 	{
 		.conf.i3c_conf.addr = I3C_STATIC_ADDR_BIC_WF,
 		.conf.i3c_conf.bus = I3C_BUS_CONTROLLER_TO_BIC,
-		.medium_type = MCTP_MEDIUM_TYPE_CONTROLLER_I3C
+		.medium_type = MCTP_MEDIUM_TYPE_CONTROLLER_I3C,
+		.support_bridge = true,
+		.bus_owner = true,
+		.eid_pool_size = 0,
+		.eid_pool_first_eid = 0,
+		.required_eid_pool_from_BO = 0,
 	},
 	{
 		.conf.i3c_conf.addr = I3C_STATIC_ADDR_BIC_FF,
 		.conf.i3c_conf.bus = I3C_BUS_CONTROLLER_TO_BIC,
-		.medium_type = MCTP_MEDIUM_TYPE_CONTROLLER_I3C
+		.medium_type = MCTP_MEDIUM_TYPE_CONTROLLER_I3C,
+		.support_bridge = true,
+		.bus_owner = true,
+		.eid_pool_size = 0,
+		.eid_pool_first_eid = 0,
+		.required_eid_pool_from_BO = 0,
 	},
 #endif
 */
@@ -99,6 +134,18 @@ static mctp_route_entry plat_mctp_route_tbl[] = {
 */
 	{ MCTP_EID_MNG_I3C, I3C_BUS_TARGET_TO_BMC, I3C_MNG_ADDR, .set_endpoint = false},
 };
+
+mctp_port *find_port_by_mctp_inst(mctp *mctp_inst)
+{
+	uint8_t i;
+	for (i = 0; i < ARRAY_SIZE(plat_mctp_port); i++) {
+		mctp_port *p = plat_mctp_port + i;
+		if (p->mctp_inst == mctp_inst)
+			return p;
+	}
+
+	return NULL;
+}
 
 mctp *find_mctp_by_medium_type(uint8_t type)
 {
@@ -355,6 +402,121 @@ void send_cmd_to_dev(struct k_timer *timer)
 	k_work_submit(&send_cmd_work);
 }
 
+#if 1 //[Mia] Support discovery notify cmd
+#if 0
+uint8_t register_endpoint(mctp *mctp_inst, uint8_t eid)
+{
+	CHECK_NULL_ARG_WITH_RETURN(mctp_inst, MCTP_ERROR);
+
+	for (uint8_t i = 0; i < ARRAY_SIZE(plat_mctp_port); i++) {
+		mctp_port *p = plat_mctp_port + i;
+		if (p->mctp_inst == mctp_inst) {
+			/* Check if it is a bus owner and eid_pool_alloc_info.size is not zero */
+			if (p->bus_owner && p->mctp_inst->eid_pool_alloc_info.size) {
+				/* Get MCTP version support */
+				struct _get_mctp_ver_support_resp get_mctp_ctl_ver_resp = { 0 };
+				if (get_mctp_ver_support_ctrl_cmd(mctp_inst, MCTP_MESSAGE_TYPE_MCTP_CTRL, MCTP_NULL_EID, &get_mctp_ctl_ver_resp)) {
+					LOG_ERR("Get MCTP version support failed");
+					return MCTP_ERROR;
+				}
+				/* Get endpoint id */
+				struct _get_eid_resp get_eid_resp = { 0 };
+				if (get_eid_ctrl_cmd(mctp_inst, MCTP_NULL_EID, &get_eid_resp)) {
+					LOG_ERR("Get endpoint id failed");
+					return MCTP_ERROR;
+				}
+				uint8_t destEID = eid;
+
+				/* Get UUID */
+				get_uuid_ctrl_cmd(mctp_inst, MCTP_NULL_EID);
+				/* Set endpoint id */
+				set_eid_ctrl_cmd(mctp_inst, eid);
+				/* Get Message Type Support */
+				get_mctp_type_support_ctrl_cmd(mctp_inst, eid);
+
+				/* Update routing table */
+			} else if (!p->bus_owner) { /* else if it is an endpoint */
+				/* Get Message Type Support */
+				get_mctp_type_support_ctrl_cmd(mctp_inst, eid);
+				/* Check if EID is already registered */
+				for (uint8_t j = 0; j < ARRAY_SIZE(plat_mctp_route_tbl); j++) {
+					mctp_route_entry *r = plat_mctp_route_tbl + j;
+					if (r->endpoint == eid) {
+						LOG_DBG("Endpoint %d is already registered", eid);
+						return MCTP_ERROR;
+					}
+				}
+				/* Get UUID */
+				get_uuid_ctrl_cmd(mctp_inst, eid);
+
+				/* Add to routing table */
+			}
+		}
+	}
+}
+#endif
+
+bool discovery_notify_ctrl_cmd(mctp *mctp_inst)
+{
+	CHECK_NULL_ARG_WITH_RETURN(mctp_inst, MCTP_ERROR);
+
+	uint8_t ret = MCTP_ERROR;
+	mctp_medium_conf *conf = &mctp_inst->medium_conf;
+	mctp_ctrl_msg msg = { 0 };
+
+	msg.ext_params.type = mctp_inst->medium_type;
+
+	if (mctp_inst->medium_type == MCTP_MEDIUM_TYPE_USB) {
+		msg.ext_params.usb_ext_params.dummy = conf->usb_conf.addr;
+	} else if (mctp_inst->medium_type == MCTP_MEDIUM_TYPE_SMBUS) {
+		msg.ext_params.smbus_ext_params.addr = conf->smbus_conf.addr;
+	} else {
+		msg.ext_params.i3c_ext_params.addr = conf->i3c_conf.addr;
+	}
+	msg.ext_params.ep = MCTP_NULL_EID; //destination
+
+	/* Send discovery notify ctrl cmd */
+	msg.hdr.cmd = MCTP_CTRL_CMD_ENDPOINT_DISCOVERY_NOTIFY;
+	msg.hdr.rq = MCTP_REQUEST;
+	msg.cmd_data_len = 0;
+
+	struct _mctp_ctrl_resp discovery_notify_resp = { 0 };
+	ret = mctp_ctrl_read(mctp_inst, &msg, (uint8_t *)&discovery_notify_resp, sizeof(discovery_notify_resp));
+	if (ret) {
+		LOG_ERR("Discovery notify failed.");
+	}
+
+	return ret;
+}
+
+void send_discovery_notify_cmd_handler(struct k_work *work)
+{
+	//mctp *mctp_inst = (mctp *)k_timer_user_data_get(&send_discovery_notify_cmd_timer);
+
+	/* Send discovery notify cmd */
+	for (uint8_t i = 0; i < ARRAY_SIZE(plat_mctp_port); i++) {
+		mctp_port *p = plat_mctp_port + i;
+		//if (p->mctp_inst == mctp_inst) {
+			if (!p->bus_owner && !p->mctp_inst->discovered) {
+				discovery_notify_ctrl_cmd(p->mctp_inst);
+			}
+		//}
+	}
+}
+
+void send_discovery_notify_cmd(struct k_timer *timer)
+{
+	if (k_work_busy_get(&send_discovery_notify_cmd_work)) {
+		LOG_INF("Work is busy, cancelling and resubmitting.");
+		k_work_cancel(&send_discovery_notify_cmd_work);
+		k_work_submit(&send_discovery_notify_cmd_work);
+	} else {
+		LOG_INF("Work is not busy, submitting.");
+		k_work_submit(&send_discovery_notify_cmd_work);
+	}
+}
+#endif
+
 void plat_mctp_init()
 {
 	int ret = 0;
@@ -381,6 +543,9 @@ void plat_mctp_init()
 		ret = mctp_start(p->mctp_inst);
 	}
 
+#if 1 //[Mia] Support discovery notify cmd
+	k_timer_start(&send_discovery_notify_cmd_timer, K_MSEC(3000), K_NO_WAIT);
+#endif
 #ifdef TEST_I3C_CONTROLLER_BIC
 	k_timer_start(&send_cmd_timer, K_MSEC(3000), K_NO_WAIT);
 #endif

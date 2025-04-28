@@ -94,6 +94,6 @@ void init_platform_config(void)
 	LOG_INF("Slot EID = %d, Slot ID = %d Slot PID = 0x%x\n", slot_eid, slot_id, slot_pid);
 
 	/* Only SD BIC need set pid then trigger hot-join to BMC */
-	i3c_set_pid(&i3c_msg, slot_pid);
+	//i3c_set_pid(&i3c_msg, slot_pid);
 #endif
 }
