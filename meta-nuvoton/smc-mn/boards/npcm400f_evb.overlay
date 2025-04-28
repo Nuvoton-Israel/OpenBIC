@@ -86,7 +86,7 @@
 &i3c5 {
 	status = "okay";
 	i2c-scl-hz = <100000>;
-	i3c-scl-hz = <12500000>;
+	i3c-scl-hz = <4000000>;
 };
 #endif
 
