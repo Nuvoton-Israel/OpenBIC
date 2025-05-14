@@ -35,6 +35,9 @@ K_THREAD_STACK_DEFINE(safs_isr_thread, safs_isr_STACK_SIZE);
 static struct k_thread safs_isr_thread_handler;
 static struct k_sem get_safs_isr_sem;
 
+#if defined(ENABLE_FLASH_SAFS_MODE) || defined(CONFIG_ESPI_NPCM4XX_FLASH_SAFS_HW_MODE)
+static const struct device *shd_dev;
+#endif
 static const struct device *espi_dev;
 static struct espi_callback flashrx_cb;
 uint32_t prefetch_addr = 0;
@@ -124,28 +127,76 @@ static void safs_isr(void *arvg0, void *arvg1, void *arvg2)
 			continue;
 		}
 
+		if (ioc.pkt == NULL) {
+			LOG_ERR("ioc.pkt is NULL, skipping processing.");
+			continue;
+		}
 		addr = __bswap_32(rwe_pkt->addr_be);
 		cyc = rwe_pkt->cyc;
 		tag = rwe_pkt->tag;
 		len = (rwe_pkt->len_h << 8) | (rwe_pkt->len_l & 0xff);
 
+		resp_ioc.pkt[0] = ESPI_FLASH_RESP_LEN;
+		resp_ioc.pkt[1] = ESPI_FLASH_SUC_CMPLT;
+		resp_ioc.pkt[2] = tag << 4;
+		resp_ioc.pkt[3] = 0;
+
+#if defined(ENABLE_FLASH_SAFS_MODE) || defined(CONFIG_ESPI_NPCM4XX_FLASH_SAFS_HW_MODE)
+		if (ESPI_FLASH_READ_CYCLE_TYPE == cyc) {
+			rc = flash_read(shd_dev, addr, &resp_ioc.pkt[4], len);
+			if (rc != 0) {
+				LOG_ERR("Failed to read %u.", addr);
+			} else {
+				resp_ioc.pkt[0] = ESPI_FLASH_RESP_LEN + len;
+				resp_ioc.pkt[1] = ESPI_FLASH_SUC_CMPLT_D_ONLY;
+				resp_ioc.pkt[2] = tag << 4 | (rwe_pkt->len_h & 0x0F);
+				resp_ioc.pkt[3] = rwe_pkt->len_l & 0xff;
+			}
+		} else if (ESPI_FLASH_ERASE_CYCLE_TYPE == cyc) {
+			uint32_t erase_size = 0;
+
+			switch (len) {
+			case ESPI_FLASH_ERASE_4K:
+				erase_size = 0x1000;
+				break;
+			case ESPI_FLASH_ERASE_64K:
+				erase_size = 0x10000;
+				break;
+			case ESPI_FLASH_ERASE_32K:
+			default:
+				resp_ioc.pkt[1] = ESPI_FLASH_UNSUC_CMPLT;
+				break;
+			}
+
+			if (erase_size) {
+				rc = flash_erase(shd_dev, addr, erase_size);
+				if (rc != 0) {
+					resp_ioc.pkt[1] = ESPI_FLASH_UNSUC_CMPLT;
+					LOG_ERR("Failed to erase %u.", addr);
+				}
+			}
+		} else if (ESPI_FLASH_WRITE_CYCLE_TYPE == cyc) {
+			rc = flash_write(shd_dev, addr, rwe_pkt->data, len);
+			if (rc != 0) {
+				resp_ioc.pkt[1] = ESPI_FLASH_UNSUC_CMPLT;
+				LOG_ERR("Failed to write %u.", addr);
+			}
+		}
+
+#else
 #ifdef ENABLE_EDAF_OVER_MCTP
-		resp_ioc.pkt[2] = tag << 4 | (rwe_pkt->len_h & 0x0F);
-		resp_ioc.pkt[3] = rwe_pkt->len_l & 0xff;
 		if (rwe_pkt->cyc == ESPI_FLASH_READ_CYCLE_TYPE) {
 			mctp_flash_read(find_mctp_by_medium_type(MCTP_MEDIUM_TYPE_USB),
 				&resp_ioc.pkt[4], addr, len);
 			resp_ioc.pkt[0] = ESPI_FLASH_RESP_LEN + len;
 			resp_ioc.pkt[1] = ESPI_FLASH_SUC_CMPLT_D_ONLY;
+			resp_ioc.pkt[2] = tag << 4 | (rwe_pkt->len_h & 0x0F);
+			resp_ioc.pkt[3] = rwe_pkt->len_l & 0xff;
 		} else if (rwe_pkt->cyc == ESPI_FLASH_WRITE_CYCLE_TYPE){
 			mctp_flash_write(find_mctp_by_medium_type(MCTP_MEDIUM_TYPE_USB),
 				rwe_pkt->data, addr, len);
-			resp_ioc.pkt[0] = ESPI_FLASH_RESP_LEN;
-			resp_ioc.pkt[1] = ESPI_FLASH_SUC_CMPLT;
 		} else if (rwe_pkt->cyc == ESPI_FLASH_ERASE_CYCLE_TYPE){
 			mctp_flash_erase(find_mctp_by_medium_type(MCTP_MEDIUM_TYPE_USB), addr, len);
-			resp_ioc.pkt[0] = ESPI_FLASH_RESP_LEN;
-			resp_ioc.pkt[1] = ESPI_FLASH_SUC_CMPLT;
 		} else {
 			resp_ioc.pkt[0] = ESPI_FLASH_RESP_LEN;
 			resp_ioc.pkt[1] = ESPI_FLASH_UNSUC_CMPLT;
@@ -190,6 +241,7 @@ static void safs_isr(void *arvg0, void *arvg1, void *arvg2)
 			}
 		}
 #endif
+#endif
 		rc = espi_npcm4xx_flash_put_tx(espi_dev, &resp_ioc);
 		if (rc) {
 			printk("failed to tx flash packet, rc=%d\n", rc);
@@ -209,6 +261,16 @@ static void flashrx_handler(const struct device *dev, struct espi_callback *cb, 
 
 bool edaf_npcm_init(void)
 {
+
+#if defined(ENABLE_FLASH_SAFS_MODE) || defined(CONFIG_ESPI_NPCM4XX_FLASH_SAFS_HW_MODE)
+#define FIU_SHD_FLASH			"spi_fiu0_cs1"
+	char flash_name[0x20];
+
+
+	strncpy(flash_name, FIU_SHD_FLASH, sizeof(flash_name) -1);
+	flash_name[sizeof(flash_name) -1] = '\0';
+	shd_dev = device_get_binding(flash_name);
+#endif
 	espi_dev = device_get_binding("ESPI_0");
 	if (!espi_dev) {
 		LOG_ERR("failed to get espi device");
