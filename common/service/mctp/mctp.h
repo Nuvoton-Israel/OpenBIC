@@ -181,7 +181,6 @@ typedef struct _mctp_eid_pool_alloc_info {
 	uint8_t start;
 	uint8_t size;
 	bool allocated;
-//	bool is_in_progress;
 
 	bool eid_used[256];
 } mctp_eid_pool_alloc_info;
@@ -280,6 +279,8 @@ typedef struct _mctp_msg_handler {
 
 uint8_t plat_get_mctp_port_count();
 mctp_port *plat_get_mctp_port(uint8_t index);
+uint8_t plat_get_mctp_route_tbl_count();
+mctp_route_entry *plat_get_mctp_route_tbl(uint8_t index);
 
 /* public function */
 mctp *mctp_init(void);

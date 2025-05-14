@@ -218,6 +218,7 @@ uint8_t mctp_ctrl_cmd_endpoint_discovery_notify(void *mctp_inst, uint8_t *buf, u
 	CHECK_NULL_ARG_WITH_RETURN(resp, MCTP_ERROR);
 	CHECK_NULL_ARG_WITH_RETURN(resp_len, MCTP_ERROR);
 
+	mctp_ext_params *ext_params_p = (mctp_ext_params *)ext_params;
 	mctp_port *port = find_port_by_mctp_inst(mctp_inst);
 	if (port != NULL) {
 		if (port->bus_owner) {
@@ -229,7 +230,9 @@ uint8_t mctp_ctrl_cmd_endpoint_discovery_notify(void *mctp_inst, uint8_t *buf, u
 			/* If PCIe, send prepare discovery cmd to clean discoveried flag */
 
 			/* Register endpoint */
-			//register_endpoint(mctp_inst, eid);
+			reg_eid_work[WORK_VIA_DISCOVERY_NOTIFY].mctp_inst = (mctp *)mctp_inst;
+			reg_eid_work[WORK_VIA_DISCOVERY_NOTIFY].eid = ext_params_p->ep;
+			k_work_submit(&reg_eid_work[WORK_VIA_DISCOVERY_NOTIFY].work);
 
 			return MCTP_SUCCESS;
 		}
@@ -283,43 +286,124 @@ uint8_t mctp_get_routing_table_entries(void *mctp_inst, uint8_t *buf, uint16_t l
 	CHECK_NULL_ARG_WITH_RETURN(resp, MCTP_ERROR);
 	CHECK_NULL_ARG_WITH_RETURN(resp_len, MCTP_ERROR);
 
-
-	//struct _get_routing_tbl_entry_req *req = (struct _get_routing_tbl_entry_req *)buf;
+	struct _get_routing_tbl_entry_req *req = (struct _get_routing_tbl_entry_req *)buf;
 	struct _get_routing_tbl_entry_resp *p = (struct _get_routing_tbl_entry_resp *)resp;
-	struct _routing_tbl_entry *entry = &p->routing_tbl_entry;
+	size_t entry_offset = sizeof(struct _get_routing_tbl_entry_resp);
+	struct _get_routing_tbl_entry *rt_entry = NULL;
+	uint8_t *phys_address = NULL;
 
-	uint8_t plat_mctp_port_count = plat_get_mctp_port_count();
 	mctp *inst = (mctp *)mctp_inst;
-	if (plat_mctp_port_count != 0) {
-		for (uint8_t i = 0; i < plat_mctp_port_count; i++) {
-			mctp_port *port = plat_get_mctp_port(i);
-			if (port != NULL) {
-				if (port->mctp_inst->medium_type == inst->medium_type) {
-					entry->starting_eid = port->mctp_inst->endpoint;
-					entry->physical_media_type_identifier = port->mctp_inst->medium_type;
-					entry->physical_address_size = 8;
-					entry->physical_transport_binding = 0x11;
+	if (req->entry_handle == 0x00) { // 0x00 to access first entries
+		rt_entry = (struct _get_routing_tbl_entry *)((uint8_t *)p + entry_offset);
+		entry_offset += sizeof(struct _get_routing_tbl_entry);
+
+		/* Add own eid info to p->routing_tbl_entry from plat_mctp_port */
+		rt_entry->eid_range_size = 1;
+		rt_entry->starting_eid = inst->endpoint;
+
+		//[7:6] 10b = entry is for a single endpoint that serves as an MCTP bridge;
+		//[5] 1b = Entry was statically configured
+		rt_entry->entry_type = 0xA0;
+
+		// TODO: need to set correct values according to inst->medium_type.
+		phys_address = (uint8_t *)p + entry_offset;
+		if (inst->medium_type == MCTP_MEDIUM_TYPE_USB) {
+			rt_entry->phys_transport_binding_id = mctp_over_usb;
+			rt_entry->phys_media_type_id = usb_2_0_compatible;
+			rt_entry->phys_address_size = 1; //USB phys addr is 2 bytes
+
+			*phys_address = inst->medium_conf.usb_conf.addr;
+		} else if (inst->medium_type == MCTP_MEDIUM_TYPE_SMBUS) {
+			rt_entry->phys_transport_binding_id = mctp_over_smbus;
+			rt_entry->phys_media_type_id = smbus_2_0_or_i2c_100_khz_compatible;
+			rt_entry->phys_address_size = 1; //SMBus phys addr is 1 byte
+
+			*phys_address = inst->medium_conf.smbus_conf.addr;
+		} else { //I3C
+			rt_entry->phys_transport_binding_id = mctp_over_i3c;
+			rt_entry->phys_media_type_id = i3c_basic_compatible;
+			rt_entry->phys_address_size = 1; //I3C phys addr is 1 byte
+
+			*phys_address = inst->medium_conf.i3c_conf.addr;
+		}
+
+		/* Set p->next_entry_handle */
+		p->next_entry_handle = 0xFF;
+
+		/* Set p->num_of_entries */
+		p->num_of_entries++;
+
+		entry_offset += rt_entry->phys_address_size;
+		*resp_len = entry_offset;
+
+		p->completion_code = MCTP_CTRL_CC_SUCCESS;
+	}
+
+	mctp *port_inst = NULL;
+	uint8_t plat_mctp_route_tbl_count = plat_get_mctp_route_tbl_count();
+	if (req->entry_handle < plat_mctp_route_tbl_count) {
+		/* for loop plat_mctp_route_tbl */
+		for (uint8_t i = req->entry_handle; i < plat_mctp_route_tbl_count; i++) {
+			mctp_route_entry *entry = plat_get_mctp_route_tbl(i);
+			if (entry != NULL) {
+				rt_entry = (struct _get_routing_tbl_entry *)((uint8_t *)resp + entry_offset);
+				entry_offset += sizeof(struct _get_routing_tbl_entry);
+
+				// Check entry_offset size
+				if (entry_offset >= MCTP_BASE_LINE_UNIT)
 					break;
+
+				/* Add other eid info to p->routing_tbl_entry from plat_mctp_route_tbl */
+				rt_entry->eid_range_size = 1;
+				rt_entry->starting_eid = entry->endpoint;
+
+				//[7:6] 10b = entry is for a single endpoint that serves as an MCTP bridge;
+				//[5] 1b = Entry was statically configured
+				rt_entry->entry_type = 0xA0;
+
+				// TODO: need to set correct values according to inst->medium_type.
+				phys_address = (uint8_t *)p + entry_offset;
+				port_inst = pal_find_mctp_by_bus(entry->bus);
+				if (port_inst->medium_type == MCTP_MEDIUM_TYPE_USB) {
+					rt_entry->phys_transport_binding_id = mctp_over_usb;
+					rt_entry->phys_media_type_id = usb_2_0_compatible;
+					rt_entry->phys_address_size = 1; //USB phys addr is 2 bytes
+				} else if (port_inst->medium_type == MCTP_MEDIUM_TYPE_SMBUS) {
+					rt_entry->phys_transport_binding_id = mctp_over_smbus;
+					rt_entry->phys_media_type_id = smbus_2_0_or_i2c_100_khz_compatible;
+					rt_entry->phys_address_size = 1; //SMBus phys addr is 1 byte
+				} else { //I3C
+					rt_entry->phys_transport_binding_id = mctp_over_i3c;
+					rt_entry->phys_media_type_id = i3c_basic_compatible;
+					rt_entry->phys_address_size = 1; //I3C phys addr is 1 byte
 				}
-			} else {
-				LOG_ERR("plat_get_mctp_port not implemented");
-				p->completion_code = MCTP_CTRL_CC_ERROR;
-				*resp_len = 1;
-				return MCTP_SUCCESS;
+
+				*phys_address = entry->addr;
+
+				/* Set p->next_entry_handle */
+				p->next_entry_handle = i + 1;
+
+				/* Set p->num_of_entries */
+				p->num_of_entries++;
+
+				entry_offset += rt_entry->phys_address_size;
+
+				*resp_len = entry_offset;
 			}
 		}
+
+		if(p->next_entry_handle == plat_mctp_route_tbl_count) {
+			p->next_entry_handle = 0xFF; // No more entries
+		}
+
 		p->completion_code = MCTP_CTRL_CC_SUCCESS;
-		p->next_entry_handle = 0xff;
-		p->num_of_entries = 1;
 	} else {
 		LOG_ERR("plat_get_mctp_port not implemented");
 		p->completion_code = MCTP_CTRL_CC_ERROR;
+		*resp_len = 1;
 	}
 
-	*resp_len = (p->completion_code == MCTP_CTRL_CC_SUCCESS) ? (sizeof(*p) ) : 1;
-
 	return MCTP_SUCCESS;
-
 }
 
 void set_downstream_eid_pool(mctp *mctp_inst, uint8_t eid_pool_size, uint8_t first_eid)

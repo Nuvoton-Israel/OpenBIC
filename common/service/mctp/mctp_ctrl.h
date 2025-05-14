@@ -38,6 +38,7 @@ typedef struct _mctp_ctrl_cmd_handler {
 #define MCTP_CTRL_CMD_GET_ENDPOINT_ID 0x02
 #define MCTP_CTRL_CMD_GET_UUID 0x03
 
+#define MCTP_CTRL_CMD_GET_MCTP_VERSION_SUPPORT 0x04
 #define MCTP_CTRL_CMD_GET_MESSAGE_TYPE_SUPPORT 0x05
 #define MCTP_CTRL_CMD_PREPARE_ENDPOINT_DISCOVERY 0x0B
 #define MCTP_CTRL_CMD_ENDPOINT_DISCOVERY 0x0c
@@ -72,14 +73,35 @@ struct _get_uuid_resp {
 	uint8_t uuid[16];
 } __attribute__((packed));
 
-struct _routing_tbl_entry {
-	uint8_t sizeof_eid;
+/* Assume 8 byte is enough for holding largest physical address */
+#define MAX_PHYSICAL_ADDRESS_SIZE 8
+
+typedef enum {
+	mctp_over_smbus = 0x01,
+	mctp_over_pcie_vdm,
+	mctp_over_usb,
+	mctp_over_i3c = 0x06,
+} mctp_phys_transport_binding_id;
+
+typedef enum {
+	smbus_2_0_or_i2c_100_khz_compatible = 0x02,
+	usb_2_0_compatible = 0x11,
+	i3c_basic_compatible = 0x30,
+} mctp_phys_media_id;
+
+struct _get_routing_tbl_entry {
+	uint8_t eid_range_size;
 	uint8_t starting_eid;
-	uint8_t physical_transport_binding;
-	uint8_t physical_media_type_identifier;
-	uint8_t physical_address_size;
-	uint8_t physical_address[8]; /* variable length */
+	uint8_t entry_type;
+	uint8_t phys_transport_binding_id;
+	uint8_t phys_media_type_id;
+	uint8_t phys_address_size;
 } __attribute__((packed));
+
+struct _get_routing_tbl_entry_with_address {
+	struct _get_routing_tbl_entry routing_info;
+	uint8_t phys_address[MAX_PHYSICAL_ADDRESS_SIZE];
+} __attribute__((__packed__));
 
 struct _get_routing_tbl_entry_req {
 	uint8_t entry_handle;
@@ -89,14 +111,13 @@ struct _get_routing_tbl_entry_resp {
 	uint8_t completion_code;
 	uint8_t next_entry_handle;
 	uint8_t num_of_entries;
-	struct _routing_tbl_entry routing_tbl_entry; /* variable length */
+	struct _get_routing_tbl_entry_with_address entries[0]; /* variable length */
 } __attribute__((packed));
 
 typedef enum {
 	allocate_eids,
 	force_allocation,
 	get_allocation_info,
-	reserved
 } allocate_eids_req_op;
 
 struct _alocate_ep_id_req {
@@ -116,6 +137,13 @@ struct _alocate_ep_id_resp {
 	uint8_t eid_pool_size;
 	uint8_t fisrt_eid;
 } __attribute__((packed));
+
+typedef enum {
+	set_eid,
+	force_eid,
+	reset_eid,
+	set_discovered_flag,
+} mctp_ctrl_cmd_set_eid_op;
 
 struct _set_eid_req {
 	uint8_t op;
@@ -139,8 +167,11 @@ enum eid_type {
 	STATIC_EID,
 };
 
-struct _mctp_ver_fields
-{
+struct _get_mctp_ver_support_req {
+	uint8_t msg_type_number;
+} __attribute__((packed));
+
+struct _mctp_ver_fields {
 	uint8_t major;
 	uint8_t minor;
 	uint8_t update;

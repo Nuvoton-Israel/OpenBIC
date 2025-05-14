@@ -66,11 +66,29 @@
 #define I3C_BUS_CONTROLLER_TO_HUB	5
 #define I3C_BUS_TARGET_TO_HUB		I3C_BUS_TARGET_TO_BMC
 
+
+#define MAX_WORK_ITEMS  4
+enum {
+    WORK_VIA_DISCOVERY_NOTIFY = 0,
+    WORK_VIA_ALLOC_EID,
+    WORK_VIA_BO,
+    WORK_VIA_ROUTING_CHANGE,
+};
+
+typedef struct _mctp_reg_eid_work {
+    struct k_work work;
+    mctp *mctp_inst;
+    uint8_t eid;
+} mctp_reg_eid_work;
+
+extern mctp_reg_eid_work reg_eid_work[MAX_WORK_ITEMS];
+
 /* init the mctp moduel for platform */
 void send_cmd_to_dev(struct k_timer *timer);
 void send_cmd_to_dev_handler(struct k_work *work);
 void send_discovery_notify_cmd(struct k_timer *timer);
 void send_discovery_notify_cmd_handler(struct k_work *work);
+uint8_t register_endpoint(mctp *mctp_inst, uint8_t eid);
 void plat_mctp_init(void);
 mctp *find_mctp_by_bus(uint8_t bus);
 mctp *get_mctp_init();
