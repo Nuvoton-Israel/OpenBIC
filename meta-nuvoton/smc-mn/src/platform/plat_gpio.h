@@ -25,8 +25,8 @@
 #define name_gpio0 \
 	gpio_name_to_num(Reserve_GPIO00) \
 	gpio_name_to_num(Reserve_GPIO01) \
-	gpio_name_to_num(Reserve_GPIO02) \
-	gpio_name_to_num(Reserve_GPIO03) \
+	gpio_name_to_num(FM_SMC_UART_EN_N) \
+	gpio_name_to_num(FM_SMC_FLASH_MUX_SEL) \
 	gpio_name_to_num(Reserve_GPIO04) \
 	gpio_name_to_num(Reserve_GPIO05) \
 	gpio_name_to_num(Reserve_GPIO06) \
@@ -74,7 +74,7 @@
 	gpio_name_to_num(Reserve_GPIO50) \
 	gpio_name_to_num(Reserve_GPIO51) \
 	gpio_name_to_num(Reserve_GPIO52) \
-	gpio_name_to_num(Reserve_GPIO53) \
+	gpio_name_to_num(FM_SLPS3_CPU1_SMC_N) \
 	gpio_name_to_num(Reserve_GPIO54) \
 	gpio_name_to_num(Reserve_GPIO55) \
 	gpio_name_to_num(Reserve_GPIO56) \
@@ -84,23 +84,23 @@
 	gpio_name_to_num(Reserve_GPIO61) \
 	gpio_name_to_num(Reserve_GPIO62) \
 	gpio_name_to_num(Reserve_GPIO63) \
-	gpio_name_to_num(Reserve_GPIO64) \
-	gpio_name_to_num(Reserve_GPIO65) \
+	gpio_name_to_num(FM_PORST_SMC_N) \
+	gpio_name_to_num(FM_SLPS4_CPU1_SMC_N) \
 	gpio_name_to_num(Reserve_GPIO66) \
 	gpio_name_to_num(Reserve_GPIO67)
 #define name_gpio7	\
 	gpio_name_to_num(Reserve_GPIO70) \
 	gpio_name_to_num(Reserve_GPIO71) \
-	gpio_name_to_num(Reserve_GPIO72) \
+	gpio_name_to_num(FM_SMC_FW_READY) \
 	gpio_name_to_num(Reserve_GPIO73) \
-	gpio_name_to_num(GPIO74_Strap_DSW_EN) \
-	gpio_name_to_num(GPIO75_Strap_JEN_N) \
+	gpio_name_to_num(DSW_SMC_EN) \
+	gpio_name_to_num(JTAG_SMC_EN_N) \
 	gpio_name_to_num(Reserve_GPIO76) \
 	gpio_name_to_num(Reserve_GPIO77)
 #define name_gpio8	\
 	gpio_name_to_num(Reserve_GPIO80) \
 	gpio_name_to_num(Reserve_GPIO81) \
-	gpio_name_to_num(LED_NPCM_HEARTBEAT_R) \
+	gpio_name_to_num(Reserve_GPIO82) \
 	gpio_name_to_num(Reserve_GPIO83) \
 	gpio_name_to_num(Reserve_GPIO84) \
 	gpio_name_to_num(Reserve_GPIO85) \
@@ -116,7 +116,7 @@
 	gpio_name_to_num(Reserve_GPIO96) \
 	gpio_name_to_num(Reserve_GPIO97)
 #define name_gpioA	\
-	gpio_name_to_num(Reserve_GPIOA0) \
+	gpio_name_to_num(FM_SMC_HEARTBEAT_R) \
 	gpio_name_to_num(Reserve_GPIOA1) \
 	gpio_name_to_num(Reserve_GPIOA2) \
 	gpio_name_to_num(Reserve_GPIOA3) \
@@ -125,7 +125,7 @@
 	gpio_name_to_num(Reserve_GPIOA6) \
 	gpio_name_to_num(Reserve_GPIOA7)
 #define name_gpioB	\
-	gpio_name_to_num(RSVD_GPIO_1_R) \
+	gpio_name_to_num(Reserve_GPIOB0) \
 	gpio_name_to_num(Reserve_GPIOB1) \
 	gpio_name_to_num(Reserve_GPIOB2) \
 	gpio_name_to_num(Reserve_GPIOB3) \
@@ -158,7 +158,7 @@
 	gpio_name_to_num(Reserve_GPIOE3) \
 	gpio_name_to_num(Reserve_GPIOE4) \
 	gpio_name_to_num(Reserve_GPIOE5) \
-	gpio_name_to_num(Reserve_GPIOE6) \
+	gpio_name_to_num(FM_CPU1_SKTOCC_N) \
 	gpio_name_to_num(Reserve_GPIOE7)
 #define name_gpioF	\
 	gpio_name_to_num(Reserve_GPIOF0) \

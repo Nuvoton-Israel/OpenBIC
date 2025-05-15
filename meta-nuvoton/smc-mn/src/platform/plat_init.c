@@ -84,6 +84,9 @@ void pal_pre_init()
 		printk("failed to initialize 1ou rg3mxxb12\n");
 	}
 #endif
+
+	gpio_set(FM_SMC_FLASH_MUX_SEL, 1);
+
 }
 
 void pal_post_init()
@@ -94,6 +97,8 @@ void pal_post_init()
 	plat_isr_init();
 	edaf_npcm_init();
 	plat_uart_bridge_init();
+
+	gpio_set(FM_SMC_FW_READY, 1);
 }
 
 void pal_device_init()
