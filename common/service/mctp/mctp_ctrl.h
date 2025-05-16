@@ -150,9 +150,18 @@ struct _set_eid_req {
 	uint8_t eid;
 } __attribute__((packed));
 
+enum endpoint_status {
+	DEV_DONT_USE_EID_POOL,
+	EP_REQ_EID_POOL_ALLOCATION,
+	EP_USE_EID_POOL_WITH_ALREADY_RECV,
+};
+
 struct _set_eid_resp {
 	uint8_t completion_code;
-	uint8_t status;
+	uint8_t eid_alloc_status : 2;
+	uint8_t : 2;
+	uint8_t eid_assign_status : 2;
+	uint8_t : 2;
 	uint8_t eid;
 	uint8_t eid_pool_size;
 } __attribute__((packed));
@@ -181,6 +190,7 @@ struct _mctp_ver_fields {
 struct _get_mctp_ver_support_resp {
 	uint8_t completion_code;
 	uint8_t ver_num_entry_count;
+	struct _mctp_ver_fields entry[0];
 } __attribute__((packed));
 
 /*

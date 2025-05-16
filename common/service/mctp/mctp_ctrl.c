@@ -77,7 +77,7 @@ uint8_t mctp_ctrl_cmd_set_endpoint_id(void *mctp_inst, uint8_t *buf, uint16_t le
 				if (port->mctp_inst->medium_type == inst->medium_type) {
 					port->mctp_inst->endpoint = req->eid;
 					if (port->required_eid_pool_from_BO != 0) {
-						p->status |= 1;
+						p->eid_alloc_status |= 1;
 						p->eid_pool_size = port->required_eid_pool_from_BO;
 					}
 					break;

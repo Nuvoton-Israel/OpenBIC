@@ -37,7 +37,8 @@
 #include "util_sys.h"
 #include "plat_def.h"
 
-LOG_MODULE_REGISTER(plat_mctp);
+//LOG_MODULE_REGISTER(plat_mctp);
+LOG_MODULE_REGISTER(plat_mctp, LOG_LEVEL_DBG);
 
 K_TIMER_DEFINE(send_cmd_timer, send_cmd_to_dev, NULL);
 K_WORK_DEFINE(send_cmd_work, send_cmd_to_dev_handler);
@@ -444,16 +445,9 @@ bool get_mctp_ver_support_ctrl_cmd(mctp *mctp_inst, uint8_t dest_eid, uint8_t ms
 
 	ret = mctp_ctrl_read(mctp_inst, &msg, (uint8_t *)resp, sizeof(*resp));
 	if (ret) {
-		LOG_ERR("Get mctp version support failed.");
+		LOG_ERR("Get MCTP version support failed.");
 	} else {
-		for (int i = 1; i <= (resp->ver_num_entry_count); i++) {
-			//TODO: check the version support
-			size_t ver_no_entry_offset = sizeof(struct _mctp_ver_fields)*(i - 1);
-			struct _mctp_ver_fields *entry = (struct _mctp_ver_fields *)(resp +
-											  sizeof(struct _get_mctp_ver_support_resp) + ver_no_entry_offset);
-			LOG_DBG("Get mctp version support entry[%d]={%d, %d, %d, %d}",
-					 i, entry->major, entry->minor, entry->update, entry->alpha);
-		}
+		LOG_HEXDUMP_DBG(resp->entry, sizeof(struct _mctp_ver_fields) * resp->ver_num_entry_count, "Get MCTP ver support");
 	}
 
 	return ret;
@@ -521,7 +515,7 @@ bool get_uuid_ctrl_cmd(mctp *mctp_inst, uint8_t dest_eid, struct _get_uuid_resp 
 	if (ret) {
 		LOG_ERR("Get uuid failed.");
 	} else {
-		LOG_HEXDUMP_DBG(resp->uuid, sizeof(resp->uuid), "Get uuid");
+		LOG_HEXDUMP_DBG(resp->uuid, sizeof(resp->uuid), "Get UUID");
 	}
 
 	return ret;
@@ -562,6 +556,49 @@ bool set_eid_ctrl_cmd(mctp *mctp_inst, uint8_t dest_eid, uint8_t operation,
 		LOG_ERR("Set endpoint id failed.");
 	} else {
 		LOG_DBG("Set eid: %d", resp->eid);
+	}
+
+	return ret;
+}
+
+bool alloc_eid_ctrl_cmd(mctp *mctp_inst, uint8_t dest_eid, uint8_t operation,
+	uint8_t start_eid, uint8_t alloc_pool_size, struct _alocate_ep_id_resp *resp)
+{
+	CHECK_NULL_ARG_WITH_RETURN(mctp_inst, MCTP_ERROR);
+	CHECK_NULL_ARG_WITH_RETURN(resp, MCTP_ERROR);
+
+	uint8_t ret = MCTP_ERROR;
+	mctp_medium_conf *conf = &mctp_inst->medium_conf;
+
+	struct _alocate_ep_id_req req = { 0 };
+	req.op_flag = operation;
+	req.num_of_eid = alloc_pool_size;
+	req.starting_eid = start_eid;
+
+	mctp_ctrl_msg msg = { 0 };
+	msg.ext_params.type = mctp_inst->medium_type;
+
+	if (mctp_inst->medium_type == MCTP_MEDIUM_TYPE_USB) {
+		msg.ext_params.usb_ext_params.dummy = conf->usb_conf.addr;
+	} else if (mctp_inst->medium_type == MCTP_MEDIUM_TYPE_SMBUS) {
+		msg.ext_params.smbus_ext_params.addr = conf->smbus_conf.addr;
+	} else {
+		msg.ext_params.i3c_ext_params.addr = conf->i3c_conf.addr;
+	}
+	msg.ext_params.ep = dest_eid; //destination
+
+	msg.hdr.cmd = MCTP_CTRL_CMD_ALLOCATE_EP_ID;
+	msg.hdr.rq = MCTP_REQUEST;
+	msg.cmd_data = (uint8_t *)&req;
+	msg.cmd_data_len = sizeof(req);
+
+	ret = mctp_ctrl_read(mctp_inst, &msg, (uint8_t *)resp, sizeof(*resp));
+	if (ret) {
+		LOG_ERR("Allocate endpoint id failed.");
+	} else {
+		if (resp->status == allocation_accepted) {
+			LOG_DBG("Allocate start_eid %d, pool_size %d.", resp->fisrt_eid, resp->eid_pool_size);
+		}
 	}
 
 	return ret;
@@ -615,48 +652,67 @@ uint8_t register_endpoint(mctp *mctp_inst, uint8_t eid)
 			mctp_eid_pool_alloc_info *eid_pool_info = &p->mctp_inst->eid_pool_alloc_info;
 			/* Check if it is as a bus owner role and eid_pool_alloc_info.size is not zero */
 			if (p->bus_owner && eid_pool_info->size) {
-				/* Get MCTP version support */
-				struct _get_mctp_ver_support_resp get_mctp_ctl_ver_resp = { 0 };
-				get_mctp_ver_support_ctrl_cmd(mctp_inst, MCTP_NULL_EID, MCTP_MSG_TYPE_CTRL, &get_mctp_ctl_ver_resp);
-
 				/* Get endpoint id */
 				struct _get_eid_resp get_eid_resp = { 0 };
 				if (get_eid_ctrl_cmd(mctp_inst, MCTP_NULL_EID, &get_eid_resp)) {
 					return MCTP_ERROR;
 				}
-				uint8_t alloc_eid = get_eid_resp.eid;
+				uint8_t assign_eid = get_eid_resp.eid;
 
 				/* Set endpoint id */
 				struct _set_eid_resp set_eid_resp = { 0 };
-				if (alloc_eid != MCTP_NULL_EID && alloc_eid >= eid_pool_info->start &&
-					alloc_eid <= (eid_pool_info->start + eid_pool_info->size) && !eid_pool_info->eid_used[alloc_eid]) {
-					if (!set_eid_ctrl_cmd(mctp_inst, MCTP_NULL_EID, set_eid, alloc_eid, &set_eid_resp)) {
-						eid_pool_info->eid_used[alloc_eid] = true;
+				if (assign_eid != MCTP_NULL_EID && assign_eid >= eid_pool_info->start &&
+					assign_eid <= (eid_pool_info->start + eid_pool_info->size) && !eid_pool_info->eid_used[assign_eid]) {
+					if (!set_eid_ctrl_cmd(mctp_inst, MCTP_NULL_EID, set_eid, assign_eid, &set_eid_resp)) {
+						eid_pool_info->eid_used[assign_eid] = true;
 					}
 				} else {
-					for (alloc_eid = eid_pool_info->start; alloc_eid < (eid_pool_info->start + eid_pool_info->size); alloc_eid++) {
-						if (!eid_pool_info->eid_used[alloc_eid]) {
-							if (!set_eid_ctrl_cmd(mctp_inst, MCTP_NULL_EID, set_eid, alloc_eid, &set_eid_resp)) {
-								eid_pool_info->eid_used[alloc_eid] = true;
+					for (assign_eid = eid_pool_info->start; assign_eid < (eid_pool_info->start + eid_pool_info->size); assign_eid++) {
+						if (!eid_pool_info->eid_used[assign_eid]) {
+							if (!set_eid_ctrl_cmd(mctp_inst, MCTP_NULL_EID, set_eid, assign_eid, &set_eid_resp)) {
+								eid_pool_info->eid_used[assign_eid] = true;
 								break;
 							}
 						}
 					}
 				}
 
-				//TODO: Trigger allocate eid ctrl cmd if endpoint requires EID pool allocation
-				//struct _alloc_eid_resp alloc_eid_resp = { 0 };
-				//alloc_eid_ctrl_cmd(mctp_inst, alloc_eid, alloc_eid_resp);
+				/* Check endpoint ID allocation status and EID pool size requirement via set_eid_resp */
+				if (set_eid_resp.eid_alloc_status == EP_REQ_EID_POOL_ALLOCATION && set_eid_resp.eid_pool_size <= eid_pool_info->size) {
+					/* Find unused eid from eid pool and requirement size <= eid pool unused size */
+					uint8_t pool_last_eid = eid_pool_info->start + eid_pool_info->size - 1;
+					for (uint8_t start_eid = eid_pool_info->start; start_eid <= pool_last_eid; start_eid++) {
+						uint8_t pool_remain_size = pool_last_eid - start_eid + 1;
+						if (!eid_pool_info->eid_used[start_eid] && set_eid_resp.eid_pool_size <= pool_remain_size) {
+							struct _alocate_ep_id_resp alloc_eid_resp = { 0 };
+							if (!alloc_eid_ctrl_cmd(mctp_inst, assign_eid, allocate_eids, start_eid, set_eid_resp.eid_pool_size, &alloc_eid_resp)) {
+								if (alloc_eid_resp.status == allocation_accepted) {
+									uint8_t count = 0;
+									while (count < set_eid_resp.eid_pool_size) {
+										/* Update eid status */
+										eid_pool_info->eid_used[start_eid + count] = true;
+										count++;
+									}
+								}
+							}
+							break;
+						}
+					}
+				}
+
+				/* Get MCTP version support */
+				struct _get_mctp_ver_support_resp get_mctp_ctl_ver_resp = { 0 };
+				get_mctp_ver_support_ctrl_cmd(mctp_inst, MCTP_NULL_EID, MCTP_MSG_TYPE_CTRL, &get_mctp_ctl_ver_resp);
 
 				/* Get UUID */
 				struct _get_uuid_resp get_uuid_resp = { 0 };
-				get_uuid_ctrl_cmd(mctp_inst, alloc_eid, &get_uuid_resp);
+				get_uuid_ctrl_cmd(mctp_inst, assign_eid, &get_uuid_resp);
 
 				/* Get Message Type Support */
 				struct _get_message_type_resp get_mctp_type_resp = { 0 };
-				get_mctp_type_support_ctrl_cmd(mctp_inst, alloc_eid, &get_mctp_type_resp);
+				get_mctp_type_support_ctrl_cmd(mctp_inst, assign_eid, &get_mctp_type_resp);
 
-				//add_routing_table_entry(mctp_inst, alloc_eid);
+				//add_routing_table_entry(mctp_inst, assign_eid);
 
 				/* If eid is bridge, */
 					/* Routing info update (0x09) */
@@ -678,7 +734,7 @@ uint8_t register_endpoint(mctp *mctp_inst, uint8_t eid)
 					mctp_route_entry *r = plat_mctp_route_tbl + j;
 					// Check bus & addr are match and then update the endpoint id
 					if (r->bus == bus && r->addr == addr) {
-						r->endpoint = alloc_eid;
+						r->endpoint = assign_eid;
 						break;
 					}
 				}
@@ -702,7 +758,7 @@ uint8_t register_endpoint(mctp *mctp_inst, uint8_t eid)
 				struct _get_uuid_resp get_uuid_resp = { 0 };
 				get_uuid_ctrl_cmd(mctp_inst, eid, &get_uuid_resp);
 
-				//add_routing_table_entry(mctp_inst, alloc_eid);
+				//add_routing_table_entry(mctp_inst, assign_eid);
 
 				/* If eid is bridge, */
 					/* Routing info update (0x09) */
