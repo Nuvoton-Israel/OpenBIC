@@ -17,6 +17,7 @@
 #include "hal_gpio.h"
 #include "plat_gpio.h"
 
+#include "plat_led.h"
 #include "plat_class.h"
 #include "plat_isr.h"
 #include "plat_vw_gpio.h"
@@ -96,6 +97,7 @@ void pal_post_init()
 	kcs_init();
 	plat_isr_init();
 	edaf_npcm_init();
+	plat_led_init();
 	plat_uart_bridge_init();
 
 	gpio_set(FM_SMC_FW_READY, 1);
