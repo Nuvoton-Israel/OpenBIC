@@ -7,6 +7,11 @@
 &uart1 {
 	status = "okay";
 	current-speed = <115200>;
+
+	/* ESPI UARTB to COM port B(SINB SOUTB)*/
+	// pinctrl-0 = <&pinctrl_sinoutb_default>;
+
+	/*EPSI UARTB to CR_UART2*/
 	ext-loopback;
 };
 
