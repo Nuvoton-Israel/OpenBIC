@@ -73,36 +73,6 @@ struct _get_uuid_resp {
 	uint8_t uuid[16];
 } __attribute__((packed));
 
-/* Assume 8 byte is enough for holding largest physical address */
-#define MAX_PHYSICAL_ADDRESS_SIZE 8
-
-typedef enum {
-	mctp_over_smbus = 0x01,
-	mctp_over_pcie_vdm,
-	mctp_over_usb,
-	mctp_over_i3c = 0x06,
-} mctp_phys_transport_binding_id;
-
-typedef enum {
-	smbus_2_0_or_i2c_100_khz_compatible = 0x02,
-	usb_2_0_compatible = 0x11,
-	i3c_basic_compatible = 0x30,
-} mctp_phys_media_id;
-
-struct _get_routing_tbl_entry {
-	uint8_t eid_range_size;
-	uint8_t starting_eid;
-	uint8_t entry_type;
-	uint8_t phys_transport_binding_id;
-	uint8_t phys_media_type_id;
-	uint8_t phys_address_size;
-} __attribute__((packed));
-
-struct _get_routing_tbl_entry_with_address {
-	struct _get_routing_tbl_entry routing_info;
-	uint8_t phys_address[MAX_PHYSICAL_ADDRESS_SIZE];
-} __attribute__((__packed__));
-
 struct _get_routing_tbl_entry_req {
 	uint8_t entry_handle;
 } __attribute__((packed));

@@ -23,9 +23,8 @@
 #include <sys/printk.h>
 #include <zephyr.h>
 #include "libutil.h"
-#include "plat_def.h"
 
-LOG_MODULE_REGISTER(mctp, LOG_LEVEL_DBG);
+LOG_MODULE_REGISTER(mctp);
 
 typedef struct __attribute__((packed)) {
 	uint8_t hdr_ver;

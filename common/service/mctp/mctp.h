@@ -46,6 +46,8 @@ extern "C" {
 #define MCTP_DEFAULT_ENDPOINT 0x0A
 #define MCTP_NULL_EID 0x00
 
+#define MCTP_DEFAULT_ROUTE_TBL_SIZE 5
+
 #define MCTP_DEFAULT_MSG_MAX_SIZE 64
 #define MCTP_TRANSPORT_HEADER_SIZE 4
 #define MCTP_MEDIUM_META_SIZE_SMBUS 3
@@ -263,6 +265,38 @@ typedef struct _mctp_smbus_port {
 	uint8_t required_eid_pool_from_BO;
 } mctp_port;
 
+/* Assume 8 byte is enough for holding largest physical address */
+#define MAX_PHYSICAL_ADDRESS_SIZE 8
+
+typedef enum {
+	mctp_over_smbus = 0x01,
+	mctp_over_pcie_vdm,
+	mctp_over_usb,
+	mctp_over_i3c = 0x06,
+} mctp_phys_transport_binding_id;
+
+typedef enum {
+	smbus_2_0_or_i2c_100_khz_compatible = 0x02,
+	usb_2_0_compatible = 0x11,
+	i3c_basic_compatible = 0x30,
+} mctp_phys_media_id;
+
+struct _get_routing_tbl_entry {
+	uint8_t eid_range_size;
+	uint8_t starting_eid;
+	uint8_t port_number : 5;
+	uint8_t entry_config: 1;
+	uint8_t entry_type : 2;
+	uint8_t phys_transport_binding_id;
+	uint8_t phys_media_type_id;
+	uint8_t phys_address_size;
+} __attribute__((packed));
+
+struct _get_routing_tbl_entry_with_address {
+	struct _get_routing_tbl_entry routing_info;
+	uint8_t phys_address[MAX_PHYSICAL_ADDRESS_SIZE];
+} __attribute__((__packed__));
+
 /* mctp route entry struct */
 typedef struct _mctp_route_entry {
 	uint8_t endpoint;
@@ -270,6 +304,15 @@ typedef struct _mctp_route_entry {
 	uint8_t addr; /* TODO: only consider smbus/i3c */
 	uint8_t dev_present_pin;
 	bool set_endpoint;
+
+	struct _get_routing_tbl_entry_with_address routing_tbl_entries;
+	enum {
+        UNUSED = 0,
+        REMOTE,
+        // Local address. Note that multiple interfaces
+        // in a network may have the same local address.
+        LOCAL,
+	} state;
 } mctp_route_entry;
 
 typedef struct _mctp_msg_handler {

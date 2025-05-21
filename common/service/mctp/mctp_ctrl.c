@@ -301,9 +301,8 @@ uint8_t mctp_get_routing_table_entries(void *mctp_inst, uint8_t *buf, uint16_t l
 		rt_entry->eid_range_size = 1;
 		rt_entry->starting_eid = inst->endpoint;
 
-		//[7:6] 10b = entry is for a single endpoint that serves as an MCTP bridge;
-		//[5] 1b = Entry was statically configured
-		rt_entry->entry_type = 0xA0;
+		rt_entry->entry_config = 1; // Entry was statically configured
+		rt_entry->entry_type = 2; // Entry is for a single endpoint that serves as an MCTP bridge
 
 		// TODO: need to set correct values according to inst->medium_type.
 		phys_address = (uint8_t *)p + entry_offset;
@@ -339,46 +338,30 @@ uint8_t mctp_get_routing_table_entries(void *mctp_inst, uint8_t *buf, uint16_t l
 		p->completion_code = MCTP_CTRL_CC_SUCCESS;
 	}
 
-	mctp *port_inst = NULL;
 	uint8_t plat_mctp_route_tbl_count = plat_get_mctp_route_tbl_count();
 	if (req->entry_handle < plat_mctp_route_tbl_count) {
 		/* for loop plat_mctp_route_tbl */
 		for (uint8_t i = req->entry_handle; i < plat_mctp_route_tbl_count; i++) {
 			mctp_route_entry *entry = plat_get_mctp_route_tbl(i);
 			if (entry != NULL) {
-				rt_entry = (struct _get_routing_tbl_entry *)((uint8_t *)resp + entry_offset);
+				if (entry->endpoint == 0) {
+					/* Set p->next_entry_handle */
+					p->next_entry_handle = i + 1;
+					continue;
+				}
+				rt_entry = (struct _get_routing_tbl_entry *)((uint8_t *)p + entry_offset);
 				entry_offset += sizeof(struct _get_routing_tbl_entry);
 
 				// Check entry_offset size
-				if (entry_offset >= MCTP_BASE_LINE_UNIT)
+				if (entry_offset >= MCTP_BASE_LINE_UNIT) {
 					break;
-
-				/* Add other eid info to p->routing_tbl_entry from plat_mctp_route_tbl */
-				rt_entry->eid_range_size = 1;
-				rt_entry->starting_eid = entry->endpoint;
-
-				//[7:6] 10b = entry is for a single endpoint that serves as an MCTP bridge;
-				//[5] 1b = Entry was statically configured
-				rt_entry->entry_type = 0xA0;
-
-				// TODO: need to set correct values according to inst->medium_type.
-				phys_address = (uint8_t *)p + entry_offset;
-				port_inst = pal_find_mctp_by_bus(entry->bus);
-				if (port_inst->medium_type == MCTP_MEDIUM_TYPE_USB) {
-					rt_entry->phys_transport_binding_id = mctp_over_usb;
-					rt_entry->phys_media_type_id = usb_2_0_compatible;
-					rt_entry->phys_address_size = 1; //USB phys addr is 2 bytes
-				} else if (port_inst->medium_type == MCTP_MEDIUM_TYPE_SMBUS) {
-					rt_entry->phys_transport_binding_id = mctp_over_smbus;
-					rt_entry->phys_media_type_id = smbus_2_0_or_i2c_100_khz_compatible;
-					rt_entry->phys_address_size = 1; //SMBus phys addr is 1 byte
-				} else { //I3C
-					rt_entry->phys_transport_binding_id = mctp_over_i3c;
-					rt_entry->phys_media_type_id = i3c_basic_compatible;
-					rt_entry->phys_address_size = 1; //I3C phys addr is 1 byte
 				}
 
-				*phys_address = entry->addr;
+				/* Add other eid info to p->routing_tbl_entry from plat_mctp_route_tbl */
+				memcpy(rt_entry, &entry->routing_tbl_entries.routing_info,
+				       sizeof(struct _get_routing_tbl_entry));
+
+				*((uint8_t *)p + entry_offset) = entry->addr; // Physical Address
 
 				/* Set p->next_entry_handle */
 				p->next_entry_handle = i + 1;

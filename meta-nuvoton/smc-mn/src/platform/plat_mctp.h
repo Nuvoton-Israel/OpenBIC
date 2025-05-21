@@ -21,6 +21,9 @@
 #include "storage_handler.h"
 #include "pldm.h"
 
+#define max(a, b) ((a) > (b) ? (a) : (b))
+#define min(a, b) ((a) < (b) ? (a) : (b))
+
 #define MCTP_MSG_TYPE_SHIFT	0
 #define MCTP_MSG_TYPE_MASK	0x7F
 #define MCTP_IC_SHIFT		7
@@ -88,7 +91,7 @@ void send_cmd_to_dev(struct k_timer *timer);
 void send_cmd_to_dev_handler(struct k_work *work);
 void send_discovery_notify_cmd(struct k_timer *timer);
 void send_discovery_notify_cmd_handler(struct k_work *work);
-uint8_t register_endpoint(mctp *mctp_inst, uint8_t eid);
+uint8_t register_endpoint(mctp *mctp_inst, uint8_t eid, uint8_t endpoint_type);
 void plat_mctp_init(void);
 mctp *find_mctp_by_bus(uint8_t bus);
 mctp *get_mctp_init();
