@@ -86,7 +86,7 @@ void pal_pre_init()
 	}
 #endif
 
-	gpio_set(FM_SMC_FLASH_MUX_SEL, 1);
+	gpio_set(FM_SMC_FLASH_MUX_SEL, 0);
 
 }
 
@@ -98,9 +98,9 @@ void pal_post_init()
 	plat_isr_init();
 	edaf_npcm_init();
 	plat_led_init();
-	plat_uart_bridge_init();
-
 	gpio_set(FM_SMC_FW_READY, 1);
+
+	plat_uart_bridge_init();
 }
 
 void pal_device_init()

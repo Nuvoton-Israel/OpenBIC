@@ -8,12 +8,15 @@ project(smc-mn)
 set(common_path ../../common)
 
 FILE(GLOB app_sources src/ipmi/*.c src/platform/*.c src/lib/*.c src/shell/*.c)
-FILE(GLOB common_sources ${common_path}/service/*.c ${common_path}/service/*/*.c ${common_path}/hal/*.c ${common_path}/dev/*.c ${common_path}/shell/*.c ${common_path}/shell/commands/*.c)
-# remove ast_adc only
-list(REMOVE_ITEM common_sources "${CMAKE_CURRENT_SOURCE_DIR}/${common_path}/dev/ast_adc.c")
-list(REMOVE_ITEM common_sources "${CMAKE_CURRENT_SOURCE_DIR}/${common_path}/dev/snoop.c")
-list(REMOVE_ITEM common_sources "${CMAKE_CURRENT_SOURCE_DIR}/${common_path}/dev/pcc.c")
+FILE(GLOB common_sources ${common_path}/service/*.c ${common_path}/service/*/*.c ${common_path}/hal/*.c ${common_path}/shell/*.c ${common_path}/shell/commands/*.c)
 
+target_sources(app PRIVATE ${common_path}/dev/snoop_npcm.c)
+target_sources(app PRIVATE ${common_path}/dev/npcm4xx_adc.c)
+target_sources(app PRIVATE ${common_path}/dev/fru.c)
+target_sources(app PRIVATE ${common_path}/dev/eeprom.c)
+target_sources(app PRIVATE ${common_path}/dev/altera.c)
+target_sources(app PRIVATE ${common_path}/dev/pmic.c)
+target_sources(app PRIVATE ${common_path}/dev/guid.c)
 target_sources(app PRIVATE ${app_sources})
 target_sources(app PRIVATE ${common_sources})
 
