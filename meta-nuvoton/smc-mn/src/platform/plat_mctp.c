@@ -55,11 +55,13 @@ static mctp_port plat_mctp_port[] = {
 #endif
 		.medium_type = MCTP_MEDIUM_TYPE_TARGET_I3C
 	},
+/*
 	{
 		.conf.smbus_conf.addr = I2C_ADDR_BIC,
 		.conf.smbus_conf.bus = I2C_BUS_TARGET_TO_BMC,
 		.medium_type = MCTP_MEDIUM_TYPE_SMBUS
 	},
+*/
 	{
 		.channel_target = PLDM, 
 		.conf.usb_conf.addr = 0,
@@ -81,7 +83,7 @@ static mctp_port plat_mctp_port[] = {
 };
 
 static mctp_route_entry plat_mctp_route_tbl[] = {
-	{ MCTP_EID_BMC_I2C, I2C_BUS_TARGET_TO_BMC, I2C_ADDR_BMC, .set_endpoint = false},
+	//{ MCTP_EID_BMC_I2C, I2C_BUS_TARGET_TO_BMC, I2C_ADDR_BMC, .set_endpoint = false},
 	{ MCTP_EID_BMC_I3C, I3C_BUS_TARGET_TO_BMC, I3C_STATIC_ADDR_BMC, .set_endpoint = false},
 	{ MCTP_EID_BMC_SERIAL, 0x0, 0x0, .set_endpoint = false},
 #ifdef TEST_I3C_CONTROLLER_BIC
