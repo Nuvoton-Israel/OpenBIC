@@ -174,7 +174,9 @@ SENSOR_DRIVE_INIT_DECLARE(isl28022);
 #ifndef DISABLE_PEX89000
 SENSOR_DRIVE_INIT_DECLARE(pex89000);
 #endif
+#ifndef DISABLE_INTEL_PECI
 SENSOR_DRIVE_INIT_DECLARE(intel_peci);
+#endif
 #ifndef DISABLE_PCH
 SENSOR_DRIVE_INIT_DECLARE(pch);
 #endif
@@ -392,7 +394,11 @@ sensor_drive_api sensor_drive_tbl[] = {
 #else
 	SENSOR_DRIVE_TYPE_UNUSE(ast_adc),
 #endif
+#ifndef DISABLE_INTEL_PECI
 	SENSOR_DRIVE_TYPE_INIT_MAP(intel_peci),
+#else
+	SENSOR_DRIVE_TYPE_UNUSE(intel_peci),
+#endif
 #ifndef DISABLE_ISL69259
 	SENSOR_DRIVE_TYPE_INIT_MAP(isl69259),
 #else
