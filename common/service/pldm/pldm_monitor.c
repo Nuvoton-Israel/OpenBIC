@@ -150,10 +150,11 @@ uint8_t pldm_get_state_sensor_reading(void *mctp_inst, uint8_t *buf, uint16_t le
 		goto ret;
 	}
 
+	uint8_t status = PLDM_ERROR;
+#ifdef ENABLE_PLDM_SENSOR
 	uint8_t sensor_number = (uint8_t)req_p->sensor_id;
-	uint8_t status;
-
 	status = plat_pldm_state_sensor_get_reading(sensor_number, res_p);
+#endif
 	res_p->completion_code = status;
 
 	*resp_len = sizeof(struct pldm_get_state_sensor_reading_resp);
