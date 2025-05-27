@@ -409,7 +409,7 @@ void i2c_scan(uint8_t bus, uint8_t *target_addr, uint8_t *target_addr_len)
 
 void util_init_I2C(void)
 {
-	int status;
+	[[maybe_unused]] int status;
 
 #ifdef DEV_I2C_0
 	dev_i2c[0] = device_get_binding("I2C_0");
