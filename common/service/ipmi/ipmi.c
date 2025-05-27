@@ -21,7 +21,7 @@
 #include "cmsis_os2.h"
 #include "ipmi.h"
 
-#ifdef CONFIG_IPMI_KCS_ASPEED
+#if defined(CONFIG_IPMI_KCS_ASPEED) || defined(CONFIG_IPMI_KCS_NPCM4XX)
 #include "kcs.h"
 #endif
 
@@ -360,7 +360,7 @@ void ipmi_cmd_handle(void *parameters, void *arvg0, void *arvg1)
 		usb_write_by_ipmi(&msg_cfg.buffer);
 		break;
 #endif
-#ifdef CONFIG_IPMI_KCS_ASPEED
+#if defined(CONFIG_IPMI_KCS_ASPEED) || defined(CONFIG_IPMI_KCS_NPCM4XX)
 	case HOST_KCS_1:
 	case HOST_KCS_2:
 	case HOST_KCS_3:
