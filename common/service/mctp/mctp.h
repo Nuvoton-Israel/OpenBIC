@@ -247,6 +247,7 @@ typedef struct _mctp {
 
 	/* Flag for endpoint discovery process */
 	bool discovered;
+	uint8_t bus_owner_eid;
 	mctp_eid_pool_alloc_info eid_pool_alloc_info;
 } mctp;
 
@@ -280,6 +281,13 @@ typedef enum {
 	usb_2_0_compatible = 0x11,
 	i3c_basic_compatible = 0x30,
 } mctp_phys_media_id;
+
+enum entry_type {
+	MCTP_ROUTING_ENTRY_ENDPOINT,
+	MCTP_ROUTING_ENTRY_BRIDGE_AND_ENDPOINTS,
+	MCTP_ROUTING_ENTRY_BRIDGE,
+	MCTP_ROUTING_ENTRY_ENDPOINTS,
+};
 
 struct _get_routing_tbl_entry {
 	uint8_t eid_range_size;

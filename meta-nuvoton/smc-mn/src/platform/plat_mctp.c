@@ -45,6 +45,9 @@ K_WORK_DEFINE(send_cmd_work, send_cmd_to_dev_handler);
 K_TIMER_DEFINE(send_discovery_notify_cmd_timer, send_discovery_notify_cmd, NULL);
 K_WORK_DEFINE(send_discovery_notify_cmd_work, send_discovery_notify_cmd_handler);
 
+K_TIMER_DEFINE(get_routing_tbl_entries_timer, get_routing_tbl_entries_timer_handler, NULL);
+K_WORK_DEFINE(get_routing_tbl_entries_work, get_routing_tbl_entries_work_handler);
+
 uint8_t plat_eid = MCTP_DEFAULT_ENDPOINT;
 mctp_reg_eid_work reg_eid_work[MAX_WORK_ITEMS];
 
@@ -64,16 +67,29 @@ static mctp_port plat_mctp_port[] = {
 		.eid_pool_first_eid = 0,
 		.required_eid_pool_from_BO = 0,
 	},*/
-	{
+#if 1
+	{ /* I3C controller & MCTP EP */
 		.conf.i3c_conf.addr = I3C_MNG_ADDR,
-		.conf.i3c_conf.bus = I3C_BUS_CONTROLLER_TO_HUB, //i3c5 is as a controller
+		.conf.i3c_conf.bus = I3C_BUS_CONTROLLER_TO_HUB,
 		.medium_type = MCTP_MEDIUM_TYPE_CONTROLLER_I3C,
 		.support_bridge = true,
-		.bus_owner = false, //true,
+		.bus_owner = false,
 		.eid_pool_size = 0,
 		.eid_pool_first_eid = 0,
 		.required_eid_pool_from_BO = 3,
 	},
+#else
+	{ /* I3C target & MCTP topmost BO */
+		.conf.i3c_conf.addr = I3C_MNG_ADDR,
+		.conf.i3c_conf.bus = I3C_BUS_CONTROLLER_TO_HUB,
+		.medium_type = MCTP_MEDIUM_TYPE_TARGET_I3C,
+		.support_bridge = true,
+		.bus_owner = true,
+		.eid_pool_size = 10,
+		.eid_pool_first_eid = 0x11,
+		.required_eid_pool_from_BO = 0,
+	},
+#endif
 	{
 		.conf.smbus_conf.addr = I2C_ADDR_BIC,
 		.conf.smbus_conf.bus = I2C_BUS_TARGET_TO_BMC,
@@ -91,9 +107,9 @@ static mctp_port plat_mctp_port[] = {
 		.medium_type = MCTP_MEDIUM_TYPE_USB,
 		.support_bridge = true,
 		.bus_owner = true,
-		.eid_pool_size = 3,
-		.eid_pool_first_eid = 0x10,
-		.required_eid_pool_from_BO = 0,
+		.eid_pool_size = 0,
+		.eid_pool_first_eid = 0,
+		.required_eid_pool_from_BO = 3,
 	},
 /*
 #ifdef TEST_I3C_CONTROLLER_BIC
@@ -420,8 +436,14 @@ void send_cmd_to_dev(struct k_timer *timer)
 void mctp_reg_eid_handler(struct k_work *work)
 {
 	mctp_reg_eid_work *reg_eid_work_p = CONTAINER_OF(work, mctp_reg_eid_work, work);
+	uint8_t ret = MCTP_ERROR;
 
-	register_endpoint(reg_eid_work_p->mctp_inst, reg_eid_work_p->eid, SIMPLE_ENDPOINT);
+	ret = register_endpoint(reg_eid_work_p->mctp_inst, &reg_eid_work_p->routing_tbl_entry);
+	if (ret && (ret != MCTP_ERROR)) {
+		LOG_DBG("Register endpoint success, eid: %d", reg_eid_work_p->routing_tbl_entry.routing_info.starting_eid);
+	} else {
+		LOG_ERR("Register endpoint failed, ret: %d", ret);
+	}
 }
 
 static void get_mctp_ver_support_resp_handler(void *args, uint8_t *buf, uint16_t len)
@@ -669,10 +691,125 @@ bool get_mctp_type_support_ctrl_cmd(mctp *mctp_inst, uint8_t dest_eid)
 	return ret;
 }
 
-bool add_routing_table_entries(mctp *mctp_inst, uint8_t eid, uint8_t endpoint_type)
+bool send_routing_info_update(mctp *mctp_inst, uint8_t dest_eid, struct _routing_info_update_req *req, size_t req_data_len)
 {
 	CHECK_NULL_ARG_WITH_RETURN(mctp_inst, MCTP_ERROR);
-	CHECK_ARG_WITH_RETURN(eid == MCTP_NULL_EID, MCTP_ERROR);
+	CHECK_ARG_WITH_RETURN(dest_eid == MCTP_NULL_EID, MCTP_ERROR);
+	CHECK_NULL_ARG_WITH_RETURN(req, MCTP_ERROR);
+
+	uint8_t ret = MCTP_ERROR;
+	mctp_medium_conf *conf = &mctp_inst->medium_conf;
+
+	mctp_ctrl_msg msg = { 0 };
+	msg.ext_params.type = mctp_inst->medium_type;
+
+	if (mctp_inst->medium_type == MCTP_MEDIUM_TYPE_USB) {
+		msg.ext_params.usb_ext_params.dummy = conf->usb_conf.addr;
+	} else if (mctp_inst->medium_type == MCTP_MEDIUM_TYPE_SMBUS) {
+		msg.ext_params.smbus_ext_params.addr = conf->smbus_conf.addr;
+	} else {
+		msg.ext_params.i3c_ext_params.addr = conf->i3c_conf.addr;
+	}
+	msg.ext_params.ep = dest_eid; //destination
+
+	msg.hdr.cmd = MCTP_CTRL_CMD_ROUTING_INFO_UPDATE;
+	msg.hdr.rq = MCTP_REQUEST;
+	msg.cmd_data = (uint8_t *)req;
+	msg.cmd_data_len = req_data_len;
+
+	struct _mctp_ctrl_resp routing_info_update_resp = { 0 };
+	ret = mctp_ctrl_read(mctp_inst, &msg, (uint8_t *)&routing_info_update_resp, sizeof(routing_info_update_resp));
+	if (ret) {
+		LOG_ERR("Send routing info update failed.");
+	}
+
+	return ret;
+}
+
+bool send_routing_tbl_etries_to_bridge(mctp *mctp_inst, uint8_t dest_eid)
+{
+	CHECK_ARG_WITH_RETURN(dest_eid == MCTP_NULL_EID, MCTP_ERROR);
+
+	mctp_medium_conf *conf = &mctp_inst->medium_conf;
+	struct _routing_info_update_req *req = NULL;
+	struct routing_info_update_entry *cur_entry = NULL;
+	mctp_route_entry *rt_entry = NULL;
+	struct _get_routing_tbl_entry *rt_info = NULL;
+	uint8_t num_of_entries = 0;
+	uint8_t idx;
+	uint8_t ret = MCTP_ERROR;
+	size_t entry_offset = sizeof(struct _routing_info_update_req);
+
+	/* Get ALL routing table entries */
+#if SUPPORT_DYNAMIC_MCTP_ROUTE_TBL
+	for (idx = 0; idx < plat_mctp_route_tbl_size; idx++)
+#else
+	for (idx = 0; idx < ARRAY_SIZE(plat_mctp_route_tbl); idx++)
+#endif
+	{
+		rt_entry = &plat_mctp_route_tbl[idx];
+		if (rt_entry->state != UNUSED) {
+			num_of_entries++;
+		} else {
+			break;
+		}
+	}
+
+	if (num_of_entries != 0) {
+		/* Allocate routing info update request */
+		req = calloc(1, sizeof(struct _routing_info_update_req) + (num_of_entries + 1) * sizeof(struct _get_routing_tbl_entry_with_address));
+		req->count = num_of_entries + 1; //Add own eid entry
+
+		cur_entry = (struct routing_info_update_entry *)((uint8_t *)req + entry_offset);
+		entry_offset += sizeof(struct routing_info_update_entry);
+
+		/* Add own eid first */
+		cur_entry->type = MCTP_ROUTING_ENTRY_BRIDGE;
+		cur_entry->eid_count = 1;
+		cur_entry->starting_eid = mctp_inst->endpoint;
+
+		//Own eid phys addr is 1 byte
+		if (mctp_inst->medium_type == MCTP_MEDIUM_TYPE_USB) {
+			memcpy(cur_entry->address, &conf->usb_conf.addr, 1);
+		} else if (mctp_inst->medium_type == MCTP_MEDIUM_TYPE_SMBUS) {
+			memcpy(cur_entry->address, &conf->smbus_conf.addr, 1);
+		} else {
+			memcpy(cur_entry->address, &conf->i3c_conf.addr, 1);
+		}
+		entry_offset += 1; //Own eid phys addr is 1 byte
+
+		for (idx = 0; idx < num_of_entries; idx++) {
+			cur_entry = (struct routing_info_update_entry *)((uint8_t *)req + entry_offset);
+			entry_offset += sizeof(struct routing_info_update_entry);
+
+			rt_entry = &plat_mctp_route_tbl[idx];
+			rt_info = &rt_entry->routing_tbl_entries.routing_info;
+
+			cur_entry->type = rt_info->entry_type;
+			cur_entry->eid_count = rt_info->eid_range_size;
+			cur_entry->starting_eid = rt_info->starting_eid;
+			memcpy(cur_entry->address, rt_entry->routing_tbl_entries.phys_address, rt_info->phys_address_size);
+			entry_offset += rt_info->phys_address_size;
+		}
+
+		/* Send routing info update (0x09) */
+		ret = send_routing_info_update(mctp_inst, dest_eid, req, entry_offset);
+		if (ret) {
+			LOG_ERR("Send routing info update failed.");
+		} else {
+			LOG_DBG("Send routing info update success.");
+		}
+		free(req);
+
+	}
+
+	return ret;
+}
+
+bool add_routing_table_entries(mctp *mctp_inst, struct _get_routing_tbl_entry_with_address *routing_tbl_entry)
+{
+	CHECK_NULL_ARG_WITH_RETURN(mctp_inst, MCTP_ERROR);
+	CHECK_NULL_ARG_WITH_RETURN(routing_tbl_entry, MCTP_ERROR);
 
 	size_t idx;
 	size_t new_size;
@@ -682,11 +819,22 @@ bool add_routing_table_entries(mctp *mctp_inst, uint8_t eid, uint8_t endpoint_ty
 	mctp_medium_conf *conf = &mctp_inst->medium_conf;
 
 	// Find a slot
-	for (idx = 0; idx < plat_mctp_route_tbl_size; idx++) {
-		if (plat_mctp_route_tbl[idx].state == UNUSED) {
+#if SUPPORT_DYNAMIC_MCTP_ROUTE_TBL
+	for (idx = 0; idx < plat_mctp_route_tbl_size; idx++)
+#else
+	for (idx = 0; idx < ARRAY_SIZE(plat_mctp_route_tbl); idx++)
+#endif
+	{
+		/* Check if EID is already registered */
+		if (plat_mctp_route_tbl[idx].endpoint == routing_tbl_entry->routing_info.starting_eid) {
+			LOG_WRN("EID 0x%02x already registered, udate it.", routing_tbl_entry->routing_info.starting_eid);
+			break;
+		} else if (plat_mctp_route_tbl[idx].state == UNUSED) {
 			break;
 		}
 	}
+
+#if SUPPORT_DYNAMIC_MCTP_ROUTE_TBL
 	if (idx == plat_mctp_route_tbl_size) {
 		// Allocate more entries
 		new_size = max(MCTP_DEFAULT_ROUTE_TBL_SIZE, plat_mctp_route_tbl_size*2);
@@ -699,37 +847,50 @@ bool add_routing_table_entries(mctp *mctp_inst, uint8_t eid, uint8_t endpoint_ty
 		memset(&plat_mctp_route_tbl[plat_mctp_route_tbl_size], 0x0, sizeof(*plat_mctp_route_tbl) * (new_size - plat_mctp_route_tbl_size));
 		plat_mctp_route_tbl_size = new_size;
 	}
+#else
+	if (idx == ARRAY_SIZE(plat_mctp_route_tbl)) {
+		LOG_ERR("No more routing table entries available.");
+		return MCTP_ERROR;
+	}
+#endif
 
 	// Populate it
 	rt_entry = &plat_mctp_route_tbl[idx];
-	rt_info = &rt_entry->routing_tbl_entries.routing_info;
+	rt_entry->endpoint = routing_tbl_entry->routing_info.starting_eid;
 
-	rt_entry->endpoint = eid;
-	rt_info->eid_range_size = 1;
-	rt_info->starting_eid = eid;
-	rt_info->entry_type = endpoint_type; //TODO: support entry type
+	rt_info = &rt_entry->routing_tbl_entries.routing_info;
+	memcpy(rt_info, &routing_tbl_entry->routing_info, sizeof(*rt_info));
 
 	if (mctp_inst->medium_type == MCTP_MEDIUM_TYPE_USB) {
 		rt_entry->bus = conf->usb_conf.bus;
 		rt_entry->addr = conf->usb_conf.addr;
-		rt_info->phys_transport_binding_id = mctp_over_usb;
-		rt_info->phys_media_type_id = usb_2_0_compatible;
-		rt_info->phys_address_size = 1; //USB phys addr is 2 bytes
-		memcpy(rt_entry->routing_tbl_entries.phys_address, &conf->usb_conf.addr, rt_info->phys_address_size);
+
+		if (rt_info->phys_address_size == 0) {
+			rt_info->phys_transport_binding_id = mctp_over_usb;
+			rt_info->phys_media_type_id = usb_2_0_compatible;
+			rt_info->phys_address_size = 1; //USB phys addr is 2 bytes
+			memcpy(rt_entry->routing_tbl_entries.phys_address, &conf->usb_conf.addr, rt_info->phys_address_size);
+		}
 	} else if (mctp_inst->medium_type == MCTP_MEDIUM_TYPE_SMBUS) {
 		rt_entry->bus = conf->smbus_conf.bus;
 		rt_entry->addr = conf->smbus_conf.addr;
-		rt_info->phys_transport_binding_id = mctp_over_smbus;
-		rt_info->phys_media_type_id = smbus_2_0_or_i2c_100_khz_compatible;
-		rt_info->phys_address_size = 1; //SMBus phys addr is 1 byte
-		memcpy(rt_entry->routing_tbl_entries.phys_address, &conf->smbus_conf.addr, rt_info->phys_address_size);
+
+		if (rt_info->phys_address_size == 0) {
+			rt_info->phys_transport_binding_id = mctp_over_smbus;
+			rt_info->phys_media_type_id = smbus_2_0_or_i2c_100_khz_compatible;
+			rt_info->phys_address_size = 1; //SMBus phys addr is 1 byte
+			memcpy(rt_entry->routing_tbl_entries.phys_address, &conf->smbus_conf.addr, rt_info->phys_address_size);
+		}
 	} else {
 		rt_entry->bus = conf->i3c_conf.bus;
 		rt_entry->addr = conf->i3c_conf.addr;
-		rt_info->phys_transport_binding_id = mctp_over_i3c;
-		rt_info->phys_media_type_id = i3c_basic_compatible;
-		rt_info->phys_address_size = 1; //I3C phys addr is 1 byte
-		memcpy(rt_entry->routing_tbl_entries.phys_address, &conf->i3c_conf.addr, rt_info->phys_address_size);
+
+		if (rt_info->phys_address_size == 0) {
+			rt_info->phys_transport_binding_id = mctp_over_i3c;
+			rt_info->phys_media_type_id = i3c_basic_compatible;
+			rt_info->phys_address_size = 1; //I3C phys addr is 1 byte
+			memcpy(rt_entry->routing_tbl_entries.phys_address, &conf->i3c_conf.addr, rt_info->phys_address_size);
+		}
 	}
 
 	rt_entry->state = REMOTE;
@@ -737,9 +898,12 @@ bool add_routing_table_entries(mctp *mctp_inst, uint8_t eid, uint8_t endpoint_ty
 	return MCTP_SUCCESS;
 }
 
-uint8_t register_endpoint(mctp *mctp_inst, uint8_t eid, uint8_t endpoint_type)
+uint8_t register_endpoint(mctp *mctp_inst, struct _get_routing_tbl_entry_with_address *routing_tbl_entry)
 {
 	CHECK_NULL_ARG_WITH_RETURN(mctp_inst, MCTP_ERROR);
+	CHECK_NULL_ARG_WITH_RETURN(routing_tbl_entry, MCTP_ERROR);
+
+	struct _get_routing_tbl_entry *rt_info = &routing_tbl_entry->routing_info;
 
 	for (uint8_t i = 0; i < ARRAY_SIZE(plat_mctp_port); i++) {
 		mctp_port *p = plat_mctp_port + i;
@@ -788,11 +952,28 @@ uint8_t register_endpoint(mctp *mctp_inst, uint8_t eid, uint8_t endpoint_type)
 							if (!alloc_eid_ctrl_cmd(mctp_inst, assign_eid, allocate_eids, start_eid, set_eid_resp.eid_pool_size, &alloc_eid_resp)) {
 								if (alloc_eid_resp.status == allocation_accepted) {
 									uint8_t count = 0;
-									while (count < set_eid_resp.eid_pool_size) {
+									while (count < alloc_eid_resp.eid_pool_size) {
 										/* Update eid status */
 										eid_pool_info->eid_used[start_eid + count] = true;
 										count++;
 									}
+
+									/* Update routing table entry */
+									struct _get_routing_tbl_entry_with_address alloc_routing_tbl_entry = {0};
+									struct _get_routing_tbl_entry *alloc_rt_info = &alloc_routing_tbl_entry.routing_info;
+
+									/* Use eid_pool's start EID and size */
+									alloc_rt_info->starting_eid = eid_pool_info->start;
+									alloc_rt_info->eid_range_size = eid_pool_info->size;
+									alloc_rt_info->entry_type = MCTP_ROUTING_ENTRY_ENDPOINT;
+
+									if (add_routing_table_entries(mctp_inst, &alloc_routing_tbl_entry)) {
+										LOG_ERR("Failed to add routing table entries for allocated EID.");
+										return MCTP_ERROR;
+									}
+
+									/* Change assign_eid's entry_type to bridge */
+									rt_info->entry_type = MCTP_ROUTING_ENTRY_BRIDGE;
 								}
 							}
 							break;
@@ -807,52 +988,244 @@ uint8_t register_endpoint(mctp *mctp_inst, uint8_t eid, uint8_t endpoint_type)
 				/* Get Message Type Support */
 				get_mctp_type_support_ctrl_cmd(mctp_inst, assign_eid);
 
-				if (add_routing_table_entries(mctp_inst, assign_eid, get_eid_resp.endpoint_type)) {
+				rt_info->starting_eid = assign_eid;
+				if (add_routing_table_entries(mctp_inst, routing_tbl_entry)) {
+					LOG_ERR("Failed to add routing table entries for assigned EID 0x%x.", assign_eid);
 					return MCTP_ERROR;
 				}
 
-				/* If eid is bridge, */
+				/* If eid is bridge, send routing table entries to bridge */
 				if (get_eid_resp.endpoint_type == BUS_OWNER_BRIDGE) {
 					/* Routing info update (0x09) */
+					send_routing_tbl_etries_to_bridge(mctp_inst, assign_eid);
 				}
 
-			} else if (!p->bus_owner) { /* as an endpoint role */
+			} else if (!p->bus_owner) {	/* Entry's EID is an endpoint or a bridge */
 				/* Get Message Type Support */
-				if (get_mctp_type_support_ctrl_cmd(mctp_inst, eid)) {
+				if (get_mctp_type_support_ctrl_cmd(mctp_inst, routing_tbl_entry->routing_info.starting_eid)) {
 					return MCTP_ERROR;
-				}
-
-				/* Check if EID is already registered */
-#if SUPPORT_DYNAMIC_MCTP_ROUTE_TBL
-				for (uint8_t j = 0; j < plat_mctp_route_tbl_size; j++) {
-#else
-				for (uint8_t j = 0; j < ARRAY_SIZE(plat_mctp_route_tbl); j++) {
-#endif
-					mctp_route_entry *r = plat_mctp_route_tbl + j;
-					if (r->endpoint == eid) {
-						LOG_DBG("Endpoint %d is already registered", eid);
-						return MCTP_ERROR;
-					}
 				}
 
 				/* Get UUID */
 				struct _get_uuid_resp get_uuid_resp = { 0 };
-				get_uuid_ctrl_cmd(mctp_inst, eid, &get_uuid_resp);
+				get_uuid_ctrl_cmd(mctp_inst, routing_tbl_entry->routing_info.starting_eid, &get_uuid_resp);
 
-				if (add_routing_table_entries(mctp_inst, eid, endpoint_type)) {
+				if (add_routing_table_entries(mctp_inst, routing_tbl_entry)) {
+					LOG_ERR("Failed to add routing table entries for endpoint 0x%02x", routing_tbl_entry->routing_info.starting_eid);
 					return MCTP_ERROR;
 				}
-
-				/* If eid is bridge, */
-				if (endpoint_type == BUS_OWNER_BRIDGE) {
-					/* Routing info update (0x09) */
-				}
-
+			} else { //p->bus_owner's eid pool is not ready yet
+				return MCTP_ERROR;
 			}
+
+			return routing_tbl_entry->routing_info.starting_eid;
 		}
 	}
 
-	return MCTP_SUCCESS;
+	return MCTP_ERROR;
+}
+
+static void get_routing_tbl_entries_resp_handler(void *args, uint8_t *read_buf, uint16_t read_len)
+{
+	CHECK_NULL_ARG(args);
+	CHECK_NULL_ARG(read_buf);
+
+	uint8_t status = 0;
+	mctp_ctrl_resp_arg *resp_arg = (mctp_ctrl_resp_arg *)args;
+	/* Store the pointer-to-pointer in read_buf to handle resp of variable length */
+	struct _get_routing_tbl_entry_resp **resp_ptr = (struct _get_routing_tbl_entry_resp **)resp_arg->read_buf;
+
+	if (read_len > resp_arg->read_len) {
+		LOG_WRN("Response length(%d) is greater than buffer length(%d)", read_len,
+			resp_arg->read_len);
+
+		/* Reallocate resp */
+		if (*resp_ptr != NULL) {
+			void *tmp = realloc(*resp_ptr, read_len);
+
+			if (!tmp) {
+				return;
+			}
+			*resp_ptr = tmp;
+
+			/* Zero the new entries */
+			memset((uint8_t *)(*resp_ptr) + resp_arg->read_len, 0x0, read_len - resp_arg->read_len);
+
+			/* Update read_buf length */
+			resp_arg->read_len = read_len;
+		}
+		resp_arg->return_len = resp_arg->read_len;
+	} else {
+		resp_arg->return_len = read_len;
+	}
+
+	/* Return first data is completion code */
+	if (read_buf[0] != MCTP_CTRL_CC_SUCCESS) {
+		LOG_ERR("Return code status(0x%x)", read_buf[0]);
+		status = MCTP_CTRL_READ_STATUS_CC_ERROR;
+	} else {
+		memcpy(*resp_ptr, read_buf, resp_arg->return_len);
+		status = MCTP_CTRL_READ_STATUS_SUCCESS;
+	}
+
+	k_msgq_put(resp_arg->msgq, &status, K_NO_WAIT);
+}
+
+bool get_routing_tbl_entries_ctrl_cmd(mctp *mctp_inst, uint8_t dest_eid)
+{
+	CHECK_NULL_ARG_WITH_RETURN(mctp_inst, MCTP_ERROR);
+	CHECK_ARG_WITH_RETURN(dest_eid == MCTP_NULL_EID, MCTP_ERROR);
+
+	mctp_medium_conf *conf = &mctp_inst->medium_conf;
+	struct _get_routing_tbl_entry_req req = { 0 };
+	struct _get_routing_tbl_entry_resp *resp = NULL;
+	struct _get_routing_tbl_entry_with_address *resp_rt_entry = NULL;
+	uint8_t entry_handle = 0x00; //0x00 to access first entries in table
+	uint8_t ret = MCTP_ERROR;
+	size_t entry_offset = sizeof(struct _get_routing_tbl_entry_resp);
+
+	mctp_ctrl_msg msg = { 0 };
+
+	msg.ext_params.type = mctp_inst->medium_type;
+
+	if (mctp_inst->medium_type == MCTP_MEDIUM_TYPE_USB) {
+		msg.ext_params.usb_ext_params.dummy = conf->usb_conf.addr;
+	} else if (mctp_inst->medium_type == MCTP_MEDIUM_TYPE_SMBUS) {
+		msg.ext_params.smbus_ext_params.addr = conf->smbus_conf.addr;
+	} else {
+		msg.ext_params.i3c_ext_params.addr = conf->i3c_conf.addr;
+	}
+	msg.ext_params.ep = dest_eid; //destination
+
+	uint8_t status = 0;
+	uint8_t status_msgq_buf[1];
+	struct k_msgq *status_msgq = (struct k_msgq *)malloc(sizeof(struct k_msgq));
+	if (status_msgq == NULL) {
+		LOG_ERR("Fail to allocate status_msgq");
+		return ret;
+	}
+	k_msgq_init(status_msgq, status_msgq_buf, sizeof(uint8_t), 1);
+
+	mctp_ctrl_resp_arg *resp_arg = (mctp_ctrl_resp_arg *)malloc(sizeof(mctp_ctrl_resp_arg));
+	if (resp_arg == NULL) {
+		SAFE_FREE(status_msgq);
+		LOG_ERR("Fail to allocate resp_arg");
+		return ret;
+	}
+
+	resp = calloc(1, sizeof(struct _get_routing_tbl_entry_resp));
+	if (!resp) {
+		LOG_ERR("Failed to allocate memory for routing table");
+		return MCTP_ERROR;
+	}
+
+	resp->completion_code = MCTP_CTRL_CC_ERROR;
+	while (entry_handle != 0xFF) //0xFF = No more entries
+	{
+		req.entry_handle = entry_handle;
+
+		/* Send the get routing table entries ctrl cmd */
+		msg.hdr.cmd = MCTP_CTRL_CMD_GET_ROUTING_TABLE_ENTRIES;
+		msg.hdr.rq = MCTP_REQUEST;
+		msg.cmd_data = (uint8_t *)&req;
+		msg.cmd_data_len = sizeof(req);
+
+		resp_arg->msgq = status_msgq;
+		resp_arg->read_buf = (uint8_t *)&resp; /* Store the pointer-to-pointer in read_buf */
+		resp_arg->read_len = sizeof(*resp);
+		resp_arg->return_len = 0;
+
+		msg.recv_resp_cb_fn = get_routing_tbl_entries_resp_handler;
+		msg.recv_resp_cb_args = (void *)resp_arg;
+
+		if (mctp_ctrl_send_msg(mctp_inst, &msg) == MCTP_ERROR) {
+			LOG_ERR("Fail to send ctrl msg");
+			goto exit;
+		}
+
+		status = MCTP_CTRL_READ_STATUS_CC_ERROR;
+		if (k_msgq_get(status_msgq, &status, K_FOREVER)) {
+			LOG_ERR("Fail to get status from msgq");
+			goto exit;
+		}
+
+		if (status == MCTP_CTRL_READ_STATUS_SUCCESS) {
+			ret = MCTP_SUCCESS;
+		} else {
+			LOG_ERR("MCTP ctrl status: 0x%x", status);
+			goto exit;
+		}
+
+		/* Add routing table entries */
+		if (resp->completion_code == MCTP_CTRL_CC_SUCCESS) {
+			for (uint8_t i = 0; i < resp->num_of_entries; i++) {
+				resp_rt_entry = (struct _get_routing_tbl_entry_with_address *)((uint8_t *)resp + entry_offset);
+				entry_offset += sizeof(struct _get_routing_tbl_entry) + resp_rt_entry->routing_info.phys_address_size;
+
+				/* Check if starting_eid is own eid */
+				if(resp_rt_entry->routing_info.starting_eid == plat_eid) {
+					continue;
+				}
+
+				/* Check if starting_eid is downstream eid */
+				bool downstream_eids_flag = false;
+				for (uint8_t j = 0; j < ARRAY_SIZE(plat_mctp_port); j++) {
+					mctp_port *p = plat_mctp_port + j;
+					mctp_eid_pool_alloc_info *eid_pool_info = &p->mctp_inst->eid_pool_alloc_info;
+					if (eid_pool_info->allocated &&
+						resp_rt_entry->routing_info.starting_eid >= eid_pool_info->start &&
+						resp_rt_entry->routing_info.starting_eid < (eid_pool_info->start + eid_pool_info->size)) {
+						downstream_eids_flag = true;
+						break;
+					}
+				}
+				if (downstream_eids_flag) {
+					LOG_DBG("Downstream EID 0x%02x, skip it.", resp_rt_entry->routing_info.starting_eid);
+					continue;
+				}
+
+				/* Register endpoint */
+				ret = register_endpoint(mctp_inst, resp_rt_entry);
+				if (ret == MCTP_ERROR) {
+					LOG_ERR("Failed to register endpoint for routing table entry.");
+				}
+			}
+
+			entry_handle = resp->next_entry_handle;
+		} else {
+			LOG_ERR("Get routing tbl entries response is NULL.");
+			ret = MCTP_ERROR;
+			goto exit;
+		}
+	}
+
+exit:
+	SAFE_FREE(resp_arg);
+	SAFE_FREE(status_msgq);
+	SAFE_FREE(resp);
+	return ret;
+}
+
+void get_routing_tbl_entries_work_handler(struct k_work *work)
+{
+	mctp *mctp_inst = (mctp *)k_timer_user_data_get(&get_routing_tbl_entries_timer);
+
+	if (mctp_inst->discovered) {
+		/* Get routing tbl entries ctrl cmd */
+		get_routing_tbl_entries_ctrl_cmd(mctp_inst, mctp_inst->bus_owner_eid);
+	}
+}
+
+void get_routing_tbl_entries_timer_handler(struct k_timer *timer)
+{
+	if (k_work_busy_get(&get_routing_tbl_entries_work)) {
+		LOG_DBG("%s: Work is busy, cancelling and resubmitting.", __func__);
+		k_work_cancel(&get_routing_tbl_entries_work);
+		k_work_submit(&get_routing_tbl_entries_work);
+	} else {
+		LOG_DBG("%s: Work is not busy, submitting.", __func__);
+		k_work_submit(&get_routing_tbl_entries_work);
+	}
 }
 
 bool discovery_notify_ctrl_cmd(mctp *mctp_inst)
@@ -906,11 +1279,11 @@ void send_discovery_notify_cmd_handler(struct k_work *work)
 void send_discovery_notify_cmd(struct k_timer *timer)
 {
 	if (k_work_busy_get(&send_discovery_notify_cmd_work)) {
-		LOG_INF("Work is busy, cancelling and resubmitting.");
+		LOG_DBG("%s: Work is busy, cancelling and resubmitting.", __func__);
 		k_work_cancel(&send_discovery_notify_cmd_work);
 		k_work_submit(&send_discovery_notify_cmd_work);
 	} else {
-		LOG_INF("Work is not busy, submitting.");
+		LOG_DBG("%s: Work is not busy, submitting.", __func__);
 		k_work_submit(&send_discovery_notify_cmd_work);
 	}
 }
@@ -947,7 +1320,7 @@ void plat_mctp_init()
 			eid_pool_info->allocated = true;
 		} else {
 			//TODO: Use k_work to replace k_timer_start(&send_discovery_notify_cmd_timer, K_MSEC(3000), K_NO_WAIT);
-			LOG_INF("Send discovery notify cmd by k_work with mctp_inst and dest_eid");
+			LOG_DBG("Send discovery notify cmd by k_work with mctp_inst and dest_eid");
 		}
 	}
 
@@ -997,6 +1370,12 @@ void plat_update_mctp_routing_table(uint8_t eid)
 
 	// Set platform eid
 	plat_eid = eid;
+	for (uint8_t i = 0; i < ARRAY_SIZE(plat_mctp_port); i++) {
+		mctp_port *p = plat_mctp_port + i;
+		if (p->mctp_inst) {
+			p->mctp_inst->endpoint = plat_eid;
+		}
+	}
 
 	return;
 }

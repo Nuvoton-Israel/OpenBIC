@@ -45,6 +45,7 @@ typedef struct _mctp_ctrl_cmd_handler {
 #define MCTP_CTRL_CMD_ENDPOINT_DISCOVERY_NOTIFY 0x0D
 #define MCTP_CTRL_CMD_ALLOCATE_EP_ID 0x08
 
+#define MCTP_CTRL_CMD_ROUTING_INFO_UPDATE 0x09
 #define MCTP_CTRL_CMD_GET_ROUTING_TABLE_ENTRIES 0x0A
 
 
@@ -187,6 +188,18 @@ struct _get_eid_resp {
 	uint8_t : 2;
 	uint8_t medium_specific_info;
 } __attribute__((packed));
+
+struct routing_info_update_entry {
+	uint8_t type;
+	uint8_t eid_count;
+	uint8_t starting_eid;
+	uint8_t address[0];
+} __attribute__((__packed__));
+
+struct _routing_info_update_req {
+	uint8_t count;
+	uint8_t entries[0];
+} __attribute__((__packed__));
 
 typedef struct __attribute__((packed)) {
 	uint8_t msg_type : 7;
