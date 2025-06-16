@@ -30,6 +30,7 @@
 
 LOG_MODULE_REGISTER(hal_edaf_npcm);
 #define safs_isr_STACK_SIZE 2048
+#define MAX_FLASH_ADDR 0x4000000
 
 K_THREAD_STACK_DEFINE(safs_isr_thread, safs_isr_STACK_SIZE);
 static struct k_thread safs_isr_thread_handler;
@@ -214,12 +215,17 @@ static void safs_isr(void *arvg0, void *arvg1, void *arvg2)
 			resp_ioc.pkt[3] = len;
 			memcpy(&resp_ioc.pkt[4], &prefetch_buf[addr - prefetch_addr], len);
 		} else {
-			prefetch_len = ESPI_FLASH_BUF_SIZE;
 			if (rwe_pkt->cyc == ESPI_FLASH_READ_CYCLE_TYPE) {
+				if ((addr + ESPI_FLASH_BUF_SIZE) > MAX_FLASH_ADDR)
+					prefetch_len = len;
+				else
+					prefetch_len = ESPI_FLASH_BUF_SIZE;
 				rwe_pkt->len_h = prefetch_len >> 8;
 				rwe_pkt->len_l = prefetch_len & 0xff;
 				prefetch_addr = addr;
 				prefetch = true;
+			} else {
+				prefetch = false;
 			}
 
 			resp_ioc.pkt[0] = ESPI_FLASH_RESP_LEN;
