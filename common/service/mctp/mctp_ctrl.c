@@ -250,7 +250,7 @@ uint8_t mctp_ctrl_cmd_endpoint_discovery_notify(void *mctp_inst, uint8_t *buf, u
 
 			/* Register endpoint */
 			routing_tbl_entry = &reg_eid_work[WORK_VIA_DISCOVERY_NOTIFY].routing_tbl_entry;
-			memset(routing_tbl_entry, 0, sizeof(routing_tbl_entry));
+			memset(routing_tbl_entry, 0, sizeof(*routing_tbl_entry));
 
 			reg_eid_work[WORK_VIA_DISCOVERY_NOTIFY].mctp_inst = (mctp *)mctp_inst;
 
@@ -524,7 +524,7 @@ void set_downstream_eid_pool(mctp *mctp_inst, uint8_t eid_pool_size, uint8_t fir
 
 					/* Find and register downstream's endpoint device */
 					routing_tbl_entry = &reg_eid_work[WORK_VIA_ALLOC_EID].routing_tbl_entry;
-					memset(routing_tbl_entry, 0, sizeof(routing_tbl_entry));
+					memset(routing_tbl_entry, 0, sizeof(*routing_tbl_entry));
 
 					reg_eid_work[WORK_VIA_ALLOC_EID].mctp_inst = port->mctp_inst;
 

@@ -1324,11 +1324,13 @@ void plat_mctp_init()
 		}
 	}
 
+#if SUPPORT_DYNAMIC_MCTP_ROUTE_TBL
 	plat_mctp_route_tbl = calloc(MCTP_DEFAULT_ROUTE_TBL_SIZE, sizeof(mctp_route_entry));
 	if (!plat_mctp_route_tbl) {
 		LOG_ERR("Failed to allocate memory for routing table");
 		return;
 	}
+#endif
 
 	for (uint8_t j = 0; j < MAX_WORK_ITEMS; j++) {
 		k_work_init(&reg_eid_work[j].work, mctp_reg_eid_handler);
