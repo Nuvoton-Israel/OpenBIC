@@ -411,6 +411,7 @@ PDR_sensor_auxiliary_names plat_pdr_sensor_aux_names_table[] = {
 		.nameLanguageTag = "en",
 		.sensorName = u"VHIF",
 	},
+#if 0
 	{
 		// GPIO26
 		/*** PDR common header***/
@@ -428,6 +429,7 @@ PDR_sensor_auxiliary_names plat_pdr_sensor_aux_names_table[] = {
 		.nameLanguageTag = "en",
 		.sensorName = u"GPIO26",
 	},
+#endif
 };
 
 PDR_entity_auxiliary_names plat_pdr_entity_aux_names_table[] = { {
