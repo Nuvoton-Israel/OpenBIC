@@ -171,6 +171,7 @@ int mctp_flash_write(void *mctp_p, uint8_t *buf, uint32_t offset, uint16_t len)
 	ext_params.type = MCTP_MEDIUM_TYPE_USB;
 	ext_params.ep = 0;
 	req->msg_type = MCTP_MSG_TYPE_FLASH;
+	req->ic = 0;
 	req->cmd = MCTP_FLASH_WRITE;
 	req->len = len;
 	req->offset = offset;
