@@ -39,7 +39,7 @@ static void obmf_out_cb(const struct device *dev, uint32_t len, uint8_t *data)
 }
 #endif
 
-#define OBMF_MAX_CHANNELS 5
+#define OBMF_MAX_CHANNELS 7
 #define OBMF_DEFAULT_MAX_TRANS_SIZE 64 // Default 64-byte payload
 #define OBMF_PRIMARY_ENDPOINT 0 // Placeholder for Primary's endpoint address
 
@@ -118,10 +118,13 @@ static uint8_t channel_tags[OBMF_MAX_CHANNELS + 1] = {0}; // To track next tag f
 // --- Forward Declarations ---
 static void handle_ch0_read_req(obmf_icp_header_t *req_hdr, uint8_t *req_payload, uint32_t req_len, uint8_t *rsp_buf, uint32_t *rsp_len);
 static void handle_ch0_write_req(obmf_icp_header_t *req_hdr, uint8_t *req_payload, uint32_t req_len, uint8_t *rsp_buf, uint32_t *rsp_len);
-static void handle_vw_response(obmf_icp_header_t *rsp_hdr, uint8_t *rsp_payload, uint32_t rsp_len);
-static void handle_uart_response(obmf_icp_header_t *rsp_hdr, uint8_t *rsp_payload, uint32_t rsp_len);
-static void handle_legacy_io_response(obmf_icp_header_t *rsp_hdr, uint8_t *rsp_payload, uint32_t rsp_len);
 static void handle_flash_response(obmf_icp_header_t *rsp_hdr, uint8_t *rsp_payload, uint32_t rsp_len);
+static void handle_vw_response(obmf_icp_header_t *rsp_hdr, uint8_t *rsp_payload, uint32_t rsp_len);
+static void handle_rtc_response(obmf_icp_header_t *rsp_hdr, uint8_t *rsp_payload, uint32_t rsp_len);
+static void handle_uart_response(obmf_icp_header_t *rsp_hdr, uint8_t *rsp_payload, uint32_t rsp_len);
+static void handle_mmio_response(obmf_icp_header_t *rsp_hdr, uint8_t *rsp_payload, uint32_t rsp_len);
+static void handle_tpm_response(obmf_icp_header_t *rsp_hdr, uint8_t *rsp_payload, uint32_t rsp_len);
+static void handle_legacy_io_response(obmf_icp_header_t *rsp_hdr, uint8_t *rsp_payload, uint32_t rsp_len);
 
 
 // --- Public API --- 
@@ -148,25 +151,40 @@ void obmf_service_init(void)
 	discovery_struct.write_size.write_size_pri = OBMF_DEFAULT_MAX_TRANS_SIZE;
 	discovery_struct.max_channel_no.max_channel_no = OBMF_MAX_CHANNELS;
 
-	// Channel 1: Virtual Wires
-	const uint8_t vw_guid[] = {0x12, 0x34, 0x23, 0x16, 0x80, 0x94, 0xF0, 0x01, 0x80, 0x90, 0x01, 0x24, 0x56, 0x78, 0x90, 0xAB};
-	memcpy(discovery_struct.channels[0].channel_guid, vw_guid, 16);
-	discovery_struct.channels[0].cfg = (0 << 9) | (0 << 8) | 1; // Enabled=0, Mandatory=0, Ch No=1
+	// Channel 1: Flash
+	const uint8_t flash_guid[] = {0x12, 0x34, 0x23, 0x16, 0x80, 0x94, 0xF0, 0x01, 0x80, 0x90, 0x01, 0x24, 0x56, 0x78, 0x90, 0xAB};
+	memcpy(discovery_struct.channels[0].channel_guid, flash_guid, 16);
+	discovery_struct.channels[0].cfg = (0 << 9) | (1 << 8) | 1; // Enabled=0, Mandatory=1, Ch No=1
 
-	// Channel 2: UART
-	const uint8_t uart_guid[] = {0x89, 0x9A, 0xBC, 0x22, 0x89, 0x02, 0x34, 0x51, 0x89, 0xAB, 0xBC, 0x56, 0x09, 0xBC, 0x45, 0x0F};
-	memcpy(discovery_struct.channels[1].channel_guid, uart_guid, 16);
+	// Channel 2: Virtual Wires
+	const uint8_t vw_guid[] = {0x08, 0x99, 0xAB, 0xC2, 0x28, 0x90, 0x23, 0x45, 0x18, 0x9A, 0xBB, 0xC5, 0x60, 0x9B, 0xC4, 0x50};
+	memcpy(discovery_struct.channels[1].channel_guid, vw_guid, 16);
 	discovery_struct.channels[1].cfg = (0 << 9) | (0 << 8) | 2; // Enabled=0, Mandatory=0, Ch No=2
 
-	// Channel 4: Legacy I/O
-	const uint8_t legacy_io_guid[] = {0xC1, 0x43, 0xA2, 0x89, 0x04, 0x73, 0x40, 0x80, 0x9C, 0x42, 0x1E, 0x8C, 0x94, 0x15, 0x35, 0xB2};
-	memcpy(discovery_struct.channels[3].channel_guid, legacy_io_guid, 16);
+	// Channel 3: RTC
+	const uint8_t rtc_guid[] = {0x34, 0x56, 0x88, 0x66, 0xAB, 0x34, 0x56, 0x7f, 0x89, 0xAB, 0x32, 0x42, 0x12, 0x35, 0x67, 0x89};
+	memcpy(discovery_struct.channels[2].channel_guid, rtc_guid, 16);
+	discovery_struct.channels[2].cfg = (0 << 9) | (0 << 8) | 3; // Enabled=0, Mandatory=0, Ch No=3
+
+	// Channel 4: UART
+	const uint8_t uart_guid[] = {0xC1, 0x43, 0xA2, 0x89, 0x04, 0x73, 0x40, 0x80, 0x9C, 0x42, 0x1E, 0x8C, 0x94, 0x15, 0x35, 0xB2};
+	memcpy(discovery_struct.channels[3].channel_guid, uart_guid, 16);
 	discovery_struct.channels[3].cfg = (0 << 9) | (0 << 8) | 4; // Enabled=0, Mandatory=0, Ch No=4
 
-	// Channel 5: Flash
-	const uint8_t flash_guid[] = {0x23, 0x54, 0xAB, 0x22, 0x98, 0x71, 0x54, 0x3A, 0x89, 0xAB, 0xBC, 0x56, 0x09, 0xBC, 0x75, 0x67};
-	memcpy(discovery_struct.channels[4].channel_guid, flash_guid, 16);
-	discovery_struct.channels[4].cfg = (0 << 9) | (1 << 8) | 5; // Enabled=0, Mandatory=1, Ch No=5
+	// Channel 5: MMIO
+	const uint8_t mmio_guid[] = {0x23, 0x54, 0xAB, 0x22, 0x98, 0x71, 0x54, 0x3A, 0x89, 0xAB, 0xBC, 0x56, 0x09, 0xBC, 0x75, 0x67};
+	memcpy(discovery_struct.channels[4].channel_guid, mmio_guid, 16);
+	discovery_struct.channels[4].cfg = (0 << 9) | (0 << 8) | 5; // Enabled=0, Mandatory=0, Ch No=5
+
+	// Channel 6: TPM
+	const uint8_t tpm_guid[] = {0x0a, 0x92, 0x24, 0x5f, 0x1c, 0xf4, 0x42, 0x1d, 0xbf, 0x0f, 0x13, 0xa9, 0x56, 0x37, 0xca, 0x2d};
+	memcpy(discovery_struct.channels[5].channel_guid, tpm_guid, 16);
+	discovery_struct.channels[5].cfg = (0 << 9) | (0 << 8) | 6; // Enabled=0, Mandatory=0, Ch No=6
+
+	// Channel 7: POST Code
+	const uint8_t post_code_guid[] = {0xba, 0xd9, 0xe5, 0xa3, 0xfe, 0xd8, 0x4f, 0xdc, 0x99, 0xbb, 0x47, 0xa5, 0x47, 0x83, 0x08, 0x18};
+	memcpy(discovery_struct.channels[6].channel_guid, post_code_guid, 16);
+	discovery_struct.channels[6].cfg = (0 << 9) | (0 << 8) | 7; // Enabled=0, Mandatory=0, Ch No=7
 }
 
 int obmf_get_response(uint8_t *msg, uint32_t len, uint8_t *rsp_buf, uint32_t *rsp_len)
@@ -202,17 +220,26 @@ int obmf_get_response(uint8_t *msg, uint32_t len, uint8_t *rsp_buf, uint32_t *rs
 		// --- Handle incoming RESPONSES (we are the Consumer) ---
 		LOG_INF("Received OBMF response: Channel=%d", channel);
 		switch (channel) {
+		case OBMF_ICP_FLASH_CHANNEL:
+			handle_flash_response(hdr, payload, payload_len);
+			break;
 		case OBMF_ICP_VIRTUAL_WIRES_CHANNEL:
 			handle_vw_response(hdr, payload, payload_len);
+			break;
+		case OBMF_ICP_RTC_CHANNEL:
+			handle_rtc_response(hdr, payload, payload_len);
 			break;
 		case OBMF_ICP_UART_CHANNEL:
 			handle_uart_response(hdr, payload, payload_len);
 			break;
-		case OBMF_ICP_LEGACY_IO_CHANNEL:
-			handle_legacy_io_response(hdr, payload, payload_len);
+		case OBMF_ICP_MMIO_CHANNEL:
+			handle_mmio_response(hdr, payload, payload_len);
 			break;
-		case OBMF_ICP_FLASH_CHANNEL:
-			handle_flash_response(hdr, payload, payload_len);
+		case OBMF_ICP_TPM_CHANNEL:
+			handle_tpm_response(hdr, payload, payload_len);
+			break;
+		case OBMF_ICP_POST_CODE_CHANNEL:
+			handle_legacy_io_response(hdr, payload, payload_len);
 			break;
 		default:
 			LOG_WRN("Response received for unhandled channel %d", channel);
@@ -329,6 +356,7 @@ static void handle_vw_response(obmf_icp_header_t *rsp_hdr, uint8_t *rsp_payload,
 int obmf_vw_read_state(uint8_t wire_index, uint8_t *state)
 {
 	uint8_t tx_buf[16];
+	memset(tx_buf, 0, sizeof(tx_buf));
 	obmf_icp_header_t *hdr = (obmf_icp_header_t *)tx_buf;
 	OBMF_ICP_SET_TRANS(hdr, OBMF_ICP_TRANS_SHORT_READ);
 
@@ -344,6 +372,7 @@ int obmf_vw_read_state(uint8_t wire_index, uint8_t *state)
 int obmf_vw_write_state(uint8_t wire_index, uint8_t state)
 {
 	uint8_t tx_buf[16];
+	memset(tx_buf, 0, sizeof(tx_buf));
 	obmf_icp_header_t *hdr = (obmf_icp_header_t *)tx_buf;
 	OBMF_ICP_SET_TRANS(hdr, OBMF_ICP_TRANS_SHORT_WRITE);
 
@@ -405,6 +434,7 @@ static void handle_legacy_io_response(obmf_icp_header_t *rsp_hdr, uint8_t *rsp_p
 int obmf_legacy_io_write_post_code(uint8_t code)
 {
 	uint8_t tx_buf[sizeof(obmf_icp_header_t) + 10]; // Header + Short Write Hdr
+	memset(tx_buf, 0, sizeof(tx_buf));
 	obmf_icp_header_t *hdr = (obmf_icp_header_t *)tx_buf;
 	OBMF_ICP_SET_TRANS(hdr, OBMF_ICP_TRANS_SHORT_WRITE);
 
@@ -416,7 +446,7 @@ int obmf_legacy_io_write_post_code(uint8_t code)
 	*size = 1;
 	*data = code;
 
-	return obmf_send_request(OBMF_ICP_LEGACY_IO_CHANNEL, tx_buf, sizeof(obmf_icp_header_t) + 10);
+	return obmf_send_request(OBMF_ICP_POST_CODE_CHANNEL, tx_buf, sizeof(obmf_icp_header_t) + 10);
 }
 
 
@@ -439,6 +469,7 @@ int obmf_flash_read(uint32_t offset, uint32_t len, uint8_t *buf)
 	// This implementation doesn't handle receiving the read data, it only sends the request.
 	// A real implementation would need a mechanism (e.g. callbacks) to return the data.
 	uint8_t tx_buf[sizeof(obmf_icp_header_t) + 10]; // Header + Long Read Hdr
+	memset(tx_buf, 0, sizeof(tx_buf));
 	obmf_icp_header_t *hdr = (obmf_icp_header_t *)tx_buf;
 	OBMF_ICP_SET_TRANS(hdr, OBMF_ICP_TRANS_LONG_READ);
 
@@ -472,6 +503,7 @@ int obmf_flash_erase(uint32_t offset, uint32_t len)
 {
 	int ret = 0;
 	uint8_t tx_buf[sizeof(obmf_icp_header_t) + 13]; // Header + Short Write Hdr for 4 bytes
+	memset(tx_buf, 0, sizeof(tx_buf));
 	obmf_icp_header_t *hdr = (obmf_icp_header_t *)tx_buf;
 	OBMF_ICP_SET_TRANS(hdr, OBMF_ICP_TRANS_SHORT_WRITE);
 
@@ -495,4 +527,146 @@ int obmf_flash_erase(uint32_t offset, uint32_t len)
 	ret = obmf_send_request(OBMF_ICP_FLASH_CHANNEL, tx_buf, sizeof(obmf_icp_header_t) + 9 + sizeof(uint32_t));
 
 	return ret;
+}
+
+// --- RTC (Consumer) Logic ---
+
+static void handle_rtc_response(obmf_icp_header_t *rsp_hdr, uint8_t *rsp_payload, uint32_t rsp_len)
+{
+    if (rsp_len > 0 && rsp_payload[0] == OBMF_ICP_SUCCESS) {
+        LOG_INF("RTC Operation Success");
+        if (rsp_len > 1) {
+            LOG_HEXDUMP_INF(rsp_payload + 1, rsp_len - 1, "RTC Response Data:");
+        }
+    } else {
+        LOG_ERR("RTC Operation Failed: code=0x%x", rsp_len > 0 ? rsp_payload[0] : -1);
+    }
+}
+
+int obmf_rtc_read(uint8_t offset, uint8_t *data)
+{
+	uint8_t tx_buf[16];
+	memset(tx_buf, 0, sizeof(tx_buf));
+	obmf_icp_header_t *hdr = (obmf_icp_header_t *)tx_buf;
+	OBMF_ICP_SET_TRANS(hdr, OBMF_ICP_TRANS_SHORT_READ);
+
+	uint64_t *addr = (uint64_t *)(tx_buf + sizeof(obmf_icp_header_t));
+	uint8_t *size = (uint8_t *)(tx_buf + sizeof(obmf_icp_header_t) + sizeof(uint64_t));
+
+	*addr = offset;
+	*size = 1;
+
+	return obmf_send_request(OBMF_ICP_RTC_CHANNEL, tx_buf, sizeof(obmf_icp_header_t) + 9);
+}
+
+int obmf_rtc_write(uint8_t offset, uint8_t data)
+{
+	uint8_t tx_buf[16];
+	memset(tx_buf, 0, sizeof(tx_buf));
+	obmf_icp_header_t *hdr = (obmf_icp_header_t *)tx_buf;
+	OBMF_ICP_SET_TRANS(hdr, OBMF_ICP_TRANS_SHORT_WRITE);
+
+	uint64_t *addr = (uint64_t *)(tx_buf + sizeof(obmf_icp_header_t));
+	uint8_t *size = (uint8_t *)(tx_buf + sizeof(obmf_icp_header_t) + sizeof(uint64_t));
+	uint8_t *write_data = (uint8_t *)(tx_buf + sizeof(obmf_icp_header_t) + sizeof(uint64_t) + 1);
+
+	*addr = offset;
+	*size = 1;
+	*write_data = data;
+
+	return obmf_send_request(OBMF_ICP_RTC_CHANNEL, tx_buf, sizeof(obmf_icp_header_t) + 10);
+}
+
+// --- MMIO (Consumer) Logic ---
+
+static void handle_mmio_response(obmf_icp_header_t *rsp_hdr, uint8_t *rsp_payload, uint32_t rsp_len)
+{
+    if (rsp_len > 0 && rsp_payload[0] == OBMF_ICP_SUCCESS) {
+        LOG_INF("MMIO Operation Success");
+        if (rsp_len > 1) {
+            LOG_HEXDUMP_INF(rsp_payload + 1, rsp_len - 1, "MMIO Response Data:");
+        }
+    } else {
+        LOG_ERR("MMIO Operation Failed: code=0x%x", rsp_len > 0 ? rsp_payload[0] : -1);
+    }
+}
+
+int obmf_mmio_read(uint32_t offset, uint32_t len, uint8_t *buf)
+{
+	uint8_t tx_buf[sizeof(obmf_icp_header_t) + 10];
+	memset(tx_buf, 0, sizeof(tx_buf));
+	obmf_icp_header_t *hdr = (obmf_icp_header_t *)tx_buf;
+	OBMF_ICP_SET_TRANS(hdr, OBMF_ICP_TRANS_LONG_READ);
+
+	uint64_t *addr = (uint64_t *)(tx_buf + sizeof(obmf_icp_header_t));
+	uint16_t *read_len = (uint16_t *)(tx_buf + sizeof(obmf_icp_header_t) + sizeof(uint64_t));
+
+	*addr = MMIO_SPACE_OFFSET + offset;
+	*read_len = len;
+
+	return obmf_send_request(OBMF_ICP_MMIO_CHANNEL, tx_buf, sizeof(obmf_icp_header_t) + 10);
+}
+
+int obmf_mmio_write(uint32_t offset, uint32_t len, uint8_t *buf)
+{
+	uint8_t tx_buf[sizeof(obmf_icp_header_t) + 10 + len];
+	obmf_icp_header_t *hdr = (obmf_icp_header_t *)tx_buf;
+	OBMF_ICP_SET_TRANS(hdr, OBMF_ICP_TRANS_LONG_WRITE);
+
+	uint64_t *addr = (uint64_t *)(tx_buf + sizeof(obmf_icp_header_t));
+	uint16_t *write_len = (uint16_t *)(tx_buf + sizeof(obmf_icp_header_t) + sizeof(uint64_t));
+	uint8_t *data = (uint8_t *)(tx_buf + sizeof(obmf_icp_header_t) + sizeof(uint64_t) + sizeof(uint16_t));
+
+	*addr = MMIO_SPACE_OFFSET + offset;
+	*write_len = len;
+	memcpy(data, buf, len);
+
+	return obmf_send_request(OBMF_ICP_MMIO_CHANNEL, tx_buf, sizeof(obmf_icp_header_t) + 10 + len);
+}
+
+// --- TPM (Consumer) Logic ---
+
+static void handle_tpm_response(obmf_icp_header_t *rsp_hdr, uint8_t *rsp_payload, uint32_t rsp_len)
+{
+    if (rsp_len > 0 && rsp_payload[0] == OBMF_ICP_SUCCESS) {
+        LOG_INF("TPM Operation Success");
+        if (rsp_len > 1) {
+            LOG_HEXDUMP_INF(rsp_payload + 1, rsp_len - 1, "TPM Response Data:");
+        }
+    } else {
+        LOG_ERR("TPM Operation Failed: code=0x%x", rsp_len > 0 ? rsp_payload[0] : -1);
+    }
+}
+
+int obmf_tpm_read(uint32_t offset, uint32_t len, uint8_t *buf)
+{
+	uint8_t tx_buf[sizeof(obmf_icp_header_t) + 10];
+	memset(tx_buf, 0, sizeof(tx_buf));
+	obmf_icp_header_t *hdr = (obmf_icp_header_t *)tx_buf;
+	OBMF_ICP_SET_TRANS(hdr, OBMF_ICP_TRANS_LONG_READ);
+
+	uint64_t *addr = (uint64_t *)(tx_buf + sizeof(obmf_icp_header_t));
+	uint16_t *read_len = (uint16_t *)(tx_buf + sizeof(obmf_icp_header_t) + sizeof(uint64_t));
+
+	*addr = TPM_SPACE_OFFSET + offset;
+	*read_len = len;
+
+	return obmf_send_request(OBMF_ICP_TPM_CHANNEL, tx_buf, sizeof(obmf_icp_header_t) + 10);
+}
+
+int obmf_tpm_write(uint32_t offset, uint32_t len, uint8_t *buf)
+{
+	uint8_t tx_buf[sizeof(obmf_icp_header_t) + 10 + len];
+	obmf_icp_header_t *hdr = (obmf_icp_header_t *)tx_buf;
+	OBMF_ICP_SET_TRANS(hdr, OBMF_ICP_TRANS_LONG_WRITE);
+
+	uint64_t *addr = (uint64_t *)(tx_buf + sizeof(obmf_icp_header_t));
+	uint16_t *write_len = (uint16_t *)(tx_buf + sizeof(obmf_icp_header_t) + sizeof(uint64_t));
+	uint8_t *data = (uint8_t *)(tx_buf + sizeof(obmf_icp_header_t) + sizeof(uint64_t) + sizeof(uint16_t));
+
+	*addr = TPM_SPACE_OFFSET + offset;
+	*write_len = len;
+	memcpy(data, buf, len);
+
+	return obmf_send_request(OBMF_ICP_TPM_CHANNEL, tx_buf, sizeof(obmf_icp_header_t) + 10 + len);
 }

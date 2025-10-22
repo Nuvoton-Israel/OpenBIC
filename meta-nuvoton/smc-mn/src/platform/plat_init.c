@@ -29,6 +29,7 @@
 #include "plat_i3c.h"
 #include "plat_kcs.h"
 #include "snoop_npcm.h"
+#include "obmf.h"
 #include <logging/log.h>
 #include <drivers/uart.h>
 #include <usb/usb_device.h>
@@ -98,6 +99,7 @@ void pal_post_init()
 	plat_isr_init();
 	edaf_npcm_init();
 	plat_led_init();
+	obmf_service_init();
 	gpio_set(FM_SMC_FW_READY, 1);
 
 	plat_uart_bridge_init();

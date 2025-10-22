@@ -41,11 +41,11 @@ typedef struct __attribute__((packed)) {
 #define OBMF_ICP_GET_TRANS(h)    (((h)->tag_rsvd_trans_rqresp >> 1) & 0x07)
 #define OBMF_ICP_GET_RQRESP(h)   ((h)->tag_rsvd_trans_rqresp & 0x01)
 
-#define OBMF_ICP_SET_REV(h, val)      ((h)->rev_rsvd = ((h)->rev_rsvd & ~0x03) | ((val) & 0x03))
+#define OBMF_ICP_SET_REV(h, val)      ((h)->rev_rsvd = (val) & 0x03)
 #define OBMF_ICP_SET_CHANNEL(h, val)  ((h)->channel = (val))
-#define OBMF_ICP_SET_TAG(h, val)      ((h)->tag_rsvd_trans_rqresp = ((h)->tag_rsvd_trans_rqresp & ~0x80) | (((val) & 0x01) << 7))
-#define OBMF_ICP_SET_TRANS(h, val)    ((h)->tag_rsvd_trans_rqresp = ((h)->tag_rsvd_trans_rqresp & ~0x0E) | (((val) & 0x07) << 1))
-#define OBMF_ICP_SET_RQRESP(h, val)   ((h)->tag_rsvd_trans_rqresp = ((h)->tag_rsvd_trans_rqresp & ~0x01) | ((val) & 0x01))
+#define OBMF_ICP_SET_TAG(h, val)      ((h)->tag_rsvd_trans_rqresp = (((val) & 0x01) << 7))
+#define OBMF_ICP_SET_TRANS(h, val)    ((h)->tag_rsvd_trans_rqresp = (((val) & 0x07) << 1))
+#define OBMF_ICP_SET_RQRESP(h, val)   ((h)->tag_rsvd_trans_rqresp = ((val) & 0x01))
 
 
 /* Completion Codes (spec page 20) */
@@ -131,22 +131,34 @@ typedef struct __attribute__((packed)) {
 } channel_reg_file_t;
 
 
+/* Channel 1: Flash Channel Definitions (spec page 33) */
+#define OBMF_ICP_FLASH_CHANNEL 1
+
 /* Channel 2: Virtual Wires Channel Definitions (spec page 34) */
-#define OBMF_ICP_VIRTUAL_WIRES_CHANNEL 1
+#define OBMF_ICP_VIRTUAL_WIRES_CHANNEL 2
 
-/* Channel 3: UART Channel Definitions (spec page 45) */
-#define OBMF_ICP_UART_CHANNEL 2
+/* Channel 3: RTC Channel Definitions (spec page 38) */
+#define OBMF_ICP_RTC_CHANNEL 3
+
+/* Channel 4: UART Channel Definitions (spec page 45) */
+#define OBMF_ICP_UART_CHANNEL 4
+
+/* Channel 5: MMIO Channel Definitions (spec page 54) */
+#define OBMF_ICP_MMIO_CHANNEL 5
+
+/* Channel 6: TPM Channel Definitions (spec page 55) */
+#define OBMF_ICP_TPM_CHANNEL 6
+
+/* Channel 7: POST Code Channel Definitions (spec page 55) */
+#define OBMF_ICP_POST_CODE_CHANNEL 7
+
 #define UART_RBR_THR_DLL_OFFSET 0x0
-
-/* Channel 4: Legacy I/O Channel Definitions (spec page 55) */
-#define OBMF_ICP_LEGACY_IO_CHANNEL 4
 #define LEGACY_IO_POST_CODE_OFFSET 0x80
-
-/* Channel 5: Flash Channel Definitions (spec page 33) */
-#define OBMF_ICP_FLASH_CHANNEL 5
 #define FLASH_SPACE_OFFSET           0x0000
 #define FLASH_ERASE_START_ADDR_OFFSET 0x1000
 #define FLASH_ERASE_SIZE_OFFSET       0x1004
+#define MMIO_SPACE_OFFSET 0x0
+#define TPM_SPACE_OFFSET 0x0
 
 
 /* Virtual Wires Register Offsets */
@@ -289,5 +301,12 @@ int obmf_flash_write(uint32_t offset, uint32_t len, uint8_t *buf);
  * @return 0 on success, negative on error.
  */
 int obmf_flash_erase(uint32_t offset, uint32_t len);
+
+int obmf_rtc_read(uint8_t offset, uint8_t *data);
+int obmf_rtc_write(uint8_t offset, uint8_t data);
+int obmf_mmio_read(uint32_t offset, uint32_t len, uint8_t *buf);
+int obmf_mmio_write(uint32_t offset, uint32_t len, uint8_t *buf);
+int obmf_tpm_read(uint32_t offset, uint32_t len, uint8_t *buf);
+int obmf_tpm_write(uint32_t offset, uint32_t len, uint8_t *buf);
 
 #endif /* OBMF_H */
