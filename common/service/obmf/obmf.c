@@ -11,11 +11,18 @@
 #include <stdio.h>
 
 #ifdef CONFIG_USB_DEVICE_OBMF
-#include <usb/class/usb_obmf.h>
+#include <class/usb_obmf.h>
 #include <device.h>
 #endif
 
 LOG_MODULE_REGISTER(obmf, LOG_LEVEL_INF);
+
+#define OBMF_MAX_CHANNELS 7
+#define OBMF_DEFAULT_MAX_TRANS_SIZE 64 // Default 64-byte payload
+#define OBMF_PRIMARY_ENDPOINT 0 // Placeholder for Primary's endpoint address
+
+// Forward declarations
+int obmf_transport_send(uint8_t dest_endpoint, uint8_t *msg, uint32_t len);
 
 #ifdef CONFIG_USB_DEVICE_OBMF
 static void obmf_out_cb(const struct device *dev, uint32_t len, uint8_t *data);
@@ -39,15 +46,11 @@ static void obmf_out_cb(const struct device *dev, uint32_t len, uint8_t *data)
 }
 #endif
 
-#define OBMF_MAX_CHANNELS 7
-#define OBMF_DEFAULT_MAX_TRANS_SIZE 64 // Default 64-byte payload
-#define OBMF_PRIMARY_ENDPOINT 0 // Placeholder for Primary's endpoint address
-
 // --- OBMF Transport Layer --- 
 // This is a placeholder. A real implementation would use a proper transport like MCTP.
 int obmf_transport_send(uint8_t dest_endpoint, uint8_t *msg, uint32_t len)
 {
-#if CONFIG_USB_DEVICE_OBMF
+#ifdef CONFIG_USB_DEVICE_OBMF
 	const struct device *dev = device_get_binding(CONFIG_USB_OBMF_DEVICE_NAME "_0");
 	uint32_t bytes_written = 0;
 
