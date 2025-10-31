@@ -73,6 +73,7 @@ static void uart_cb(const struct device *dev, void *ctx)
 
 void plat_uart_bridge_init(void)
 {
+	uint8_t c;
 	uint32_t dtr = 0U;
 
 	const struct device *acm_dev = device_get_binding("CDC_ACM_0");
@@ -100,8 +101,13 @@ void plat_uart_bridge_init(void)
 	LOG_INF("Front Console Device: %p\n", front_uart.name);
 	LOG_INF("End Console Device:  %p\n", end_uart.name);
 
-	uart_irq_rx_enable(front_uart.rx_dev);
-	uart_irq_rx_enable(end_uart.rx_dev);
+	uart_irq_rx_disable(front_uart.rx_dev);
+	uart_irq_rx_disable(end_uart.rx_dev);
+	while (uart_fifo_read(front_uart.rx_dev, &c, 1) > 0) {
+		continue;
+	}
 	uart_irq_callback_user_data_set(front_uart.rx_dev, uart_cb, (void *)&front_uart);
 	uart_irq_callback_user_data_set(end_uart.rx_dev, uart_cb, (void *)&end_uart);
+	uart_irq_rx_enable(front_uart.rx_dev);
+	uart_irq_rx_enable(end_uart.rx_dev);
 }
