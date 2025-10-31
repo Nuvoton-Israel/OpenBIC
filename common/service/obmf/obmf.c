@@ -13,6 +13,7 @@
 #ifdef CONFIG_USB_DEVICE_OBMF
 #include <class/usb_obmf.h>
 #include <device.h>
+#include <kernel.h>
 #endif
 
 LOG_MODULE_REGISTER(obmf, LOG_LEVEL_INF);
@@ -25,6 +26,36 @@ LOG_MODULE_REGISTER(obmf, LOG_LEVEL_INF);
 int obmf_transport_send(uint8_t dest_endpoint, uint8_t *msg, uint32_t len);
 
 #ifdef CONFIG_USB_DEVICE_OBMF
+/* Thread stack for OBMF response handling */
+#define OBMF_THREAD_STACK_SIZE 2048
+#define OBMF_THREAD_PRIORITY 7
+
+K_THREAD_STACK_DEFINE(obmf_thread_stack, OBMF_THREAD_STACK_SIZE);
+static struct k_thread obmf_thread_data;
+static k_tid_t obmf_thread_id;
+
+/* Message queue for passing transport data to thread */
+struct obmf_transport_msg {
+	uint8_t buf[256];
+	uint32_t len;
+};
+
+K_MSGQ_DEFINE(obmf_msgq, sizeof(struct obmf_transport_msg), 8, 4);
+
+/* OBMF transport handling thread */
+static void obmf_response_thread(void *arg1, void *arg2, void *arg3)
+{
+	struct obmf_transport_msg msg;
+	
+	while (1) {
+		if (k_msgq_get(&obmf_msgq, &msg, K_FOREVER) == 0) {
+			if (msg.len > 0) {
+				obmf_transport_send(OBMF_PRIMARY_ENDPOINT, msg.buf, msg.len);
+			}
+		}
+	}
+}
+
 static void obmf_out_cb(const struct device *dev, uint32_t len, uint8_t *data);
 
 static struct obmf_ops obmf_usb_ops = {
@@ -40,7 +71,18 @@ static void obmf_out_cb(const struct device *dev, uint32_t len, uint8_t *data)
 		obmf_get_response(data, len, rsp_buf, &rsp_len);
 
 		if (rsp_len > 0) {
-			obmf_transport_send(OBMF_PRIMARY_ENDPOINT, rsp_buf, rsp_len);
+			/* Send response to dedicated thread for handling */
+			struct obmf_transport_msg msg;
+			if (rsp_len <= sizeof(msg.buf)) {
+				memcpy(msg.buf, rsp_buf, rsp_len);
+				msg.len = rsp_len;
+				
+				if (k_msgq_put(&obmf_msgq, &msg, K_NO_WAIT) != 0) {
+					LOG_WRN("Failed to queue OBMF response, queue full");
+				}
+			} else {
+				LOG_ERR("OBMF response too large: %d bytes", rsp_len);
+			}
 		}
 	}
 }
@@ -141,6 +183,13 @@ void obmf_service_init(void)
 	} else {
 		LOG_ERR("Failed to get OBMF USB device for callback registration");
 	}
+	
+	/* Create dedicated thread for OBMF transport handling */
+	obmf_thread_id = k_thread_create(&obmf_thread_data, obmf_thread_stack,
+					K_THREAD_STACK_SIZEOF(obmf_thread_stack),
+					obmf_response_thread, NULL, NULL, NULL,
+					OBMF_THREAD_PRIORITY, 0, K_NO_WAIT);
+	k_thread_name_set(obmf_thread_id, "obmf_transport");
 #endif
 	LOG_INF("OBMF Secondary Service Initialized");
 
@@ -266,7 +315,21 @@ int obmf_send_request(uint8_t channel, uint8_t *req_buf, uint32_t req_len)
 	OBMF_ICP_SET_TAG(hdr, channel_tags[channel]);
 	channel_tags[channel] = 1 - channel_tags[channel]; // Alternate tag for next request
 
-	return obmf_transport_send(OBMF_PRIMARY_ENDPOINT, req_buf, req_len);
+	/* Send request to dedicated thread for handling */
+	struct obmf_transport_msg msg;
+	if (req_len <= sizeof(msg.buf)) {
+		memcpy(msg.buf, req_buf, req_len);
+		msg.len = req_len;
+		
+		if (k_msgq_put(&obmf_msgq, &msg, K_NO_WAIT) != 0) {
+			LOG_WRN("Failed to queue OBMF request, queue full");
+			return -1;
+		}
+		return 0;
+	} else {
+		LOG_ERR("OBMF request too large: %d bytes", req_len);
+		return -1;
+	}
 }
 
 static void handle_ch0_read_req(obmf_icp_header_t *req_hdr, uint8_t *req_payload, uint32_t req_len, uint8_t *rsp_buf, uint32_t *rsp_len)
