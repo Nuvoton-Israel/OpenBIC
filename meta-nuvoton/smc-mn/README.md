@@ -20,7 +20,7 @@ The documentation's [Getting Started Guide](https://docs.zephyrproject.org/lates
 ## Build OpenBIC project
 
 ```ruby
-west build -p always -b npcm400f_evb meta-facebook/yv35-npcm-test/
+west -z zephyr_nuvoton  build -p always -b npcm400f_evb openbic/meta-nuvoton/smc-mn/
 ```
 ## Flash Programing Tool
 
