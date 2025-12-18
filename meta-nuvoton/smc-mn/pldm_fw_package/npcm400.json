@@ -1,0 +1,35 @@
+{
+    "PackageHeaderInformation": {
+        "PackageHeaderIdentifier": "F018878CCB7D49439800A02F059ACA02",
+        "PackageHeaderFormatVersion": 1,
+        "PackageReleaseDateTime": "2024-08-23 15:14:00",
+        "PackageVersionString": "NPCM400"
+    },
+    "FirmwareDeviceIdentificationArea": [
+        {
+            "DeviceUpdateOptionFlags": [],
+            "ComponentImageSetVersionString": "2025.50.02",
+            "ApplicableComponents": [
+                0
+            ],
+            "Descriptors": [
+                {
+                    "DescriptorType": 1,
+                    "DescriptorData": "0000101D"
+                }
+            ]
+        }
+    ],
+    "ComponentImageInformationArea": [
+        {
+            "ComponentClassification": 65535,
+            "ComponentIdentifier": 0,
+            "ComponentOptions": [
+                0
+            ],
+            "ComponentComparisonStamp": "0xFFFF",
+            "RequestedComponentActivationMethod": [],
+            "ComponentVersionString": "NPCM400"
+        }
+    ]
+}

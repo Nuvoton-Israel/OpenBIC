@@ -81,7 +81,7 @@ uint8_t plat_pldm_query_device_identifiers(const uint8_t *buf, uint16_t len, uin
 	resp_p->completion_code = PLDM_SUCCESS;
 	resp_p->descriptor_count = 0x01;
 
-	uint8_t iana[PLDM_FWUP_IANA_ENTERPRISE_ID_LENGTH] = { 0x00, 0x00, 0xA0, 0x15 };
+	uint8_t iana[PLDM_FWUP_IANA_ENTERPRISE_ID_LENGTH] = { 0x00, 0x00, 0x10, 0x1D };
 
 	// Allocate data for tlv which including descriptors data
 	struct pldm_descriptor_tlv *tlv_ptr =
