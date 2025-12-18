@@ -1,144 +1,127 @@
 # Nuvoton NPCM400 Evaluation Board
 
-## Contact
-
-For product questions, please contact us at:
-* bmc_marketing@nuvoton.com
+This repository provides support for the Nuvoton NPCM400 Evaluation Board (EVB) within the OpenBIC framework.
 
 ## Table of Contents
-
 - [Getting Started](#getting-started)
-  * [Build OpenBIC Project](#build-openbic-project)
-  * [Flash Programming Tools](#flash-programming-tools)
-    * [J-Link](#j-link)
-    * [NpcmFwProg](#npcmfwprog)
-  * [Features](#features)
-    * [PLDM Over MCTP Over USB](#pldm-over-mctp-over-usb)
+  - [Prerequisites](#prerequisites)
+  - [Building the Project](#building-the-project)
+  - [Flash Programming](#flash-programming)
+    - [Method 1: J-Link](#j-link)
+    - [Method 2: NpcmFwProg](#npcmfwprog)
+- [Features & Verification](#features--verification)
+  - [PLDM over MCTP over USB](#pldm-over-mctp-over-usb)
+  - [PLDM Firmware Update](#pldm-firmware-update)
+- [Contact Information](#contact-information)
+
+---
 
 ## Getting Started
 
+### Prerequisites
 Refer to the [Zephyr Getting Started Guide](https://docs.zephyrproject.org/latest/develop/getting_started/index.html) to set up your development environment.
 
-### Build OpenBIC Project
-
-Run the following command to build the project:
-
+### Building the Project
+Run the following command to build the OpenBIC firmware for NPCM400:
 ```bash
 west -z zephyr_nuvoton build -p always -b npcm400f_evb openbic/meta-nuvoton/smc-mn/
 ```
 
-### Flash Programming Tools
+### Flash Programming
 
 #### J-Link
 The NPCM400F supports J-Link flash programming.
 
-Please copy the [NUVOTON folder][def] to the appropriate directory for your operating system:
+1. Copy the [NUVOTON folder][def] to the appropriate directory for your OS:
+   - **Windows**: `C:\Users\<USER>\AppData\Roaming\SEGGER\JLinkDevices\`
+   - **Linux**: `$HOME/.config/SEGGER/JLinkDevices/`
+   - **macOS**: `$HOME/Library/Application Support/SEGGER/JLinkDevices/`
 
-| OS | Location |
-|:---|:---|
-| Windows | `C:\Users\<USER>\AppData\Roaming\SEGGER\JLinkDevices\` |
-| Linux | `$HOME/.config/SEGGER/JLinkDevices/` |
-| macOS | `$HOME/Library/Application Support/SEGGER/JLinkDevices/` |
-
-**Flash image to your board:**
-
-```bash
-cp build/zephyr/SMCNPCM_signed.bin build/zephyr/zephyr_signed.bin
-west flash
-```
+2. Flash the image to your board:
+   ```bash
+   cp build/zephyr/SMCNPCM_signed.bin build/zephyr/zephyr_signed.bin
+   west flash
+   ```
 
 #### NpcmFwProg
-
-`NpcmFwProg` is a tool to program the SMC firmware under Windows/Linux host over a TTY serial connection.
-Please follow up the [npcmFwProg](https://github.com/Nuvoton-Israel/npcmFwProg) for more details.
-
+`NpcmFwProg` is a tool to program firmware over a TTY serial connection. Refer to the [npcmFwProg repository](https://github.com/Nuvoton-Israel/npcmFwProg) for details.
 
 [def]: https://github.com/Nuvoton-Israel/zephyr/tree/openbic-v2.6/boards/arm/npcm400f_evb/NUVOTON
 
+---
 
-### Features
+## Features & Verification
 
-#### PLDM Over MCTP Over USB
+### PLDM over MCTP over USB
 
-To verify MCTP over USB functionality:
+1. **Physical Connection**: Connect the SMC USB device to the BMC USB HOST.
+   - Ensure the BMC uses the [latest OpenBMC image](https://github.com/Nuvoton-Israel/openbmc/commit/4f6ca14b691fd7d7dbe5d6305fcd8787f240899d).
+   - if you connect the SMC after BMC is booted, you need to add do `systemctl restart mctpd` in the OpenBMC.
 
-1.  Connect the SMC USB device to the BMC USB HOST via a USB cable.
-    *  Ensure the BMC is booted with the latest OpenBMC image: [https://github.com/Nuvoton-Israel/openbmc](https://github.com/Nuvoton-Israel/openbmc/commit/4f6ca14b691fd7d7dbe5d6305fcd8787f240899d)
-    *  Ensure the SMC is connected before BMC is booted, the udev rule in lastest OpenBMC is still under improvement.
+2. **Verify MCTP Link**:
+   ```bash
+   mctp link
+   # Expected: dev mctpusb0 index 9 address none net 1 mtu 68 up
+   ```
 
-2.  From the BMC console, verify the MCTP USB link is up:
-    ```bash
-    mctp link
-    ```
-    Expected output:
-    ```
-    dev mctpusb0 index 9 address none net 1 mtu 68 up
-    ```
-3.  From the BMC console, verify the MCTP EID is set up:
-    ```bash
-    mctp route
-    ```
-    Expected output:
-    ```
-    eid min 10 max 10 net 1 dev mctpusb0 mtu 68
-    ```
-4.  From the BMC console, use `pldmtool` to send PLDM messages to the SMC:
+3. **Verify MCTP Route**:
+   ```bash
+   mctp route
+   # Expected: eid min 10 max 10 net 1 dev mctpusb0 mtu 68
+   ```
 
-    *   **Get PLDM Types:**
-        ```bash
-        pldmtool base GetPLDMTypes -m 10
-        ```
-        Expected output:
-        ```json
-        {
-            "CompletionCode": "SUCCESS",
-            "PLDMTypes": [
-                {
-                    "PLDM Type": "base",
-                    "PLDM Type Code": 0
-                },
-                {
-                    "PLDM Type": "platform",
-                    "PLDM Type Code": 2
-                },
-                {
-                    "PLDM Type": "firmware update",
-                    "PLDM Type Code": 5
-                }
-            ]
-        }
-        ```
-    *   **Get Firmware Parameters:**
-        ```bash
-        pldmtool fw_update GetFwParams -m 10
-        ```
-        Expected output:
-        ```json
-        {
-            "CapabilitiesDuringUpdate": {
-                "Component Update Failure Recovery Capability": "Device will revert to previous component image upon failure, timeout or cancellation of the transfer.",
-                "Component Update Failure Retry Capability": " Device can have component updated again without exiting update mode and restarting transfer via RequestUpdate command.",
-                "Firmware Device Host Functionality during Firmware Update": "Device will revert to previous component image upon failure, timeout or cancellation of the transfer",
-                "Firmware Device Partial Updates": "Firmware Device cannot accept a partial update and all components present on the FD shall be updated.",
-                "Firmware Device Update Mode Restrictions": "No host OS environment restriction for update mode"
-            },
-            "ComponentCount": 0,
-            "ActiveComponentImageSetVersionString": "2025.22.02",
-            "PendingComponentImageSetVersionString": "",
-            "ComponentParameterEntries": null
-        }
-        ```
-  5.  If the PLDM sensor is enabled in SMC (see [plat_def.h](https://github.com/Nuvoton-Israel/OpenBIC/blob/npcm_main_rebase/meta-nuvoton/smc-mn/src/platform/plat_def.h#L26)), use the following command to retrieve SMC's ADC sensor data:
-        ```bash
-        ipmitool sdr
-        ```
+4. **Query PLDM Info**:
+   ```bash
+   # Get PLDM Types
+   pldmtool base GetPLDMTypes -m 10
 
-        Expected output:
-        ```json
-            root@evb-npcm845-stage:~# ipmitool sdr
-            ........
-            NPCM_AVSB        | 3.28 Volts        | ok
-            NPCM_VCC         | 3.29 Volts        | ok
-            NPCM_VHIF        | 1.93 Volts        | cr
-            NPCM_VSB         | 3.28 Volts        | ok
-        ```
+   # Get Firmware Parameters
+   pldmtool fw_update GetFwParams -m 10
+   ```
+
+5. **Sensor Data (SDR)**:
+   If PLDM sensors are enabled in [plat_def.h](https://github.com/Nuvoton-Israel/OpenBIC/blob/npcm_main_rebase/meta-nuvoton/smc-mn/src/platform/plat_def.h), retrieve ADC data via BMC:
+   ```bash
+   ipmitool sdr
+   ```
+   *Example Output:*
+   ```text
+   NPCM_AVSB        | 3.28 Volts        | ok
+   NPCM_VCC         | 3.29 Volts        | ok
+   NPCM_VHIF        | 1.93 Volts        | cr
+   NPCM_VSB         | 3.28 Volts        | ok
+   ```
+
+### PLDM Firmware Update
+
+1. **Generate PLDM Package**:
+   Use [pldm_fwup_pkg_creator.py](https://github.com/openbmc/pldm/tree/master/tools/fw-update):
+   ```bash
+   python3 pldm_fwup_pkg_creator.py SMCNPCM_signed_with_header.bin npcm400.json SMCNPCM_signed.bin
+   ```
+   The `npcm400.json` you can find from "[meta-nuvoton/smc-mn/pldm_fw_package/npcm400.json](https://github.com/Nuvoton-Israel/OpenBIC/blob/npcm_main_rebase/meta-nuvoton/smc-mn/pldm_fw_package/npcm400.json)"
+
+2. **Transfer to BMC**:
+   ```bash
+   cd /tmp/images/
+   tftp -g -r SMCNPCM_signed_with_header.bin <HOST_IP>
+   ```
+
+3. **Initiate Update**:
+   ```bash
+   busctl call \
+     xyz.openbmc_project.PLDM \
+     /xyz/openbmc_project/software/pldm \
+     xyz.openbmc_project.Software.Update \
+     StartUpdate \
+     hs \
+     3 \
+     "xyz.openbmc_project.Software.ApplyTime.RequestedApplyTimes.Immediate" \
+     3< /tmp/images/SMCNPCM_signed_with_header.bin
+   ```
+
+---
+
+## Contact Information
+For product questions or support, please contact:
+* **Email**: bmc_marketing@nuvoton.com
