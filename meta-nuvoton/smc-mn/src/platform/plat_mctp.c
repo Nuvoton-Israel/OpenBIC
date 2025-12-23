@@ -36,6 +36,7 @@
 #include "plat_i2c.h"
 #include "util_sys.h"
 #include "plat_def.h"
+#include "guid.h"
 
 LOG_MODULE_REGISTER(plat_mctp);
 
@@ -406,4 +407,22 @@ uint8_t plat_get_eid()
 uint8_t pal_get_bmc_interface()
 {
 	return BMC_INTERFACE_USB;
+}
+
+uint8_t get_system_guid(uint16_t *data_len, uint8_t *data)
+{
+	/* Fake UUID for reference */
+	const uint8_t fake_guid[16] = {
+		0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+		0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F
+	};
+
+	if (data == NULL || data_len == NULL) {
+		return GUID_FAIL_TO_ACCESS;
+	}
+
+	*data_len = 16;
+	memcpy(data, fake_guid, 16);
+
+	return GUID_READ_SUCCESS;
 }

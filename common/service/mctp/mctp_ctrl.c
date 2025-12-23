@@ -24,6 +24,7 @@
 #include <sys/printk.h>
 #include <zephyr.h>
 #include "libutil.h"
+#include "guid.h"
 
 LOG_MODULE_DECLARE(mctp);
 
@@ -147,6 +148,29 @@ uint8_t mctp_ctrl_cmd_get_endpoint_id(void *mctp_inst, uint8_t *buf, uint16_t le
 	//p->completion_code = (len != 0) ? MCTP_CTRL_CC_ERROR_INVALID_LENGTH : MCTP_CTRL_CC_SUCCESS;
 
 	*resp_len = (p->completion_code == MCTP_CTRL_CC_SUCCESS) ? sizeof(*p) : 1;
+
+	return MCTP_SUCCESS;
+}
+
+uint8_t mctp_ctrl_cmd_get_endpoint_uuid(void *mctp_inst, uint8_t *buf, uint16_t len, uint8_t *resp,
+					uint16_t *resp_len, void *ext_params)
+{
+	ARG_UNUSED(ext_params);
+	CHECK_NULL_ARG_WITH_RETURN(mctp_inst, MCTP_ERROR);
+	CHECK_NULL_ARG_WITH_RETURN(buf, MCTP_ERROR);
+	CHECK_NULL_ARG_WITH_RETURN(resp, MCTP_ERROR);
+	CHECK_NULL_ARG_WITH_RETURN(resp_len, MCTP_ERROR);
+
+	struct _get_endpoint_uuid_resp *p = (struct _get_endpoint_uuid_resp *)resp;
+	uint16_t uuid_len = 0;
+
+	if (get_system_guid(&uuid_len, p->uuid) == GUID_READ_SUCCESS) {
+		p->completion_code = MCTP_CTRL_CC_SUCCESS;
+		*resp_len = sizeof(struct _get_endpoint_uuid_resp);
+	} else {
+		p->completion_code = MCTP_CTRL_CC_ERROR;
+		*resp_len = 1;
+	}
 
 	return MCTP_SUCCESS;
 }
@@ -282,6 +306,7 @@ static uint8_t mctp_ctrl_cmd_resp_process(mctp *mctp_inst, uint8_t *buf, uint32_
 static mctp_ctrl_cmd_handler_t mctp_ctrl_cmd_tbl[] = {
 	{ MCTP_CTRL_CMD_SET_ENDPOINT_ID, mctp_ctrl_cmd_set_endpoint_id },
 	{ MCTP_CTRL_CMD_GET_ENDPOINT_ID, mctp_ctrl_cmd_get_endpoint_id },
+	{ MCTP_CTRL_CMD_GET_ENDPOINT_UUID, mctp_ctrl_cmd_get_endpoint_uuid },
 	{ MCTP_CTRL_CMD_GET_MESSAGE_TYPE_SUPPORT, mctp_ctrl_cmd_get_message_type_support }
 };
 

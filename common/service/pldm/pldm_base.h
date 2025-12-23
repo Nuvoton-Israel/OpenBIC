@@ -78,6 +78,19 @@ struct _get_tid_resp {
 	uint8_t tid;
 } __attribute__((packed));
 
+struct _get_pldm_version_req {
+	uint32_t transfer_handle;
+	uint8_t transfer_op_flag;
+	uint8_t type;
+} __attribute__((packed));
+
+struct _get_pldm_version_resp {
+	uint8_t completion_code;
+	uint32_t next_transfer_handle;
+	uint8_t transfer_flag;
+	uint8_t version_data[4];
+} __attribute__((packed));
+
 struct _get_pldm_types_resp {
 	uint8_t completion_code;
 	uint8_t pldm_types[GET_PLDM_TYPE_BUF_SIZE];

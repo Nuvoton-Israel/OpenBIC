@@ -24,6 +24,7 @@
 
 #include "pldm_firmware_update.h"
 #include "plat_pldm_fw_update.h"
+#include "plat_version.h"
 #include "mctp_ctrl.h"
 
 LOG_MODULE_REGISTER(plat_fwupdate);
@@ -38,6 +39,8 @@ uint8_t MCTP_SUPPORTED_MESSAGES_TYPES[] = {
         TYPE_PLDM,
 };
 
+
+static bool plat_get_smc_fw_version(void *info_p, uint8_t *buf, uint8_t *len);
 /* PLDM FW update table */
 pldm_fw_update_info_t PLDMUPDATE_FW_CONFIG_TABLE[] = {
 	{
@@ -51,7 +54,7 @@ pldm_fw_update_info_t PLDMUPDATE_FW_CONFIG_TABLE[] = {
 		.inf = COMP_UPDATE_VIA_SPI,
 		.activate_method = COMP_ACT_SELF,
 		.self_act_func = pldm_bic_activate,
-		.get_fw_version_fn = NULL,
+		.get_fw_version_fn = plat_get_smc_fw_version,
 	},
 	{
 		.enable = true,
@@ -67,6 +70,20 @@ pldm_fw_update_info_t PLDMUPDATE_FW_CONFIG_TABLE[] = {
 		.get_fw_version_fn = NULL,
 	},
 };
+static bool plat_get_smc_fw_version(void *info_p, uint8_t *buf, uint8_t *len)
+{
+	CHECK_NULL_ARG_WITH_RETURN(buf, false);
+	CHECK_NULL_ARG_WITH_RETURN(len, false);
+
+	int res = snprintf((char *)buf, 32, "%02x%02x.%02x.%02x", BIC_FW_YEAR_MSB, BIC_FW_YEAR_LSB,
+			   BIC_FW_WEEK, BIC_FW_VER);
+	if (res < 0) {
+		return false;
+	}
+
+	*len = (uint8_t)res;
+	return true;
+}
 
 uint8_t plat_pldm_query_device_identifiers(const uint8_t *buf, uint16_t len, uint8_t *resp,
 					   uint16_t *resp_len)

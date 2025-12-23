@@ -28,6 +28,7 @@ extern "C" {
 #include "pldm_firmware_update.h"
 #include "pldm_state_set.h"
 #include "pldm_smbios.h"
+#include "pldm_fru.h"
 #include "ipmb.h"
 
 #define MONITOR_THREAD_STACK_SIZE 1024
@@ -45,6 +46,7 @@ typedef enum {
 	PLDM_TYPE_SMBIOS = 0x01,
 	PLDM_TYPE_PLAT_MON_CTRL,
 	PLDM_TYPE_BIOS_CTRL_CONF,
+	PLDM_TYPE_FRU = 0x04,
 	PLDM_TYPE_FW_UPDATE = 0x05,
 	PLDM_TYPE_OEM = 0x3F
 } PLDM_TYPE;

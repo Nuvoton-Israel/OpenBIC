@@ -612,20 +612,17 @@ void plat_load_numeric_sensor_pdr_table(PDR_numeric_sensor *numeric_sensor_table
 		}
 
 		for (sensor_num = 0; sensor_num < max_sensor_num; sensor_num++) {
-			if (pdr_table[sensor_num].pldm_sensor_cfg.cache_status !=
-			    PLDM_SENSOR_DISABLED) {
-				if (current_sensor_size >= total_size) {
-					LOG_ERR("Load numeric sensor pdr exceeded table size, total size: 0x%x, current thread: 0x%x, sensor id: 0x%x",
-						total_size, thread_id,
-						pdr_table[sensor_num].pdr_numeric_sensor.sensor_id);
-					continue;
-				}
-
-				memcpy(&numeric_sensor_table[current_sensor_size],
-				       &pdr_table[sensor_num].pdr_numeric_sensor,
-				       sizeof(PDR_numeric_sensor));
-				current_sensor_size++;
+			if (current_sensor_size >= total_size) {
+				LOG_ERR("Load numeric sensor pdr exceeded table size, total size: 0x%x, current thread: 0x%x, sensor id: 0x%x",
+					total_size, thread_id,
+					pdr_table[sensor_num].pdr_numeric_sensor.sensor_id);
+				continue;
 			}
+
+			memcpy(&numeric_sensor_table[current_sensor_size],
+			       &pdr_table[sensor_num].pdr_numeric_sensor,
+			       sizeof(PDR_numeric_sensor));
+			current_sensor_size++;
 		}
 	}
 }
@@ -649,18 +646,16 @@ void plat_load_state_sensor_pdr_table(PDR_state_sensor *state_sensor_table)
 	}
 
 	for (sensor_num = 0; sensor_num < max_sensor_num; sensor_num++) {
-		if (pdr_table[sensor_num].pldm_sensor_cfg.cache_status != PLDM_SENSOR_DISABLED) {
-			if (current_sensor_size >= total_size) {
-				LOG_ERR("Load state sensor pdr exceeded table size, total size: 0x%x, sensor id: 0x%x",
-					total_size,
-					pdr_table[sensor_num].pdr_state_sensor.sensor_id);
-				continue;
-			}
-
-			memcpy(&state_sensor_table[current_sensor_size],
-			       &pdr_table[sensor_num].pdr_state_sensor, sizeof(PDR_state_sensor));
-			current_sensor_size++;
+		if (current_sensor_size >= total_size) {
+			LOG_ERR("Load state sensor pdr exceeded table size, total size: 0x%x, sensor id: 0x%x",
+				total_size,
+				pdr_table[sensor_num].pdr_state_sensor.sensor_id);
+			continue;
 		}
+
+		memcpy(&state_sensor_table[current_sensor_size],
+		       &pdr_table[sensor_num].pdr_state_sensor, sizeof(PDR_state_sensor));
+		current_sensor_size++;
 	}
 }
 
