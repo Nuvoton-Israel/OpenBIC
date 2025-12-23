@@ -58,6 +58,36 @@ uint8_t get_tid(void *mctp_inst, uint8_t *buf, uint16_t len, uint8_t instance_id
 	return PLDM_SUCCESS;
 }
 
+uint8_t get_pldm_version(void *mctp_inst, uint8_t *buf, uint16_t len, uint8_t instance_id,
+			 uint8_t *resp, uint16_t *resp_len, void *ext_params)
+{
+	CHECK_NULL_ARG_WITH_RETURN(mctp_inst, PLDM_ERROR);
+	CHECK_NULL_ARG_WITH_RETURN(buf, PLDM_ERROR);
+	CHECK_NULL_ARG_WITH_RETURN(resp, PLDM_ERROR);
+	CHECK_NULL_ARG_WITH_RETURN(resp_len, PLDM_ERROR);
+	CHECK_NULL_ARG_WITH_RETURN(ext_params, PLDM_ERROR);
+
+	struct _get_pldm_version_resp *resp_p = (struct _get_pldm_version_resp *)resp;
+
+	if (len != sizeof(struct _get_pldm_version_req)) {
+		resp_p->completion_code = PLDM_ERROR_INVALID_LENGTH;
+		*resp_len = 1;
+		return PLDM_SUCCESS;
+	}
+
+	resp_p->completion_code = PLDM_SUCCESS;
+	resp_p->next_transfer_handle = 0x00000000;
+	resp_p->transfer_flag = PLDM_START_AND_END;
+	/* version 1.0.0 */
+	resp_p->version_data[0] = 0xF1;
+	resp_p->version_data[1] = 0xF0;
+	resp_p->version_data[2] = 0xF0;
+	resp_p->version_data[3] = 0x00;
+
+	*resp_len = sizeof(*resp_p);
+	return PLDM_SUCCESS;
+}
+
 uint8_t get_pldm_types(void *mctp_inst, uint8_t *buf, uint16_t len, uint8_t instance_id,
 		       uint8_t *resp, uint16_t *resp_len, void *ext_params)
 {
@@ -129,6 +159,7 @@ uint8_t get_pldm_commands(void *mctp_inst, uint8_t *buf, uint16_t len, uint8_t i
 static pldm_cmd_handler pldm_base_cmd_tbl[] = {
 	{ PLDM_BASE_CMD_CODE_SETTID, set_tid },
 	{ PLDM_BASE_CMD_CODE_GETTID, get_tid },
+	{ PLDM_BASE_CMD_CODE_GET_PLDM_VER, get_pldm_version },
 	{ PLDM_BASE_CMD_CODE_GET_PLDM_TYPE, get_pldm_types },
 	{ PLDM_BASE_CMD_CODE_GET_PLDM_CMDS, get_pldm_commands },
 };
