@@ -17,21 +17,7 @@ jobs:
         # This job matrix will generate a separate job for all platforms listed.
         # Add platforms in alphabetical order.
         platform: [
-          at-cb,
-          at-mc,
-          gt-cc,
-          wc-mb,
-          yv3-dl,
-          yv3-vf,
-          yv35-bb, 
-          yv35-cl, 
-          yv35-gl, 
-          yv35-hd,
-          yv35-rf,
-          yv35-ji,
-          yv4-sd,
-          yv4-ff,
-          yv4-wf,
+          smc-mn,
         ]
         # Need to set this to false otherwise it will cancel all platform builds if one fails.
       fail-fast: false
@@ -56,7 +42,9 @@ jobs:
         libsdl2-dev \
   
     - name: Setup Python
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
 
     # Exactly what it says on the tin.    
     - name: Install requirements
@@ -75,7 +63,7 @@ jobs:
       with:
         path: |
           ./modules
-          ./zephyr
+          ./zephyr_nuvoton
         key: west-yml-${{ hashFiles('OpenBIC/west.yml') }}
  
     - name: Cache SDK Toolchain
@@ -100,20 +88,15 @@ jobs:
 
     - name: Update West Project
       run: |
-        cd OpenBIC 
+        cd OpenBIC
         west update
- 
-    - name: Apply Kernel Patches
-      run: |
-        ${{ github.event.repository.name }}/scripts/build/apply_patches.py --source="${{ github.event.repository.name }}/fix_patch/" --destination="zephyr"
  
     - name: Build Platform
       id: build
       continue-on-error: true
       run: |
-        cd ${{ github.event.repository.name }} 
-        touch meta-facebook/${{ matrix.platform }}/CMakeLists.txt
-        west build -p auto -b ast1030_evb meta-facebook/${{ matrix.platform }}/
+        echo $(ls -l)
+        west -z zephyr_nuvoton build -p auto -b npcm400f_evb OpenBIC/meta-nuvoton/${{ matrix.platform }}/
 
     - name: Get Build Status
       env:
@@ -171,9 +154,11 @@ jobs:
       name: Checkout Repo
       if: env.contains_c_source == 'true'
         
-    - uses: actions/setup-python@v2
-      name: Setup Python
+    - name: Setup Python
       if: env.contains_c_source == 'true'
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
 
     - name: Install CPPCheck
       if: env.contains_c_source == 'true'
