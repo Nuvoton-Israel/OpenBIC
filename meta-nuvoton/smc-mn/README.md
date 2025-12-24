@@ -45,6 +45,7 @@ The NPCM400F supports J-Link flash programming.
 
 #### NpcmFwProg
 `NpcmFwProg` is a tool to program firmware over a TTY serial connection. Refer to the [npcmFwProg repository](https://github.com/Nuvoton-Israel/npcmFwProg) for details.
+> **Note**: Execute the command `flash erase spi_spim0_cs0 0x0 0x4000` in the SMC console before using the `npcmFwProg` tool to update the SMC firmware.
 
 [def]: https://github.com/Nuvoton-Israel/zephyr/tree/openbic-v2.6/boards/arm/npcm400f_evb/NUVOTON
 
@@ -55,8 +56,8 @@ The NPCM400F supports J-Link flash programming.
 ### PLDM over MCTP over USB
 
 1. **Physical Connection**: Connect the SMC USB device to the BMC USB HOST.
-   - Ensure the BMC uses the [latest OpenBMC image](https://github.com/Nuvoton-Israel/openbmc/commit/4f6ca14b691fd7d7dbe5d6305fcd8787f240899d).
-   - if you connect the SMC after BMC is booted, you need to add do `systemctl restart mctpd` in the OpenBMC.
+   - Ensure the BMC uses the [latest OpenBMC image](https://github.com/Nuvoton-Israel/openbmc).
+   - if you connect the SMC after BMC is booted, you need to run `systemctl restart xyz.openbmc_project.mctpreactor.service` in the OpenBMC.
 
 2. **Verify MCTP Link**:
    ```bash
