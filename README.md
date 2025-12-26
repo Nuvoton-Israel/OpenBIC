@@ -16,8 +16,9 @@ The currently supported RTOSs are:
 The board configuration files can be found in the `configs/` directory.
 
 The currently supported boards are:
-* ASPEED AST2600 EVB
-* ASPEED AST1030 EVB
+* NPCM400 EVB
+
+For Nuvoton SMC specific documentation, please refer to [meta-nuvoton/smc-mn/README.md](meta-nuvoton/smc-mn/README.md).
 
 ## Build Instructions
 
@@ -26,7 +27,7 @@ The currently supported boards are:
 The SDK develop environment is based on Ubuntu 18.04 LTS – 64bits and bash shell.
 The following tools must be installed on the host machine.
 - Reference url: https://docs.zephyrproject.org/2.6.0/getting_started/index.html
-- Reference url: https://github.com/AspeedTech-BMC/zephyr
+- Reference url: https://github.com/Nuvoton-Israel/zephyr
 
 Dependencies minimum required: 
 ```
@@ -54,7 +55,7 @@ source ~/.bashrc
 Get the application and Zephyr code base from openbic GitHub.
 > **Note:** First step will only work after west.yml being merged **
 ```
-west init -m https://github.com/facebook/OpenBIC zephyrproject
+west init -m https://github.com/Nuvoton-Israel/OpenBIC zephyrproject
 cd zephyrproject
 west update
 ```
@@ -74,9 +75,7 @@ chmod +x zephyr-sdk-0.12.4-x86_64-linux-setup.run
 
 Clean build application and Zephyr code
 ```
-cd $zephyrproject/openbic.odm
-touch meta-facebook/yv35-cl/CMakeLists.txt
-west build -p auto -b ast1030_evb meta-facebook/yv35-cl/
+west -z zephyr_nuvoton build -p always -b npcm400f_evb openbic/meta-nuvoton/smc-mn/
 ```
 
 ## Contributing
