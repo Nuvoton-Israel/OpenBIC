@@ -498,8 +498,11 @@ uint8_t mctp_pldm_send_msg(void *mctp_p, pldm_msg *msg)
 		LOG_ERR("mctp_send_msg error!!");
 
 		if (p != NULL) {
-			sys_slist_find_and_remove(&wait_recv_resp_list, &p->node);
-			SAFE_FREE(p);
+			k_mutex_lock(&wait_recv_resp_mutex, K_FOREVER);
+			bool removed = sys_slist_find_and_remove(&wait_recv_resp_list, &p->node);
+			k_mutex_unlock(&wait_recv_resp_mutex);
+			if (removed)
+				SAFE_FREE(p);
 		}
 
 		goto error;
