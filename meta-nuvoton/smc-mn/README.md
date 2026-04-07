@@ -23,6 +23,14 @@ This repository provides support for the Nuvoton NPCM400 Evaluation Board (EVB) 
 ### Prerequisites
 Refer to the [Zephyr Getting Started Guide](https://docs.zephyrproject.org/latest/develop/getting_started/index.html) to set up your development environment.
 
+### Power Supply Configuration
+The NPCM400 EVB provides two power supply options, configurable via the **JP6** jumper:
+1. **USB Power**: If selected, power must be supplied by connecting a cable to the **USB Type-B** port.
+2. **DC IN 5V Power**: If selected, power must be supplied by plugging a **DC 5V Adapter** into the DC IN jack.
+
+### Debug Console (UART)
+To view the debug log, connect a UART-to-USB adapter to the UART pins on the board. Please refer to the EVB image at the top of this document for the exact location of the UART header (labeled as UART: GND, TX, RX).
+
 ### Building the Project
 Run the following command to build the OpenBIC firmware for NPCM400:
 ```bash
