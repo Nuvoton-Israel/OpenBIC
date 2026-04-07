@@ -1,5 +1,7 @@
 # Nuvoton NPCM400 Evaluation Board
 
+<img src="npcm400_evb.png" alt="NPCM400 EVB" width="50%">
+
 This repository provides support for the Nuvoton NPCM400 Evaluation Board (EVB) within the OpenBIC framework.
 
 ## Table of Contents
