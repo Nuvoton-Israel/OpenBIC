@@ -28,6 +28,8 @@ LOG_MODULE_REGISTER(plat_pldm_sensor);
 
 static struct pldm_sensor_thread pal_pldm_sensor_thread[MAX_SENSOR_THREAD_ID] = {
 	{ ADC_SENSOR_THREAD_ID, "ADC_PLDM_SENSOR_THREAD" },
+	{ FAN_SENSOR_THREAD_ID, "FAN_PLDM_SENSOR_THREAD" },
+	{ PWM_SENSOR_THREAD_ID, "PWM_PLDM_SENSOR_THREAD" },
 };
 
 pldm_state_sensor_info plat_pldm_state_sensor_table[] = {
@@ -342,6 +344,280 @@ pldm_sensor_info plat_pldm_sensor_adc_table[] = {
 	},
 };
 
+pldm_sensor_info plat_pldm_sensor_fan_table[] = {
+	{
+		{
+			// FAN0 RPM (fake value: 3000 RPM)
+			/*** PDR common header***/
+			{
+				0x00000000, //uint32_t record_handle
+				0x01, //uint8_t PDR_header_version
+				PLDM_NUMERIC_SENSOR_PDR, //uint8_t PDR_type
+				0x0000, //uint16_t record_change_number
+				0x0000, //uint16_t data_length
+			},
+			/***numeric sensor format***/
+			0x0000, //uint16_t PLDM_terminus_handle
+			0x0040, //uint16_t sensor_id
+			0x0087, //uint16_t entity_type
+			0x0001, //uint16_t entity_instance_number
+			0x0000, //uint16_t container_id
+			PDR_SENSOR_ENABLE, //uint8_t sensor_init (pre-enabled, skip hw init)
+			0x01, //uint8_t sensor_auxiliary_names_pdr
+			0x13, //uint8_t base_unit (0x13 = RPM in PLDM DSP0248 Table 74)
+			0, //int8_t unit_modifier
+			0x00, //uint8_t rate_unit
+			0x00, //uint8_t base_oem_unit_handle
+			0x00, //uint8_t aux_unit
+			0x00, //int8_t aux_unit_modifier
+			0x00, //uint8_t auxrate_unit
+			0x00, //uint8_t rel
+			0x00, //uint8_t aux_oem_unit_handle
+			0x00, //uint8_t is_linear
+			0x04, //uint8_t sensor_data_size (uint32)
+			1, //int32_t resolution
+			0, //int32_t offset
+			0x0000, //uint16_t accuracy
+			0x00, //uint8_t plus_tolerance
+			0x00, //uint8_t minus_tolerance
+			0x00000000, //uint32_t hysteresis
+			0x00, //uint8_t supported_thresholds (none)
+			0x00, //uint8_t threshold_and_hysteresis_volatility
+			0, //real32_t state_transition_interval
+			UPDATE_INTERVAL_1S, //int32_t update_interval
+			0x00001F40, //uint32_t max_readable (8000 RPM)
+			0x00000000, //uint32_t min_readable (0 RPM)
+			0x04, //uint8_t range_field_format
+			0x00, //uint8_t range_field_support (no thresholds)
+			0x00000000, //uint32_t nominal_value
+			0x00000000, //uint32_t normal_max
+			0x00000000, //uint32_t normal_min
+			0x00000000, //uint32_t warning_high
+			0x00000000, //uint32_t warning_low
+			0x00000000, //uint32_t critical_high
+			0x00000000, //uint32_t critical_low
+			0x00000000, //uint32_t fatal_high
+			0x00000000, //uint32_t fatal_low
+		},
+		.update_time = 0,
+		{
+			.type = sensor_dev_npcm_fan,
+			.port = 0,
+			.access_checker = stby_access,
+			.sample_count = SAMPLE_COUNT_DEFAULT,
+			.arg0 = 0,
+			.arg1 = 0,
+			.init_args = NULL,
+			.cache = 3000, //fake: 3000 RPM
+			.cache_status = PLDM_SENSOR_ENABLED,
+		},
+	},
+	{
+		{
+			// FAN1 RPM (fake value: 3100 RPM)
+			/*** PDR common header***/
+			{
+				0x00000000, //uint32_t record_handle
+				0x01, //uint8_t PDR_header_version
+				PLDM_NUMERIC_SENSOR_PDR, //uint8_t PDR_type
+				0x0000, //uint16_t record_change_number
+				0x0000, //uint16_t data_length
+			},
+			/***numeric sensor format***/
+			0x0000, //uint16_t PLDM_terminus_handle
+			0x0041, //uint16_t sensor_id
+			0x0087, //uint16_t entity_type
+			0x0002, //uint16_t entity_instance_number
+			0x0000, //uint16_t container_id
+			PDR_SENSOR_ENABLE, //uint8_t sensor_init (pre-enabled, skip hw init)
+			0x01, //uint8_t sensor_auxiliary_names_pdr
+			0x13, //uint8_t base_unit (0x13 = RPM in PLDM DSP0248 Table 74)
+			0, //int8_t unit_modifier
+			0x00, //uint8_t rate_unit
+			0x00, //uint8_t base_oem_unit_handle
+			0x00, //uint8_t aux_unit
+			0x00, //int8_t aux_unit_modifier
+			0x00, //uint8_t auxrate_unit
+			0x00, //uint8_t rel
+			0x00, //uint8_t aux_oem_unit_handle
+			0x00, //uint8_t is_linear
+			0x04, //uint8_t sensor_data_size (uint32)
+			1, //int32_t resolution
+			0, //int32_t offset
+			0x0000, //uint16_t accuracy
+			0x00, //uint8_t plus_tolerance
+			0x00, //uint8_t minus_tolerance
+			0x00000000, //uint32_t hysteresis
+			0x00, //uint8_t supported_thresholds
+			0x00, //uint8_t threshold_and_hysteresis_volatility
+			0, //real32_t state_transition_interval
+			UPDATE_INTERVAL_1S, //int32_t update_interval
+			0x00001F40, //uint32_t max_readable (8000 RPM)
+			0x00000000, //uint32_t min_readable
+			0x04, //uint8_t range_field_format
+			0x00, //uint8_t range_field_support
+			0x00000000, //uint32_t nominal_value
+			0x00000000, //uint32_t normal_max
+			0x00000000, //uint32_t normal_min
+			0x00000000, //uint32_t warning_high
+			0x00000000, //uint32_t warning_low
+			0x00000000, //uint32_t critical_high
+			0x00000000, //uint32_t critical_low
+			0x00000000, //uint32_t fatal_high
+			0x00000000, //uint32_t fatal_low
+		},
+		.update_time = 0,
+		{
+			.type = sensor_dev_npcm_fan,
+			.port = 1,
+			.access_checker = stby_access,
+			.sample_count = SAMPLE_COUNT_DEFAULT,
+			.arg0 = 0,
+			.arg1 = 0,
+			.init_args = NULL,
+			.cache = 3100, //fake: 3100 RPM
+			.cache_status = PLDM_SENSOR_ENABLED,
+		},
+	},
+};
+
+pldm_sensor_info plat_pldm_sensor_pwm_table[] = {
+	{
+		{
+			// PWM0 (fake value: 50%)
+			/*** PDR common header***/
+			{
+				0x00000000, //uint32_t record_handle
+				0x01, //uint8_t PDR_header_version
+				PLDM_NUMERIC_SENSOR_PDR, //uint8_t PDR_type
+				0x0000, //uint16_t record_change_number
+				0x0000, //uint16_t data_length
+			},
+			/***numeric sensor format***/
+			0x0000, //uint16_t PLDM_terminus_handle
+			0x0050, //uint16_t sensor_id
+			0x0087, //uint16_t entity_type
+			0x0001, //uint16_t entity_instance_number
+			0x0000, //uint16_t container_id
+			PDR_SENSOR_ENABLE, //uint8_t sensor_init (pre-enabled, skip hw init)
+			0x01, //uint8_t sensor_auxiliary_names_pdr
+			0x41, //uint8_t base_unit (0x41 = Percentage in PLDM DSP0248)
+			0, //int8_t unit_modifier
+			0x00, //uint8_t rate_unit
+			0x00, //uint8_t base_oem_unit_handle
+			0x00, //uint8_t aux_unit
+			0x00, //int8_t aux_unit_modifier
+			0x00, //uint8_t auxrate_unit
+			0x00, //uint8_t rel
+			0x00, //uint8_t aux_oem_unit_handle
+			0x00, //uint8_t is_linear
+			0x04, //uint8_t sensor_data_size (uint32)
+			1, //int32_t resolution
+			0, //int32_t offset
+			0x0000, //uint16_t accuracy
+			0x00, //uint8_t plus_tolerance
+			0x00, //uint8_t minus_tolerance
+			0x00000000, //uint32_t hysteresis
+			0x00, //uint8_t supported_thresholds
+			0x00, //uint8_t threshold_and_hysteresis_volatility
+			0, //real32_t state_transition_interval
+			UPDATE_INTERVAL_1S, //int32_t update_interval
+			0x00000064, //uint32_t max_readable (100%)
+			0x00000000, //uint32_t min_readable (0%)
+			0x04, //uint8_t range_field_format
+			0x00, //uint8_t range_field_support
+			0x00000000, //uint32_t nominal_value
+			0x00000000, //uint32_t normal_max
+			0x00000000, //uint32_t normal_min
+			0x00000000, //uint32_t warning_high
+			0x00000000, //uint32_t warning_low
+			0x00000000, //uint32_t critical_high
+			0x00000000, //uint32_t critical_low
+			0x00000000, //uint32_t fatal_high
+			0x00000000, //uint32_t fatal_low
+		},
+		.update_time = 0,
+		{
+			.type = sensor_dev_npcm_pwm,
+			.port = 0,
+			.access_checker = stby_access,
+			.sample_count = SAMPLE_COUNT_DEFAULT,
+			.arg0 = 0,
+			.arg1 = 0,
+			.init_args = NULL,
+			.cache = 50, //fake: 50%
+			.cache_status = PLDM_SENSOR_ENABLED,
+		},
+	},
+	{
+		{
+			// PWM1 (fake value: 60%)
+			/*** PDR common header***/
+			{
+				0x00000000, //uint32_t record_handle
+				0x01, //uint8_t PDR_header_version
+				PLDM_NUMERIC_SENSOR_PDR, //uint8_t PDR_type
+				0x0000, //uint16_t record_change_number
+				0x0000, //uint16_t data_length
+			},
+			/***numeric sensor format***/
+			0x0000, //uint16_t PLDM_terminus_handle
+			0x0051, //uint16_t sensor_id
+			0x0087, //uint16_t entity_type
+			0x0002, //uint16_t entity_instance_number
+			0x0000, //uint16_t container_id
+			PDR_SENSOR_ENABLE, //uint8_t sensor_init (pre-enabled, skip hw init)
+			0x01, //uint8_t sensor_auxiliary_names_pdr
+			0x41, //uint8_t base_unit (0x41 = Percentage in PLDM DSP0248)
+			0, //int8_t unit_modifier
+			0x00, //uint8_t rate_unit
+			0x00, //uint8_t base_oem_unit_handle
+			0x00, //uint8_t aux_unit
+			0x00, //int8_t aux_unit_modifier
+			0x00, //uint8_t auxrate_unit
+			0x00, //uint8_t rel
+			0x00, //uint8_t aux_oem_unit_handle
+			0x00, //uint8_t is_linear
+			0x04, //uint8_t sensor_data_size (uint32)
+			1, //int32_t resolution
+			0, //int32_t offset
+			0x0000, //uint16_t accuracy
+			0x00, //uint8_t plus_tolerance
+			0x00, //uint8_t minus_tolerance
+			0x00000000, //uint32_t hysteresis
+			0x00, //uint8_t supported_thresholds
+			0x00, //uint8_t threshold_and_hysteresis_volatility
+			0, //real32_t state_transition_interval
+			UPDATE_INTERVAL_1S, //int32_t update_interval
+			0x00000064, //uint32_t max_readable (100%)
+			0x00000000, //uint32_t min_readable
+			0x04, //uint8_t range_field_format
+			0x00, //uint8_t range_field_support
+			0x00000000, //uint32_t nominal_value
+			0x00000000, //uint32_t normal_max
+			0x00000000, //uint32_t normal_min
+			0x00000000, //uint32_t warning_high
+			0x00000000, //uint32_t warning_low
+			0x00000000, //uint32_t critical_high
+			0x00000000, //uint32_t critical_low
+			0x00000000, //uint32_t fatal_high
+			0x00000000, //uint32_t fatal_low
+		},
+		.update_time = 0,
+		{
+			.type = sensor_dev_npcm_pwm,
+			.port = 1,
+			.access_checker = stby_access,
+			.sample_count = SAMPLE_COUNT_DEFAULT,
+			.arg0 = 0,
+			.arg1 = 0,
+			.init_args = NULL,
+			.cache = 60, //fake: 60%
+			.cache_status = PLDM_SENSOR_ENABLED,
+		},
+	},
+};
+
 PDR_sensor_auxiliary_names plat_pdr_sensor_aux_names_table[] = {
 	{
 		// AVSB
@@ -427,6 +703,74 @@ PDR_sensor_auxiliary_names plat_pdr_sensor_aux_names_table[] = {
 		.nameStringCount = 0x1,
 		.nameLanguageTag = "en",
 		.sensorName = u"GPIO26",
+	},
+	{
+		// FAN0
+		/*** PDR common header***/
+		{
+			.record_handle = 0x00000000,
+			.PDR_header_version = 0x01,
+			.PDR_type = PLDM_SENSOR_AUXILIARY_NAMES_PDR,
+			.record_change_number = 0x0000,
+			.data_length = 0x0000,
+		},
+		.terminus_handle = 0x0000,
+		.sensor_id = 0x0040,
+		.sensor_count = 0x1,
+		.nameStringCount = 0x1,
+		.nameLanguageTag = "en",
+		.sensorName = u"FAN0_RPM",
+	},
+	{
+		// FAN1
+		/*** PDR common header***/
+		{
+			.record_handle = 0x00000000,
+			.PDR_header_version = 0x01,
+			.PDR_type = PLDM_SENSOR_AUXILIARY_NAMES_PDR,
+			.record_change_number = 0x0000,
+			.data_length = 0x0000,
+		},
+		.terminus_handle = 0x0000,
+		.sensor_id = 0x0041,
+		.sensor_count = 0x1,
+		.nameStringCount = 0x1,
+		.nameLanguageTag = "en",
+		.sensorName = u"FAN1_RPM",
+	},
+	{
+		// PWM0
+		/*** PDR common header***/
+		{
+			.record_handle = 0x00000000,
+			.PDR_header_version = 0x01,
+			.PDR_type = PLDM_SENSOR_AUXILIARY_NAMES_PDR,
+			.record_change_number = 0x0000,
+			.data_length = 0x0000,
+		},
+		.terminus_handle = 0x0000,
+		.sensor_id = 0x0050,
+		.sensor_count = 0x1,
+		.nameStringCount = 0x1,
+		.nameLanguageTag = "en",
+		.sensorName = u"PWM0",
+	},
+	{
+		// PWM1
+		/*** PDR common header***/
+		{
+			.record_handle = 0x00000000,
+			.PDR_header_version = 0x01,
+			.PDR_type = PLDM_SENSOR_AUXILIARY_NAMES_PDR,
+			.record_change_number = 0x0000,
+			.data_length = 0x0000,
+		},
+		.terminus_handle = 0x0000,
+		.sensor_id = 0x0051,
+		.sensor_count = 0x1,
+		.nameStringCount = 0x1,
+		.nameLanguageTag = "en",
+		.sensorName = u"PWM1",
 	},
 };
 
@@ -568,6 +912,10 @@ pldm_sensor_info *plat_pldm_sensor_load(int thread_id)
 	switch (thread_id) {
 	case ADC_SENSOR_THREAD_ID:
 		return plat_pldm_sensor_adc_table;
+	case FAN_SENSOR_THREAD_ID:
+		return plat_pldm_sensor_fan_table;
+	case PWM_SENSOR_THREAD_ID:
+		return plat_pldm_sensor_pwm_table;
 	default:
 		LOG_ERR("Unknow pldm sensor thread id %d", thread_id);
 		return NULL;
@@ -581,6 +929,12 @@ int plat_pldm_sensor_get_sensor_count(int thread_id)
 	switch (thread_id) {
 	case ADC_SENSOR_THREAD_ID:
 		count = ARRAY_SIZE(plat_pldm_sensor_adc_table);
+		break;
+	case FAN_SENSOR_THREAD_ID:
+		count = ARRAY_SIZE(plat_pldm_sensor_fan_table);
+		break;
+	case PWM_SENSOR_THREAD_ID:
+		count = ARRAY_SIZE(plat_pldm_sensor_pwm_table);
 		break;
 	default:
 		count = -1;

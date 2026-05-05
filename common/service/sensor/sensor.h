@@ -193,6 +193,8 @@ enum SENSOR_DEV {
 	sensor_dev_bmr316 = 0x4B,
 	sensor_dev_lx6301 = 0x4C,
 	sensor_dev_npcm4xx_adc = 0x4D,
+	sensor_dev_npcm_fan = 0x4E,
+	sensor_dev_npcm_pwm = 0x4f,
 	sensor_dev_max
 };
 
