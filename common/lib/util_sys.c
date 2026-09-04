@@ -34,7 +34,10 @@
 
 LOG_MODULE_REGISTER(util_sys);
 
+#if defined(CONFIG_SOC_FAMILY_ASPEED)
+/* ASPEED SCU System Reset Event Log register. Only exists on ASPEED SoCs. */
 #define SYS_RST_EVT_LOG_REG 0x7e6e2074
+#endif
 
 #define MAX_RETRY 10
 #define CHECK_READY_FLAG_DELAY_MS 500
@@ -51,10 +54,15 @@ void check_ac_lost()
 {
 	static bool is_read = false;
 	if (!is_read) {
+	#if defined(CONFIG_SOC_FAMILY_ASPEED)
 		if (sys_read32(SYS_RST_EVT_LOG_REG) & BIT(0)) {
 			sys_write32(BIT(0), SYS_RST_EVT_LOG_REG);
 			ac_lost = true;
 		}
+	#else
+		/* Non-ASPEED platforms do not have this reset event log register. */
+		ac_lost = false;
+	#endif
 		is_read = true;
 	} else {
 		LOG_WRN("The system reset event log register is already read");
