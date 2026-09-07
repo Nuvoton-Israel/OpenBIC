@@ -31,6 +31,22 @@ uint32_t mctp_ringbuf_space(void)
 	return ring_buf_space_get(&mctp_ringbuf);
 }
 
+/* Copy the oldest bytes without consuming them (no ring_buf_peek() in Zephyr 2.6) */
+static uint32_t mctp_ringbuf_peek(uint8_t *data, uint32_t size)
+{
+	uint32_t total = 0, part;
+	uint8_t *src;
+
+	do {
+		part = ring_buf_get_claim(&mctp_ringbuf, &src, size - total);
+		memcpy(data + total, src, part);
+		total += part;
+	} while (total < size && part);
+
+	ring_buf_get_finish(&mctp_ringbuf, 0);
+	return total;
+}
+
 static uint16_t mctp_ringbuf_read(uint8_t *buf, uint32_t len, mctp_ext_params *extra_data)
 {
 	uint16_t ret = 0, rx_len, id;
@@ -38,25 +54,33 @@ static uint16_t mctp_ringbuf_read(uint8_t *buf, uint32_t len, mctp_ext_params *e
 	struct mctp_usb_hdr *hdr;
 
 	rx_len = ring_buf_capacity_get(&mctp_ringbuf) - ring_buf_space_get(&mctp_ringbuf);
-	if (rx_len == 0)
+	if (rx_len < sizeof(*hdr))
 		return 0;
-	if (rx_len < sizeof(*hdr)) {
-		LOG_ERR("%s: invalid packet received (%d)", __func__, rx_len);
-		return 0;
-	}
-	/* Read mctp_usb hdr */
-	ring_buf_get(&mctp_ringbuf, rx_buff, sizeof(*hdr));
+
+	/*
+	 * Peek rather than consume: a frame that has not fully arrived yet must
+	 * stay in the buffer, or its header is lost and every following frame is
+	 * read at the wrong offset.
+	 */
+	mctp_ringbuf_peek(rx_buff, sizeof(*hdr));
 	hdr = (struct mctp_usb_hdr *)rx_buff;
 	LOG_DBG("mctp packet len: %d", hdr->len);
-	if (hdr->len <= sizeof(*hdr))
-		return 0;
-	if (rx_len < hdr->len) {
-		LOG_ERR("%s: short packet received (%d,%d)", __func__, rx_len, hdr->len);
+
+	if (hdr->len <= sizeof(*hdr) || hdr->len > MCTP_USB_BTU) {
+		/* Not a valid header, so the stream is misaligned - resync */
+		LOG_ERR("%s: invalid packet length %d, resyncing", __func__, hdr->len);
+		ring_buf_get(&mctp_ringbuf, NULL, 1);
 		return 0;
 	}
-	/* Read mctp packet */
-	rx_len = ring_buf_get(&mctp_ringbuf, rx_buff + sizeof(*hdr), hdr->len - sizeof(*hdr));
-	if (rx_len) {
+
+	if (rx_len < hdr->len) {
+		/* Rest of the frame is still in flight, try again later */
+		return 0;
+	}
+
+	/* Whole frame is present, take it */
+	rx_len = ring_buf_get(&mctp_ringbuf, rx_buff, hdr->len);
+	if (rx_len == hdr->len) {
 		id = sys_le16_to_cpu(hdr->id);
 
 		if (sys_be16_to_cpu(id) != MCTP_USB_DMTF_ID) {
@@ -155,13 +179,20 @@ static uint16_t mctp_usb_write(void *mctp_p, uint8_t *buf, uint32_t len,
 static int mctp_usb_rx(const struct device *dev, int32_t len,
 			uint8_t *data)
 {
-	
 	ARG_UNUSED(dev);
-	int wrote;
 
-	wrote = ring_buf_put(&mctp_ringbuf, data, len);
-	if (wrote < len)
-		LOG_WRN("Ring buffer full, drop %zd bytes", len - wrote);
+	/*
+	 * A partial write leaves a torn frame in the buffer, and the reader has
+	 * no way to tell where the next one starts - every frame after it is
+	 * mis-parsed. Dropping the whole frame instead costs one retry from the
+	 * peer and keeps the stream aligned.
+	 */
+	if (ring_buf_space_get(&mctp_ringbuf) < (uint32_t)len) {
+		LOG_WRN("Ring buffer full, dropping a %d byte frame", len);
+		return 0;
+	}
+
+	ring_buf_put(&mctp_ringbuf, data, len);
 
 	k_sem_give(&mctp_sem);
 
