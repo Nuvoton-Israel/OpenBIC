@@ -15,9 +15,6 @@
  */
 
 #include "mctp.h"
-#ifdef ENABLE_MCTP_OBMF_I2C
-#include "mctp_obmf_i2c.h"
-#endif
 #include <logging/log.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -97,17 +94,6 @@ static uint8_t set_thread_name(mctp *mctp_inst)
 			 "mctptx_%02x_%02x_%02x", mctp_inst->medium_type, i3c_conf->bus,
 			 i3c_conf->addr);
 		break;
-	case MCTP_MEDIUM_TYPE_OBMF_I2C:
-		LOG_DBG("medium_type: obmf_i2c");
-		const mctp_smbus_conf *obmf_conf =
-			(const mctp_smbus_conf *)&mctp_inst->medium_conf;
-		snprintf(mctp_inst->mctp_rx_task_name, sizeof(mctp_inst->mctp_rx_task_name),
-			 "mctprx_%02x_%02x_%02x", mctp_inst->medium_type, obmf_conf->bus,
-			 obmf_conf->addr);
-		snprintf(mctp_inst->mctp_tx_task_name, sizeof(mctp_inst->mctp_tx_task_name),
-			 "mctptx_%02x_%02x_%02x", mctp_inst->medium_type, obmf_conf->bus,
-			 obmf_conf->addr);
-		break;
 	default:
 		return MCTP_ERROR;
 		break;
@@ -137,11 +123,6 @@ static uint8_t mctp_medium_init(mctp *mctp_inst, mctp_medium_conf medium_conf)
 	case MCTP_MEDIUM_TYPE_USB:
 		ret = mctp_usb_init(mctp_inst, medium_conf);
 		break;
-#ifdef ENABLE_MCTP_OBMF_I2C
-	case MCTP_MEDIUM_TYPE_OBMF_I2C:
-		ret = mctp_obmf_i2c_init(mctp_inst, medium_conf);
-		break;
-#endif
 	default:
 		return MCTP_ERROR;
 	}
@@ -166,11 +147,6 @@ static uint8_t mctp_medium_deinit(mctp *mctp_inst)
 	case MCTP_MEDIUM_TYPE_USB:
 		mctp_usb_deinit(mctp_inst);
 		break;
-#ifdef ENABLE_MCTP_OBMF_I2C
-	case MCTP_MEDIUM_TYPE_OBMF_I2C:
-		mctp_obmf_i2c_deinit(mctp_inst);
-		break;
-#endif
 	default:
 		return MCTP_ERROR;
 	}
