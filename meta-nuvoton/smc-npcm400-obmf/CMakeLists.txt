@@ -64,13 +64,13 @@ project(smc-npcm400-obmf)
 set(common_path ../../common)
 set(nuvoton_common_path ../common)
 
-FILE(GLOB app_sources src/ipmi/*.c src/platform/*.c src/lib/*.c src/shell/*.c)
-FILE(GLOB common_sources ${common_path}/service/*.c ${common_path}/service/*/*.c ${common_path}/hal/*.c ${common_path}/shell/*.c ${common_path}/shell/commands/*.c)
+FILE(GLOB app_sources CONFIGURE_DEPENDS src/ipmi/*.c src/platform/*.c src/lib/*.c src/shell/*.c)
+FILE(GLOB common_sources CONFIGURE_DEPENDS ${common_path}/service/*.c ${common_path}/service/*/*.c ${common_path}/hal/*.c ${common_path}/shell/*.c ${common_path}/shell/commands/*.c)
 # No IPMI or sensor service on this platform
 list(FILTER common_sources EXCLUDE REGEX "/service/ipmi/")
 list(FILTER common_sources EXCLUDE REGEX "/service/sensor/")
 list(FILTER common_sources EXCLUDE REGEX "/shell/commands/sensor_shell\\.c$")
-FILE(GLOB nuvoton_common_sources ${nuvoton_common_path}/service/*/*.c)
+FILE(GLOB nuvoton_common_sources CONFIGURE_DEPENDS ${nuvoton_common_path}/service/*/*.c)
 
 target_sources(app PRIVATE ${common_path}/dev/snoop_npcm.c)
 target_sources(app PRIVATE ${common_path}/dev/fru.c)
