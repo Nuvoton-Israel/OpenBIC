@@ -10,7 +10,7 @@ manifest:
       remote: nuvoton
       repo-path: zephyr
       path: zephyr_nuvoton
-      revision: d800dbdeb38a230440310ace5a4f8057092920e0
+      revision: d9efe7634d34c5ab8d11bbbc92e9b83f20c5e19b
       import:
         name-allowlist:
           - cmsis
