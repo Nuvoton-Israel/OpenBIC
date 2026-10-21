@@ -20,21 +20,11 @@
 #include "mctp.h"
 
 /* i2c 8 bit address */
-#define I2C_ADDR_BIC		0x20
 #define I2C_ADDR_BMC		0x22
-/*
- * BMC B's MCTP device on its OBMF I2C Controller virtual adaptor.
- * The OBMF I2C Target channel request will carry this as the target
- * address, so BMC B's virtual I2C controller writes to device 0x12 (7-bit).
- */
-#define I2C_ADDR_BMC_B_OBMF_BUS1	0x24  /* BMC B virtual adaptor bus1: 7-bit 0x12 */
-#define I2C_ADDR_BMC_B_OBMF_BUS2	0x28  /* BMC B virtual adaptor bus2: 7-bit 0x14 */
 
 /* mctp endpoint */
 #define MCTP_EID_BMC_I3C	0x08
 #define MCTP_EID_BMC_USB	0x08
-#define MCTP_EID_BMC_OBMF_I2C_BUS1	0x16  /* BMC endpoint via OBMF I2C Target channel, bus1 */
-#define MCTP_EID_BMC_OBMF_I2C_BUS2	0x17  /* BMC endpoint via OBMF I2C Target channel, bus2 */
 
 /* i3c static 8-bit address */
 #define I3C_STATIC_ADDR_BMC	0x20

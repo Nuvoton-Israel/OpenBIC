@@ -1489,10 +1489,20 @@ void obmf_i3c_set_controller_bus(uint8_t bus);
  * I2C Target channel API (Consumer - we forward target writes to host)
  * =====================================================================
  *
- * When this device is addressed as an I2C target (e.g. SSIF), the platform
- * (hal_i2c_target) calls obmf_i2c_target_write() to forward the received
- * write payload to the host (OBMF Producer) as an OBMF request.
+ * When this device is addressed as an I2C target, the platform forwards the
+ * raw write payload received on the physical bus to the host (OBMF Producer)
+ * with obmf_i2c_target_write(). The payload is passed through as is, e.g. an
+ * MCTP over SMBus response from a device behind the OBMF I2C Controller
+ * channel is not parsed by this device.
  */
+/**
+ * @brief Advertise the I2C target address of an I2C Target channel.
+ * @param channel OBMF channel number (OBMF_ICP_I2C_TARGET_CHANNEL_0 .. _1).
+ * @param address 7-bit I2C target address.
+ * @return 0 on success, -EINVAL on an invalid channel.
+ */
+int obmf_i2c_target_set_address(uint8_t channel, uint8_t address);
+
 /**
  * @brief Register a response callback for an I2C Target channel.
  * @param idx Channel index (0 = ch14/bus1, 1 = ch15/bus2).

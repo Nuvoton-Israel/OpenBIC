@@ -852,6 +852,25 @@ void obmf_smc_gpio_set_config_count(uint16_t count)
 	discovery_struct.smc_gpio_channel_config.config.gpio_count = count;
 }
 
+int obmf_i2c_target_set_address(uint8_t channel, uint8_t address)
+{
+	if (channel < OBMF_ICP_I2C_TARGET_CHANNEL_0 ||
+	    channel >= OBMF_I2C_TGT_CHAN_NUM(OBMF_MAX_I2C_TARGET_CHANNELS)) {
+		return -EINVAL;
+	}
+
+	obmf_i2c_target_channel_config_t *tgt =
+		&discovery_struct.i2c_target_channel_configs[OBMF_I2C_TGT_CHAN_IDX(channel)];
+
+	tgt->config.target_address_list[0] = address;
+	tgt->config.target_address_count = 1;
+	tgt->header.config_size =
+		offsetof(obmf_i2c_target_config_data_t, target_address_list) +
+		tgt->config.target_address_count;
+
+	return 0;
+}
+
 // --- Forward Declarations ---
 static void handle_ch0_read_req(obmf_icp_header_t *req_hdr,
 				uint8_t *req_payload, uint32_t req_len,

@@ -57,6 +57,7 @@ void pal_post_init()
 	edaf_npcm_init();
 	plat_led_init();
 	obmf_service_init();
+	plat_i2c_target_passthrough_init();
 	if (!pal_load_obmf_smc_gpio_config()) {
 		LOG_ERR("failed to initialize obmf smc gpio channel");
 	}

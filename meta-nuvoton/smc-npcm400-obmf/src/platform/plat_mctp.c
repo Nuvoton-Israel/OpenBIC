@@ -29,7 +29,6 @@
 #include "guid.h"
 #include "util_sys.h"
 #include "plat_def.h"
-#include "plat_i2c.h"
 #include "plat_mctp.h"
 
 LOG_MODULE_REGISTER(plat_mctp);
@@ -60,30 +59,6 @@ static mctp_port plat_mctp_port[] = {
 		.medium_type = MCTP_MEDIUM_TYPE_USB,
 	},
 #endif
-	/* SMBus targets, also receive MCTP packets from BMC sent over OBMF I2C */
-	{
-		.conf.smbus_conf.addr = I2C_ADDR_BIC,
-		.conf.smbus_conf.bus = I2C_BUS1,
-		.medium_type = MCTP_MEDIUM_TYPE_SMBUS,
-	},
-	{
-		.conf.smbus_conf.addr = I2C_ADDR_BIC,
-		.conf.smbus_conf.bus = I2C_BUS2,
-		.medium_type = MCTP_MEDIUM_TYPE_SMBUS,
-	},
-#ifdef ENABLE_MCTP_OBMF_I2C
-	/* TX only: send MCTP packets to BMC through the OBMF I2C Target channel */
-	{
-		.conf.smbus_conf.addr = I2C_ADDR_BIC,
-		.conf.smbus_conf.bus = I2C_BUS1,
-		.medium_type = MCTP_MEDIUM_TYPE_OBMF_I2C,
-	},
-	{
-		.conf.smbus_conf.addr = I2C_ADDR_BIC,
-		.conf.smbus_conf.bus = I2C_BUS2,
-		.medium_type = MCTP_MEDIUM_TYPE_OBMF_I2C,
-	},
-#endif
 };
 
 static const plat_mctp_route plat_mctp_route_tbl[] = {
@@ -93,12 +68,6 @@ static const plat_mctp_route plat_mctp_route_tbl[] = {
 #endif
 #ifdef ENABLE_MCTP_USB
 	{ MCTP_EID_BMC_USB, MCTP_MEDIUM_TYPE_USB, 0, 0 },
-#endif
-#ifdef ENABLE_MCTP_OBMF_I2C
-	{ MCTP_EID_BMC_OBMF_I2C_BUS1, MCTP_MEDIUM_TYPE_OBMF_I2C, I2C_BUS1,
-	  I2C_ADDR_BMC_B_OBMF_BUS1 },
-	{ MCTP_EID_BMC_OBMF_I2C_BUS2, MCTP_MEDIUM_TYPE_OBMF_I2C, I2C_BUS2,
-	  I2C_ADDR_BMC_B_OBMF_BUS2 },
 #endif
 };
 

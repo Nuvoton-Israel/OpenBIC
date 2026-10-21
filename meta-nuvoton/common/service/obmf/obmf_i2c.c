@@ -258,9 +258,9 @@ void handle_i2c_request(obmf_icp_header_t *req_hdr,
 /* =====================================================================
  * I2C Target Channel (Consumer)
  *
- * When this device is addressed as an I2C target (e.g. SSIF), the platform
- * (hal_i2c_target) calls obmf_i2c_target_write() to forward the received
- * write payload to the host (OBMF Producer) and wait for its response.
+ * When this device is addressed as an I2C target, the platform calls
+ * obmf_i2c_target_write() to pass the received write payload through to the
+ * host (OBMF Producer) and wait for its response.
  * ===================================================================== */
 
 struct obmf_i2c_target_rsp_entry {

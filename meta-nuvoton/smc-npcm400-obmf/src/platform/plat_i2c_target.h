@@ -23,4 +23,6 @@
 #define TARGET_ENABLE 1
 #define TARGET_DISABLE 0
 
+void plat_i2c_target_passthrough_init(void);
+
 #endif
