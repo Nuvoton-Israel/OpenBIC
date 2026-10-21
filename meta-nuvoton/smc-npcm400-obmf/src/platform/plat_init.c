@@ -44,6 +44,20 @@ extern void edaf_npcm_init(void);
 #include <logging/log.h>
 LOG_MODULE_REGISTER(palt_init);
 
+/* No IPMI sensors or SDR on this platform, keep the common tables empty */
+const int SENSOR_CONFIG_SIZE = 0;
+const int SDR_TABLE_SIZE = 0;
+
+void load_sensor_config(void)
+{
+	return;
+}
+
+void load_sdr_table(void)
+{
+	return;
+}
+
 void pal_pre_init()
 {
 	/* Init platform config */
