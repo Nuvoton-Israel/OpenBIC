@@ -1,0 +1,90 @@
+From e8e3abdcabd535f915f64bdb12a9976bd5638d25 Mon Sep 17 00:00:00 2001
+From: Joseph Liu <kwliu@nuvoton.com>
+Date: Thu, 18 Jun 2026 15:40:38 +0800
+Subject: [PATCH] usb: obmf: add bus_reset callback to reset channel state on
+ host disconnect
+
+Add a bus_reset callback to struct obmf_ops so the USB OBMF class layer
+can notify the application when a USB bus reset or disconnect occurs
+(e.g. host reboot). The callback runs in ISR context and is expected to
+be ISR-safe.
+
+In obmf_status_cb, invoke ops->bus_reset on USB_DC_RESET and
+USB_DC_DISCONNECTED events, using usb_get_dev_data_by_cfg to reach the
+registered device. Also clear the USB-layer RX buffer on disconnect,
+matching the existing USB_DC_RESET handling.
+---
+ subsys/usb/class/obmf.c     | 28 +++++++++++++++++++++++++---
+ subsys/usb/class/usb_obmf.h |  7 +++++++
+ 2 files changed, 32 insertions(+), 3 deletions(-)
+
+diff --git a/subsys/usb/class/obmf.c b/subsys/usb/class/obmf.c
+index d88f6f8e466..bea9a7367c0 100644
+--- a/subsys/usb/class/obmf.c
++++ b/subsys/usb/class/obmf.c
+@@ -364,19 +364,41 @@ static void obmf_status_cb(struct usb_cfg_data *cfg,
+ 			       enum usb_dc_status_code status,
+ 			       const uint8_t *param)
+ {
+-	ARG_UNUSED(cfg);
++	struct obmf_device_info *dev_data = NULL;
++	struct usb_dev_data *common;
++
+ 	ARG_UNUSED(param);
+ 
++	common = usb_get_dev_data_by_cfg(&usb_obmf_devlist, cfg);
++	if (common != NULL) {
++		dev_data = CONTAINER_OF(common, struct obmf_device_info, common);
++	}
++
+ 	switch (status) {
+ 	case USB_DC_RESET:
+ 		/*
+ 		 * [1.0rc5 C7] USB bus reset detected.
+ 		 * Clear USB-layer RX buffer to ensure clean state.
+-		 * Upper-layer OBMF-ICP channel state (fragment reassembly,
+-		 * ring buffer, etc.) is managed by the application layer.
++		 * Notify the application so it can reset upper-layer
++		 * OBMF-ICP channel state (tags, fragment reassembly, etc.),
++		 * e.g. after a host reboot.
+ 		 */
+ 		LOG_WRN("USB reset: clearing OBMF USB-layer RX buffer");
+ 		memset(obmf_buf, 0, sizeof(obmf_buf));
++		if (dev_data && dev_data->ops && dev_data->ops->bus_reset) {
++			dev_data->ops->bus_reset(common->dev);
++		}
++		break;
++	case USB_DC_DISCONNECTED:
++		/*
++		 * Host connection lost. Notify the application to reset
++		 * upper-layer OBMF-ICP channel state.
++		 */
++		LOG_WRN("USB disconnected: clearing OBMF USB-layer RX buffer");
++		memset(obmf_buf, 0, sizeof(obmf_buf));
++		if (dev_data && dev_data->ops && dev_data->ops->bus_reset) {
++			dev_data->ops->bus_reset(common->dev);
++		}
+ 		break;
+ 	case USB_DC_CLEAR_HALT:
+ 		/*
+diff --git a/subsys/usb/class/usb_obmf.h b/subsys/usb/class/usb_obmf.h
+index 3ec4650912c..8113d5692d6 100644
+--- a/subsys/usb/class/usb_obmf.h
++++ b/subsys/usb/class/usb_obmf.h
+@@ -19,6 +19,13 @@ struct obmf_ops {
+ #if CONFIG_OBMF_INTERRUPT_OUT_EP_SUPPORT
+ 	void (*int_read)(const struct device *dev, uint32_t len, uint8_t *data);
+ #endif
++	/*
++	 * Called when the USB connection to the host is lost (USB bus reset
++	 * or disconnect), e.g. on a host reboot. Runs in USB interrupt
++	 * context, so the implementation must be ISR-safe (no blocking,
++	 * no dynamic memory operations).
++	 */
++	void (*bus_reset)(const struct device *dev);
+ };
+ 
+ void usb_obmf_register_device(const struct device *dev,
+-- 
+2.43.0
+

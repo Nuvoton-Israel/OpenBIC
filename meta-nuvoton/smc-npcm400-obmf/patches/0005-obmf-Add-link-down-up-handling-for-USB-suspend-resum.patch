@@ -1,0 +1,68 @@
+From 3f652739e7acb7ba3967901292be3aa20e90e4c7 Mon Sep 17 00:00:00 2001
+From: Mia Lin <mimi05633@gmail.com>
+Date: Mon, 31 Aug 2026 08:29:40 +0000
+Subject: [PATCH] obmf: Add link down/up handling for USB suspend/resume
+
+Signed-off-by: Mia Lin <mimi05633@gmail.com>
+---
+ subsys/usb/class/obmf.c     | 17 +++++++++++++++--
+ subsys/usb/class/usb_obmf.h | 13 +++++++++++++
+ 2 files changed, 28 insertions(+), 2 deletions(-)
+
+diff --git a/subsys/usb/class/obmf.c b/subsys/usb/class/obmf.c
+index 20c38afc409..6def734e6de 100644
+--- a/subsys/usb/class/obmf.c
++++ b/subsys/usb/class/obmf.c
+@@ -417,10 +417,23 @@ static void obmf_status_cb(struct usb_cfg_data *cfg,
+ 		LOG_DBG("USB device configured");
+ 		break;
+ 	case USB_DC_SUSPEND:
+-		LOG_DBG("USB device suspended");
++		/*
++		* No SOF from the host. With no VBUS pin this is the only
++		* early indication that the host is gone, so let the
++		* application take its channels down. Upper-layer tag state
++		* is left alone: a resume may follow without a bus reset.
++		*/
++		LOG_WRN("USB suspended: OBMF link down");
++		if (dev_data && dev_data->ops && dev_data->ops->link_down) {
++			dev_data->ops->link_down(common->dev);
++		}
+ 		break;
+ 	case USB_DC_RESUME:
+-		LOG_DBG("USB device resumed");
++		/* Undo the suspend-time link down; no bus reset is involved here */
++		LOG_WRN("USB resumed: OBMF link up");
++		if (dev_data && dev_data->ops && dev_data->ops->link_up) {
++			dev_data->ops->link_up(common->dev);
++		}
+ 		break;
+ 	case USB_DC_ERROR:
+ 		LOG_ERR("USB device error");
+diff --git a/subsys/usb/class/usb_obmf.h b/subsys/usb/class/usb_obmf.h
+index 8113d5692d6..e1fb83044a3 100644
+--- a/subsys/usb/class/usb_obmf.h
++++ b/subsys/usb/class/usb_obmf.h
+@@ -26,6 +26,19 @@ struct obmf_ops {
+ 	 * no dynamic memory operations).
+ 	 */
+ 	void (*bus_reset)(const struct device *dev);
++
++	/*
++	* Called when the USB link goes idle (suspend), which on a port
++	* without a VBUS pin is the earliest indication that the host is
++	* gone. Runs in USB interrupt context and must be ISR-safe.
++	*/
++	void (*link_down)(const struct device *dev);
++
++	/*
++	* Called when the USB link comes back (resume). Runs in USB interrupt
++	* context and must be ISR-safe.
++	*/
++	void (*link_up)(const struct device *dev);
+ };
+ 
+ void usb_obmf_register_device(const struct device *dev,
+-- 
+2.43.0
+

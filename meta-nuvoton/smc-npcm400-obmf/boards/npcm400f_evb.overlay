@@ -1,0 +1,381 @@
+/ {
+	chosen {
+		zephyr,legacy_console = &uart1;
+
+		/* UARTs bridged to OBMF Serial channel 0 / 1 */
+		openbic,obmf-serial-0 = &uart1;
+		//openbic,obmf-serial-1 = &uart2;
+	};
+};
+
+&uart1 {
+	status = "okay";
+	current-speed = <115200>;
+
+	/* ESPI UARTB to COM port B(SINB SOUTB)*/
+	//pinctrl-0 = <&pinctrl_sinoutb_default>;
+
+	/*EPSI UARTB to CR_UART2*/
+	ext-loopback;
+};
+
+#if 0
+&uart2 {
+	status = "okay";
+	current-speed = <115200>;
+};
+#endif
+
+&twd0 {
+       status = "okay";
+};
+
+
+&i2c1a {
+	clock-frequency = <I2C_BITRATE_STANDARD>;
+	status = "okay";
+};
+
+&i2c1b {
+    status = "disabled";
+};
+
+&i2c2a {
+	status = "okay";
+};
+
+&i2c3a {
+	status = "okay";
+};
+
+&i2c4a {
+	status = "disabled";
+};
+
+&i2c4b {
+	status = "disabled";
+};
+
+&i2c5a {
+	status = "okay";
+};
+
+&i2c6a {
+    status = "disabled";
+};
+
+&i2c6b {
+	status = "disabled";
+};
+
+&i2c7a {
+	status = "disabled";
+};
+
+&i2c8a {
+    status = "disabled";
+};
+
+&i2c9a {
+    status = "disabled";
+};
+
+&i2c10a {
+    status = "disabled";
+};
+
+&i2c11a {
+    status = "disabled";
+};
+
+&i2c12a {
+    status = "disabled";
+};
+
+/* disable peci0, pin use by i3c */
+&peci0 {
+	status = "disabled";
+};
+
+#if 1
+/* Use for I3C_5 controller */
+&i3c5 {
+	status = "okay";
+	compatible = "nuvoton,npcm4-i3c";
+	reg = <0x40004a00 0x200
+	       0x4000d000 0x20
+	       0x40015000 0x490>;
+	reg-names = "i3c", "pmc", "pdma";
+	i2c-scl-hz = <100000>;
+	i3c-scl-hz = <8000000>;
+	enable-hj;
+};
+#endif
+
+#if 0
+&i3c5 {
+	bcr = <0x66>;
+	dcr = <0xCC>;
+	part-id = <0x1234>;
+	vendor-def-id = <0x5607>;
+	slave;
+	secondary;
+	status = "okay";
+	i3c5_smq:i3c-slave-mqueue@21 {
+		compatible = "i3c-slave-mqueue";
+		reg = <0x21>;
+		msg-size = <256>;
+		num-of-msgs = <8>;
+		mandatory-data-byte = <0xae>;
+		label = "I3C_SMQ_5";
+		status = "okay";
+	};
+};
+#endif
+
+#if 1
+/* Use for I3C_4 controller */
+&i3c4 {
+	status = "okay";
+	i2c-scl-hz = <100000>;
+	i3c-scl-hz = <12500000>;
+};
+#endif
+
+#if 0
+/* test for bridge slave mode only, MCTP EID = 0x12, use for I3C_4 target */
+&i3c4 {
+	status = "okay";
+	bcr = <0x66>;
+	dcr = <0xCC>;
+	part-id = <0x4321>;
+	assigned-address = <0xA>;
+	vendor-def-id = <0x777>;
+	slave;
+	status = "okay";
+	i3c4_smq:i3c-slave-mqueue@A {
+		compatible = "i3c-slave-mqueue";
+		reg = <0xA>;
+		msg-size = <256>;
+		num-of-msgs = <4>;
+		mandatory-data-byte = <0xae>;
+		label = "I3C_SMQ_4";
+		status = "okay";
+	};
+};
+#endif
+
+#if 0
+/* test for bridge slave mode only, MCTP EID = 0x13, use for I3C_4 target */
+&i3c4 {
+	status = "okay";
+	bcr = <0x66>;
+	dcr = <0xCC>;
+	part-id = <0x4321>;
+	assigned-address = <0xB>;
+        vendor-def-id = <0x666>;
+	slave;
+	status = "okay";
+	i3c4_smq:i3c-slave-mqueue@B {
+		compatible = "i3c-slave-mqueue";
+		reg = <0xB>;
+		msg-size = <256>;
+		num-of-msgs = <4>;
+		mandatory-data-byte = <0xae>;
+		label = "I3C_SMQ_4";
+		status = "okay";
+	};
+};
+#endif
+
+&spi_spim0_cs0 {
+	status = "okay";
+};
+
+&spi_fiu0_cs1 {
+	status = "okay";
+};
+
+&spi_spip1_cs0 {
+	status = "okay";
+};
+
+&espi0 {
+	status = "okay";
+};
+
+/* Enable VW GPIO controller and all bank nodes */
+&vwgpio {
+	status = "okay";
+
+	/* Slave-to-Master (output, BIC->Host) */
+	vwgpsm0  { status = "okay"; };
+	vwgpsm1  { status = "okay"; };
+	vwgpsm2  { status = "okay"; };
+	vwgpsm3  { status = "okay"; };
+	vwgpsm4  { status = "okay"; };
+	vwgpsm5  { status = "okay"; };
+	vwgpsm6  { status = "okay"; };
+	vwgpsm7  { status = "okay"; };
+	vwgpsm8  { status = "okay"; };
+	vwgpsm9  { status = "okay"; };
+	vwgpsm10 { status = "okay"; };
+	vwgpsm11 { status = "okay"; };
+	vwgpsm12 { status = "okay"; };
+	vwgpsm13 { status = "okay"; };
+	vwgpsm14 { status = "okay"; };
+	vwgpsm15 { status = "okay"; };
+
+	/* Master-to-Slave (input, Host->BIC) */
+	vwgpms0  { status = "okay"; };
+	vwgpms1  { status = "okay"; };
+	vwgpms2  { status = "okay"; };
+	vwgpms3  { status = "okay"; };
+	vwgpms4  { status = "okay"; };
+	vwgpms5  { status = "okay"; };
+	vwgpms6  { status = "okay"; };
+	vwgpms7  { status = "okay"; };
+	vwgpms8  { status = "okay"; };
+	vwgpms9  { status = "okay"; };
+	vwgpms10 { status = "okay"; };
+	vwgpms11 { status = "okay"; };
+	vwgpms12 { status = "okay"; };
+	vwgpms13 { status = "okay"; };
+	vwgpms14 { status = "okay"; };
+	vwgpms15 { 
+		status = "okay"; 
+		gpio-line-names =
+		    "CPU100", "", "", "CPU200";
+	};
+};
+
+&peci0 {
+	status = "disabled";
+};
+
+/* Enable SGPIO0 (siox0)
+ *   Output ports (0-7):  pin-offset=0,8,16,24,32,40,48,56  -> pins 0-63
+ *   Input ports  (8-15): pin-offset=64,72,80,88,96,104,112,120 -> pins 64-127
+ */
+&sgpio0 {
+	status = "okay";
+
+	/* Output banks: SGPIO0_0 to SGPIO0_7 (pins 0-63) */
+	sgpio0_0 {
+		status = "okay";
+		gpio-line-names =
+            "SPIO00_OBMF_0", "SPIO00_OBMF_1", "SPIO00_OBMF_2", "SPIO00_OBMF_3",
+			"SPIO00_OBMF_4", "SPIO00_OBMF_5", "SPIO00_OBMF_6", "SPIO00_OBMF_7";
+
+	};
+	sgpio0_1 {
+		status = "okay";
+	};
+	sgpio0_2 {
+		status = "okay";
+	};
+	sgpio0_3 {
+		status = "okay";
+	};
+	sgpio0_4 {
+		status = "okay";
+	};
+	sgpio0_5 {
+		status = "okay";
+	};
+	sgpio0_6 {
+		status = "okay";
+		gpio-line-names =
+            "BAN", "", "MIA", "",
+			"", "", "", "";
+	};
+	sgpio0_7 {
+		status = "okay";
+	};
+
+	/* Input banks: SGPIO0_8 to SGPIO0_f (pins 64-127) */
+	sgpio0_8 {
+		status = "okay";
+	};
+	sgpio0_9 {
+		status = "okay";
+	};
+	sgpio0_a {
+		status = "okay";
+	};
+	sgpio0_b {
+		status = "okay";
+	};
+	sgpio0_c {
+		status = "okay";
+	};
+	sgpio0_d {
+		status = "okay";
+	};
+	sgpio0_e {
+		status = "okay";
+	};
+	sgpio0_f {
+		status = "okay";
+	};
+};
+
+/* Enable SGPIO1 (siox1) for OBMF SGPIO channel (channel 6)
+ *   Output ports (0-7):  pin-offset=0,8,16,24,32,40,48,56  -> pins 0-63   (SGPIO_0~63)
+ *   Input ports  (8-15): pin-offset=64,72,80,88,96,104,112,120 -> pins 64-127 (SGPIO_64~127)
+ */
+&sgpio1 {
+	status = "okay";
+
+	/* Output banks: SGPIO1_0 to SGPIO1_7 (pins 0-63) */
+	sgpio1_0 {
+		status = "okay";
+	};
+	sgpio1_1 {
+		status = "okay";
+	};
+	sgpio1_2 {
+		status = "okay";
+	};
+	sgpio1_3 {
+		status = "okay";
+	};
+	sgpio1_4 {
+		status = "okay";
+	};
+	sgpio1_5 {
+		status = "okay";
+	};
+	sgpio1_6 {
+		status = "okay";
+	};
+	sgpio1_7 {
+		status = "okay";
+	};
+
+	/* Input banks: SGPIO1_8 to SGPIO1_f (pins 64-127) */
+	sgpio1_8 {
+		status = "okay";
+	};
+	sgpio1_9 {
+		status = "okay";
+	};
+	sgpio1_a {
+		status = "okay";
+	};
+	sgpio1_b {
+		status = "okay";
+	};
+	sgpio1_c {
+		status = "okay";
+	};
+	sgpio1_d {
+		status = "okay";
+	};
+	sgpio1_e {
+		status = "okay";
+	};
+	sgpio1_f {
+		status = "okay";
+	};
+};

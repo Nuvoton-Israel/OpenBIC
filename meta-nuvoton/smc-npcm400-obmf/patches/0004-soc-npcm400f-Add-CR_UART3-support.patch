@@ -1,0 +1,82 @@
+From 36e79482fceacc8b307075a22af37b9ead8bb575 Mon Sep 17 00:00:00 2001
+From: Mia Lin <mimi05633@gmail.com>
+Date: Wed, 8 Jul 2026 09:21:26 +0000
+Subject: [PATCH] soc: npcm400f: Add CR_UART3 support
+
+Signed-off-by: Mia Lin <mimi05633@gmail.com>
+---
+ boards/arm/npcm400f_evb/fun_def_list.h       |  4 ++++
+ dts/arm/nuvoton/npcm400f.dtsi                | 10 ++++++++++
+ dts/arm/nuvoton/npcm4xx/npcm4xx-pinctrl.dtsi |  1 +
+ soc/arm/npcm4xx/npcm400f/sig_def_list.h      |  7 +++++++
+ 4 files changed, 22 insertions(+)
+
+diff --git a/boards/arm/npcm400f_evb/fun_def_list.h b/boards/arm/npcm400f_evb/fun_def_list.h
+index 3d831339204..e72a9494488 100644
+--- a/boards/arm/npcm400f_evb/fun_def_list.h
++++ b/boards/arm/npcm400f_evb/fun_def_list.h
+@@ -13,6 +13,10 @@ FUN_DEFINE(DT_NODELABEL(pinctrl_uart0_default), UARTA_CR_SIN, UARTA_CR_SOUT)
+ FUN_DEFINE(DT_NODELABEL(pinctrl_uart1_default), UARTB_CR_SIN, UARTB_CR_SOUT)
+ #endif
+ 
++#if DT_NODE_HAS_STATUS(DT_NODELABEL(uart2), okay) && CONFIG_UART_NPCM4XX
++FUN_DEFINE(DT_NODELABEL(pinctrl_uart2_default), UARTC_CR_SIN, UARTC_CR_SOUT)
++#endif
++
+ #if DT_NODE_HAS_STATUS(DT_NODELABEL(i2c1a), okay) && CONFIG_I2C_NPCM4XX
+ FUN_DEFINE(DT_NODELABEL(pinctrl_i2c1a_default), SCL1A, SDA1A)
+ #endif
+diff --git a/dts/arm/nuvoton/npcm400f.dtsi b/dts/arm/nuvoton/npcm400f.dtsi
+index 9cf40a5ef13..d97c0ae38c0 100644
+--- a/dts/arm/nuvoton/npcm400f.dtsi
++++ b/dts/arm/nuvoton/npcm400f.dtsi
+@@ -51,6 +51,16 @@
+ 			label = "UART_1";
+ 		};
+ 
++		uart2: serial@400c4400 {
++			compatible = "nuvoton,npcm4xx-uart";
++			reg = <0x400c4400 0x100>;
++			interrupts = <77 3>;
++			clocks = <&pcc NPCM4XX_CLOCK_BUS_APB2 NPCM4XX_PWDWN_CTL0 5>;
++			pinctrl-0 = <&pinctrl_uart2_default>;
++			status = "disabled";
++			label = "UART_2";
++		};
++
+ 		twd0: watchdog@400d8000 {
+ 			compatible = "nuvoton,npcm4xx-watchdog";
+ 			reg = <0x400d8000 0x1000>;
+diff --git a/dts/arm/nuvoton/npcm4xx/npcm4xx-pinctrl.dtsi b/dts/arm/nuvoton/npcm4xx/npcm4xx-pinctrl.dtsi
+index 7864e9998fa..01a6d631652 100644
+--- a/dts/arm/nuvoton/npcm4xx/npcm4xx-pinctrl.dtsi
++++ b/dts/arm/nuvoton/npcm4xx/npcm4xx-pinctrl.dtsi
+@@ -6,6 +6,7 @@
+ &pinmux {
+ 	pinctrl_uart0_default: uart0_default {};
+ 	pinctrl_uart1_default: uart1_default {};
++	pinctrl_uart2_default: uart2_default {};
+ 	pinctrl_i2c1a_default: i2c1a_default {};
+ 	pinctrl_i2c1b_default: i2c1b_default {};
+ 	pinctrl_i2c2a_default: i2c2a_default {};
+diff --git a/soc/arm/npcm4xx/npcm400f/sig_def_list.h b/soc/arm/npcm4xx/npcm400f/sig_def_list.h
+index d885cdd1b3d..edc267117c1 100644
+--- a/soc/arm/npcm4xx/npcm400f/sig_def_list.h
++++ b/soc/arm/npcm4xx/npcm400f/sig_def_list.h
+@@ -165,6 +165,13 @@ SIG_DEFINE(UARTB_CR_SIN, J6, SIG_DESC_CLEAR(0x6B, 0), SIG_DESC_SET(0x31, 4))
+ SIG_DEFINE(UARTB_CR_SOUT, K6, SIG_DESC_CLEAR(0x6B, 1), SIG_DESC_SET(0x31, 5))
+ #endif
+ 
++#if DT_NODE_HAS_STATUS(DT_NODELABEL(uart2), okay) && CONFIG_UART_NPCM4XX
++/* DEVALT31 */
++SIG_DEFINE(UARTC_CR_SIN,  M2, SIG_DESC_SET(0x31, 6))
++/* DEVALT31 */
++SIG_DEFINE(UARTC_CR_SOUT, L2, SIG_DESC_SET(0x31, 7))
++#endif
++
+ #if DT_NODE_HAS_STATUS(DT_NODELABEL(i2c1a), okay) && CONFIG_I2C_NPCM4XX
+ /* DEVALT5D, DEVALTA */
+ SIG_DEFINE(SCL1A, K10, SIG_DESC_SET(0x5D, 2), SIG_DESC_SET(0x1A, 0))
+-- 
+2.43.0
+

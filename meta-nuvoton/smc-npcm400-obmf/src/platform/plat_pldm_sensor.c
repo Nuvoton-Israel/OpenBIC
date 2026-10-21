@@ -1,0 +1,694 @@
+/*
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#include <logging/log.h>
+#include "pmbus.h"
+#include "npcm4xx_adc.h"
+#include "pdr.h"
+#include "sensor.h"
+#include "pldm_sensor.h"
+#include "pldm_monitor.h"
+#include "plat_hook.h"
+#include "plat_pldm_sensor.h"
+
+LOG_MODULE_REGISTER(plat_pldm_sensor);
+
+static struct pldm_sensor_thread pal_pldm_sensor_thread[MAX_SENSOR_THREAD_ID] = {
+	{ ADC_SENSOR_THREAD_ID, "ADC_PLDM_SENSOR_THREAD" },
+};
+
+pldm_state_sensor_info plat_pldm_state_sensor_table[] = {
+    {
+        {
+            /*** PDR common header ***/
+            {
+                .record_handle = 0x00000000,
+                .PDR_header_version = 0x01,
+				.PDR_type = PLDM_STATE_SENSOR_PDR,
+                .record_change_number = 0x0000,
+                .data_length = 0x0000,
+            },
+
+            /*** state sensor format ***/
+            .terminus_handle = 0x0000,
+            .sensor_id = 0x0030,
+            .entity_type = PLDM_ENTITY_IO_CONTROLLER,
+            .entity_instance = 0x0001,
+            .container_id = 0x0000,
+            .sensor_init = PDR_SENSOR_USEINIT_PDR,
+            .sensor_auxiliary_names_pdr = 0x01,
+            .composite_sensor_count= 0x01,
+
+			/***  state_sensor_possible_states***/
+            {
+				.state_set_id = 13,
+				.possible_states_size = 1,
+				.states[0]= { .byte = 0xf },
+			},
+		},
+        {
+            .port = 26,
+            .access_checker = stby_access,
+        },
+    },
+};
+
+
+pldm_sensor_info plat_pldm_sensor_adc_table[] = {
+	{
+		{
+			// AVSB Voltage
+			/*** PDR common header***/
+			{
+				0x00000000, //uint32_t record_handle
+				0x01, //uint8_t PDR_header_version
+				PLDM_NUMERIC_SENSOR_PDR, //uint8_t PDR_type
+				0x0000, //uint16_t record_change_number
+				0x0000, //uint16_t data_length
+			},
+
+			/***numeric sensor format***/
+			0x0000, //uint16_t PLDM_terminus_handle;
+			0x0020, //uint16_t sensor_id;
+			0x0087, //uint16_t entity_type;
+			0x0002, //uint16_t entity_instance_number;
+			0x0000, //uint16_t container_id;
+			PDR_SENSOR_USEINIT_PDR, //uint8_t sensor_init;
+			0x01, //uint8_t sensor_auxiliary_names_pdr;
+			0x05, //uint8_t base_unit;
+			-5, //int8_t unit_modifier;
+			0x00, //uint8_t rate_unit;
+			0x00, //uint8_t base_oem_unit_handle;
+			0x00, //uint8_t aux_unit;
+			0x00, //int8_t aux_unit_modifier;
+			0x00, //uint8_t auxrate_unit;
+			0x00, //uint8_t rel;
+			0x00, //uint8_t aux_oem_unit_handle;
+			0x00, //uint8_t is_linear;
+			0x04, //uint8_t sensor_data_size;
+			1, //int32_t resolution;
+			0, //int32_t offset;
+			0x0000, //uint16_t accuracy;
+			0x00, //uint8_t plus_tolerance;
+			0x00, //uint8_t minus_tolerance;
+			0x00000000, //uint32_t hysteresis;
+			0xFF, //uint8_t supported_thresholds;
+			0x00, //uint8_t threshold_and_hysteresis_volatility;
+			0, //real32_t state_transition_interval;
+			UPDATE_INTERVAL_1S, //int32_t update_interval;
+			0x00054984, //uint32_t max_readable;
+			0x0004C89C, //uint32_t min_readable;
+			0x04, //uint8_t range_field_format;
+			0xFF, //uint8_t range_field_support;
+			0x00000000, //uint32_t nominal_value;
+			0x00000000, //uint32_t normal_max;
+			0x00000000, //uint32_t normal_min;
+			0x00056496, //uint32_t warning_high;
+			0x0004B01E, //uint32_t warning_low;
+			0x0005721F, //uint32_t critical_high;
+			0x0004A3DF, //uint32_t critical_low;
+			0x000617C4, //uint32_t fatal_high;
+			0x00038658, //uint32_t fatal_low;
+		},
+		.update_time = 0,
+		{
+			.type = sensor_dev_npcm4xx_adc,
+			.port = ADC_PORT0,
+			.access_checker = stby_access,
+			.sample_count = SAMPLE_COUNT_DEFAULT,
+			.arg0 = 66,
+			.arg1 = 10,
+			.init_args = &npcm_adc_init_args[0],
+			.cache = 0,
+			.cache_status = PLDM_SENSOR_INITIALIZING,
+		},
+	},
+	{
+		{
+			// VSB Voltage
+			/*** PDR common header***/
+			{
+				0x00000000, //uint32_t record_handle
+				0x01, //uint8_t PDR_header_version
+				PLDM_NUMERIC_SENSOR_PDR, //uint8_t PDR_type
+				0x0000, //uint16_t record_change_number
+				0x0000, //uint16_t data_length
+			},
+
+			/***numeric sensor format***/
+			0x0000, //uint16_t PLDM_terminus_handle;
+			0x0021, //uint16_t sensor_id;
+			0x0087, //uint16_t entity_type;
+			0x0003, //uint16_t entity_instance_number;
+			0x0000, //uint16_t container_id;
+			PDR_SENSOR_USEINIT_PDR, //uint8_t sensor_init;
+			0x01, //uint8_t sensor_auxiliary_names_pdr;
+			0x05, //uint8_t base_unit;
+			-5, //int8_t unit_modifier;
+			0x00, //uint8_t rate_unit;
+			0x00, //uint8_t base_oem_unit_handle;
+			0x00, //uint8_t aux_unit;
+			0x00, //int8_t aux_unit_modifier;
+			0x00, //uint8_t auxrate_unit;
+			0x00, //uint8_t rel;
+			0x00, //uint8_t aux_oem_unit_handle;
+			0x00, //uint8_t is_linear;
+			0x04, //uint8_t sensor_data_size;
+			1, //int32_t resolution;
+			0, //int32_t offset;
+			0x0000, //uint16_t accuracy;
+			0x00, //uint8_t plus_tolerance;
+			0x00, //uint8_t minus_tolerance;
+			0x00000000, //uint32_t hysteresis;
+			0xFF, //uint8_t supported_thresholds;
+			0x00, //uint8_t threshold_and_hysteresis_volatility;
+			0, //real32_t state_transition_interval;
+			UPDATE_INTERVAL_1S, //int32_t update_interval;
+			0x00054984, //uint32_t max_readable;
+			0x0004C89C, //uint32_t min_readable;
+			0x04, //uint8_t range_field_format;
+			0xFF, //uint8_t range_field_support;
+			0x00000000, //uint32_t nominal_value;
+			0x00000000, //uint32_t normal_max;
+			0x00000000, //uint32_t normal_min;
+			0x00056496, //uint32_t warning_high;
+			0x0004B01E, //uint32_t warning_low;
+			0x0005721F, //uint32_t critical_high;
+			0x0004A3DF, //uint32_t critical_low;
+			0x000617C4, //uint32_t fatal_high;
+			0x00038658, //uint32_t fatal_low;
+		},
+		.update_time = 0,
+		{
+			.type = sensor_dev_npcm4xx_adc,
+			.port = ADC_PORT1,
+			.access_checker = stby_access,
+			.sample_count = SAMPLE_COUNT_DEFAULT,
+			.arg0 = 66,
+			.arg1 = 10,
+			.init_args = &npcm_adc_init_args[0],
+			.cache = 0,
+			.cache_status = PLDM_SENSOR_INITIALIZING,
+		},
+	},
+	{
+		{
+			// VCC Voltage
+			/*** PDR common header***/
+			{
+				0x00000000, //uint32_t record_handle
+				0x01, //uint8_t PDR_header_version
+				PLDM_NUMERIC_SENSOR_PDR, //uint8_t PDR_type
+				0x0000, //uint16_t record_change_number
+				0x0000, //uint16_t data_length
+			},
+
+			/***numeric sensor format***/
+			0x0000, //uint16_t PLDM_terminus_handle;
+			0x0022, //uint16_t sensor_id;
+			0x0087, //uint16_t entity_type;
+			0x0004, //uint16_t entity_instance_number;
+			0x0000, //uint16_t container_id;
+			PDR_SENSOR_USEINIT_PDR, //uint8_t sensor_init;
+			0x01, //uint8_t sensor_auxiliary_names_pdr;
+			0x05, //uint8_t base_unit;
+			-5, //int8_t unit_modifier;
+			0x00, //uint8_t rate_unit;
+			0x00, //uint8_t base_oem_unit_handle;
+			0x00, //uint8_t aux_unit;
+			0x00, //int8_t aux_unit_modifier;
+			0x00, //uint8_t auxrate_unit;
+			0x00, //uint8_t rel;
+			0x00, //uint8_t aux_oem_unit_handle;
+			0x00, //uint8_t is_linear;
+			0x04, //uint8_t sensor_data_size;
+			1, //int32_t resolution;
+			0, //int32_t offset;
+			0x0000, //uint16_t accuracy;
+			0x00, //uint8_t plus_tolerance;
+			0x00, //uint8_t minus_tolerance;
+			0x00000000, //uint32_t hysteresis;
+			0xFF, //uint8_t supported_thresholds;
+			0x00, //uint8_t threshold_and_hysteresis_volatility;
+			0, //real32_t state_transition_interval;
+			UPDATE_INTERVAL_1S, //int32_t update_interval;
+			0x00054984, //uint32_t max_readable;
+			0x0004C89C, //uint32_t min_readable;
+			0x04, //uint8_t range_field_format;
+			0xFF, //uint8_t range_field_support;
+			0x00000000, //uint32_t nominal_value;
+			0x00000000, //uint32_t normal_max;
+			0x00000000, //uint32_t normal_min;
+			0x00056496, //uint32_t warning_high;
+			0x0004B01E, //uint32_t warning_low;
+			0x0005721F, //uint32_t critical_high;
+			0x0004A3DF, //uint32_t critical_low;
+			0x000617C4, //uint32_t fatal_high;
+			0x00038658, //uint32_t fatal_low;
+		},
+		.update_time = 0,
+		{
+			.type = sensor_dev_npcm4xx_adc,
+			.port = ADC_PORT2,
+			.access_checker = stby_access,
+			.sample_count = SAMPLE_COUNT_DEFAULT,
+			.arg0 = 66,
+			.arg1 = 10,
+			.init_args = &npcm_adc_init_args[0],
+			.cache = 0,
+			.cache_status = PLDM_SENSOR_INITIALIZING,
+		},
+	},
+	{
+		{
+			// VHIF Voltage
+			/*** PDR common header***/
+			{
+				0x00000000, //uint32_t record_handle
+				0x01, //uint8_t PDR_header_version
+				PLDM_NUMERIC_SENSOR_PDR, //uint8_t PDR_type
+				0x0000, //uint16_t record_change_number
+				0x0000, //uint16_t data_length
+			},
+
+			/***numeric sensor format***/
+			0x0000, //uint16_t PLDM_terminus_handle;
+			0x0023, //uint16_t sensor_id;
+			0x0087, //uint16_t entity_type;
+			0x0005, //uint16_t entity_instance_number;
+			0x0000, //uint16_t container_id;
+			PDR_SENSOR_USEINIT_PDR, //uint8_t sensor_init;
+			0x01, //uint8_t sensor_auxiliary_names_pdr;
+			0x05, //uint8_t base_unit;
+			-5, //int8_t unit_modifier;
+			0x00, //uint8_t rate_unit;
+			0x00, //uint8_t base_oem_unit_handle;
+			0x00, //uint8_t aux_unit;
+			0x00, //int8_t aux_unit_modifier;
+			0x00, //uint8_t auxrate_unit;
+			0x00, //uint8_t rel;
+			0x00, //uint8_t aux_oem_unit_handle;
+			0x00, //uint8_t is_linear;
+			0x04, //uint8_t sensor_data_size;
+			1, //int32_t resolution;
+			0, //int32_t offset;
+			0x0000, //uint16_t accuracy;
+			0x00, //uint8_t plus_tolerance;
+			0x00, //uint8_t minus_tolerance;
+			0x00000000, //uint32_t hysteresis;
+			0xFF, //uint8_t supported_thresholds;
+			0x00, //uint8_t threshold_and_hysteresis_volatility;
+			0, //real32_t state_transition_interval;
+			UPDATE_INTERVAL_1S, //int32_t update_interval;
+			0x000049D4, //uint32_t max_readable;
+			0x000042CC, //uint32_t min_readable;
+			0x04, //uint8_t range_field_format;
+			0xFF, //uint8_t range_field_support;
+			0x00000000, //uint32_t nominal_value;
+			0x00000000, //uint32_t normal_max;
+			0x00000000, //uint32_t normal_min;
+			0x0002E64A, //uint32_t warning_high;
+			0x00029580, //uint32_t warning_low;
+			0x0002ED91, //uint32_t critical_high;
+			0x00028EC0, //uint32_t critical_low;
+			0x00032FA0, //uint32_t fatal_high;
+			0x00023280, //uint32_t fatal_low;
+		},
+		.update_time = 0,
+		{
+			.type = sensor_dev_npcm4xx_adc,
+			.port = ADC_PORT3,
+			.access_checker = stby_access,
+			.sample_count = SAMPLE_COUNT_DEFAULT,
+			.arg0 = 66,
+			.arg1 = 10,
+			.init_args = &npcm_adc_init_args[0],
+			.cache = 0,
+			.cache_status = PLDM_SENSOR_INITIALIZING,
+		},
+	},
+};
+
+PDR_sensor_auxiliary_names plat_pdr_sensor_aux_names_table[] = {
+	{
+		// AVSB
+		/*** PDR common header***/
+		{
+			.record_handle = 0x00000000,
+			.PDR_header_version = 0x01,
+			.PDR_type = PLDM_SENSOR_AUXILIARY_NAMES_PDR,
+			.record_change_number = 0x0000,
+			.data_length = 0x0000,
+		},
+		.terminus_handle = 0x0000,
+		.sensor_id = 0x0020,
+		.sensor_count = 0x1,
+		.nameStringCount = 0x1,
+		.nameLanguageTag = "en",
+		.sensorName = u"AVSB",
+	},
+	{
+		// VSB
+		/*** PDR common header***/
+		{
+			.record_handle = 0x00000000,
+			.PDR_header_version = 0x01,
+			.PDR_type = PLDM_SENSOR_AUXILIARY_NAMES_PDR,
+			.record_change_number = 0x0000,
+			.data_length = 0x0000,
+		},
+		.terminus_handle = 0x0000,
+		.sensor_id = 0x0021,
+		.sensor_count = 0x1,
+		.nameStringCount = 0x1,
+		.nameLanguageTag = "en",
+		.sensorName = u"VSB",
+	},
+	{
+		// VCC
+		/*** PDR common header***/
+		{
+			.record_handle = 0x00000000,
+			.PDR_header_version = 0x01,
+			.PDR_type = PLDM_SENSOR_AUXILIARY_NAMES_PDR,
+			.record_change_number = 0x0000,
+			.data_length = 0x0000,
+		},
+		.terminus_handle = 0x0000,
+		.sensor_id = 0x0022,
+		.sensor_count = 0x1,
+		.nameStringCount = 0x1,
+		.nameLanguageTag = "en",
+		.sensorName = u"VCC",
+	},
+	{
+		// VHIF
+		/*** PDR common header***/
+		{
+			.record_handle = 0x00000000,
+			.PDR_header_version = 0x01,
+			.PDR_type = PLDM_SENSOR_AUXILIARY_NAMES_PDR,
+			.record_change_number = 0x0000,
+			.data_length = 0x0000,
+		},
+		.terminus_handle = 0x0000,
+		.sensor_id = 0x0023,
+		.sensor_count = 0x1,
+		.nameStringCount = 0x1,
+		.nameLanguageTag = "en",
+		.sensorName = u"VHIF",
+	},
+	{
+		// GPIO26
+		/*** PDR common header***/
+		{
+			.record_handle = 0x00000000,
+			.PDR_header_version = 0x01,
+			.PDR_type = PLDM_SENSOR_AUXILIARY_NAMES_PDR,
+			.record_change_number = 0x0000,
+			.data_length = 0x0000,
+		},
+		.terminus_handle = 0x0000,
+		.sensor_id = 0x0030,
+		.sensor_count = 0x1,
+		.nameStringCount = 0x1,
+		.nameLanguageTag = "en",
+		.sensorName = u"GPIO26",
+	},
+};
+
+PDR_entity_auxiliary_names plat_pdr_entity_aux_names_table[] = { {
+	{
+		.record_handle = 0x00000000,
+		.PDR_header_version = 0x01,
+		.PDR_type = PLDM_ENTITY_AUXILIARY_NAMES_PDR,
+		.record_change_number = 0x0000,
+		.data_length = 0x0000,
+	},
+	.entity_type = 0x0000,
+	.entity_instance_number = 0x0001,
+	.container_id = 0x0000,
+	.shared_name_count = 0x0,
+	.nameStringCount = 0x1,
+	.nameLanguageTag = "en",
+} };
+
+uint32_t plat_get_pdr_size(uint8_t pdr_type)
+{
+	int total_size = 0, i = 0;
+
+	switch (pdr_type) {
+	case PLDM_STATE_SENSOR_PDR:
+		total_size += ARRAY_SIZE(plat_pldm_state_sensor_table);
+		break;
+	case PLDM_NUMERIC_SENSOR_PDR:
+		for (i = 0; i < MAX_SENSOR_THREAD_ID; i++) {
+			total_size += plat_pldm_sensor_get_sensor_count(i);
+		}
+		break;
+	case PLDM_SENSOR_AUXILIARY_NAMES_PDR:
+		total_size = ARRAY_SIZE(plat_pdr_sensor_aux_names_table);
+		break;
+	case PLDM_ENTITY_AUXILIARY_NAMES_PDR:
+		total_size = ARRAY_SIZE(plat_pdr_entity_aux_names_table);
+		break;
+	default:
+		break;
+	}
+
+	return total_size;
+}
+
+void plat_load_aux_sensor_names_pdr_table(PDR_sensor_auxiliary_names *aux_sensor_name_table)
+{
+	memcpy(aux_sensor_name_table, &plat_pdr_sensor_aux_names_table,
+	       sizeof(plat_pdr_sensor_aux_names_table));
+}
+
+uint16_t plat_pdr_entity_aux_names_table_size = 0;
+
+// Custom function to calculate the length of a char16_t string
+size_t char16_strlen(const char16_t *str)
+{
+	const char16_t *s = str;
+	while (*s)
+		++s;
+	return s - str;
+}
+
+// Custom function to copy a char16_t string
+char16_t *char16_strcpy(char16_t *dest, const char16_t *src)
+{
+	char16_t *d = dest;
+	while ((*d++ = *src++))
+		;
+	return dest;
+}
+
+// Custom function to concatenate a char16_t character to a string
+char16_t *char16_strcat_char(char16_t *dest)
+{
+	size_t len = char16_strlen(dest);
+	dest[len] = u'\0';
+	return dest;
+}
+
+char16_t *entityName = NULL;
+size_t entityName_len = 0;
+
+void plat_init_entity_aux_names_pdr_table()
+{
+	// Base name
+	const char16_t base_name[] = u"NPCM";
+
+	// Calculate the length of the base name
+	size_t base_len = char16_strlen(base_name);
+
+	// Calculate the required length for the final string (base name + 1 digit + null terminator)
+	size_t total_len = base_len + 1;
+	// Ensure the final length does not exceed MAX_AUX_SENSOR_NAME_LEN
+	if (total_len > MAX_AUX_SENSOR_NAME_LEN) {
+		total_len = MAX_AUX_SENSOR_NAME_LEN;
+	}
+
+	// Create a buffer for the full name
+	char16_t full_name[MAX_AUX_SENSOR_NAME_LEN] = { 0 };
+
+	// Copy base name to full name, with length limit
+	char16_strcpy(full_name, base_name);
+
+	// Append slot ID as a character, ensuring it fits within the buffer
+	if (base_len + 1 < MAX_AUX_SENSOR_NAME_LEN) {
+		char16_strcat_char(full_name);
+	}
+
+	entityName = (char16_t *)malloc(total_len * sizeof(char16_t));
+	entityName_len = total_len;
+
+	// Now copy the full name to the entityName field of your structure
+	char16_strcpy(entityName, full_name);
+
+	plat_pdr_entity_aux_names_table_size =
+		sizeof(PDR_entity_auxiliary_names) + (total_len * sizeof(char16_t));
+}
+
+void plat_load_entity_aux_names_pdr_table(PDR_entity_auxiliary_names *entity_aux_name_table)
+{
+	memcpy(entity_aux_name_table, &plat_pdr_entity_aux_names_table,
+	       plat_pdr_entity_aux_names_table_size - entityName_len * sizeof(char16_t));
+
+	memcpy(entity_aux_name_table->entityName, entityName, entityName_len * sizeof(char16_t));
+}
+
+uint16_t plat_get_pdr_entity_aux_names_size()
+{
+	return plat_pdr_entity_aux_names_table_size;
+}
+
+pldm_sensor_thread *plat_pldm_sensor_load_thread()
+{
+	return pal_pldm_sensor_thread;
+}
+
+pldm_sensor_info *plat_pldm_sensor_load(int thread_id)
+{
+	switch (thread_id) {
+	case ADC_SENSOR_THREAD_ID:
+		return plat_pldm_sensor_adc_table;
+	default:
+		LOG_ERR("Unknow pldm sensor thread id %d", thread_id);
+		return NULL;
+	}
+}
+
+int plat_pldm_sensor_get_sensor_count(int thread_id)
+{
+	int count = 0;
+
+	switch (thread_id) {
+	case ADC_SENSOR_THREAD_ID:
+		count = ARRAY_SIZE(plat_pldm_sensor_adc_table);
+		break;
+	default:
+		count = -1;
+		LOG_ERR("Unknow pldm sensor thread id %d", thread_id);
+		break;
+	}
+
+	return count;
+}
+
+void plat_load_numeric_sensor_pdr_table(PDR_numeric_sensor *numeric_sensor_table)
+{
+	int thread_id = 0, sensor_num = 0;
+	int max_sensor_num = 0, current_sensor_size = 0;
+	uint32_t total_size = plat_get_pdr_size(PLDM_NUMERIC_SENSOR_PDR);
+	pldm_sensor_info *pdr_table = NULL;
+
+	for (thread_id = 0; thread_id < MAX_SENSOR_THREAD_ID; thread_id++) {
+		pdr_table = plat_pldm_sensor_load(thread_id);
+		if (pdr_table == NULL) {
+			LOG_ERR("Failed to get pdr table, thread id: 0x%x", thread_id);
+			continue;
+		}
+
+		max_sensor_num = plat_pldm_sensor_get_sensor_count(thread_id);
+		if (max_sensor_num < 0) {
+			LOG_ERR("Failed to get sensor count, thread id: 0x%x", thread_id);
+			continue;
+		}
+
+		for (sensor_num = 0; sensor_num < max_sensor_num; sensor_num++) {
+			if (current_sensor_size >= total_size) {
+				LOG_ERR("Load numeric sensor pdr exceeded table size, total size: 0x%x, current thread: 0x%x, sensor id: 0x%x",
+					total_size, thread_id,
+					pdr_table[sensor_num].pdr_numeric_sensor.sensor_id);
+				continue;
+			}
+
+			memcpy(&numeric_sensor_table[current_sensor_size],
+			       &pdr_table[sensor_num].pdr_numeric_sensor,
+			       sizeof(PDR_numeric_sensor));
+			current_sensor_size++;
+		}
+	}
+}
+
+void plat_load_state_sensor_pdr_table(PDR_state_sensor *state_sensor_table)
+{
+	int sensor_num = 0;
+	int max_sensor_num = 0, current_sensor_size = 0;
+	uint32_t total_size = plat_get_pdr_size(PLDM_STATE_SENSOR_PDR);
+	pldm_state_sensor_info *pdr_table = plat_pldm_state_sensor_table;
+
+	if (pdr_table == NULL) {
+		LOG_ERR("Failed to get state sensor pdr table");
+		return;
+	}
+
+	max_sensor_num = ARRAY_SIZE(plat_pldm_state_sensor_table);
+	if (max_sensor_num < 0) {
+		LOG_ERR("Failed to get state sensor count");
+		return;
+	}
+
+	for (sensor_num = 0; sensor_num < max_sensor_num; sensor_num++) {
+		if (current_sensor_size >= total_size) {
+			LOG_ERR("Load state sensor pdr exceeded table size, total size: 0x%x, sensor id: 0x%x",
+				total_size,
+				pdr_table[sensor_num].pdr_state_sensor.sensor_id);
+			continue;
+		}
+
+		memcpy(&state_sensor_table[current_sensor_size],
+		       &pdr_table[sensor_num].pdr_state_sensor, sizeof(PDR_state_sensor));
+		current_sensor_size++;
+	}
+}
+
+uint8_t plat_pldm_state_sensor_get_reading(uint16_t sensor_id, struct pldm_get_state_sensor_reading_resp *res_p)
+{
+	int sensor_num = 0;
+	int max_sensor_num = 0;
+	pldm_state_sensor_info *pdr_table = plat_pldm_state_sensor_table;
+
+	if (pdr_table == NULL) {
+		LOG_ERR("Failed to get state sensor pdr table");
+		return PLDM_ERROR;
+	}
+
+	max_sensor_num = ARRAY_SIZE(plat_pldm_state_sensor_table);
+	if (max_sensor_num < 0) {
+		LOG_ERR("Failed to get state sensor count");
+		return PLDM_ERROR;
+	}
+
+	for (sensor_num = 0; sensor_num < max_sensor_num; sensor_num++) {
+		if (pdr_table[sensor_num].pdr_state_sensor.sensor_id == sensor_id) {
+
+			state_sensor_reading_state_field_t *field = (state_sensor_reading_state_field_t*)res_p->field;
+
+			res_p->composite_sensor_count = pdr_table[sensor_num].pdr_state_sensor.composite_sensor_count;
+			field->sensor_op_state = PLDM_SENSOR_ENABLED;
+			field->previous_state = PLDM_SENSOR_NORMAL;
+			field->present_state = PLDM_SENSOR_NORMAL;
+			field->event_state = PLDM_SENSOR_NORMAL;
+			return PLDM_SUCCESS;
+		}
+	}
+
+	return PLDM_ERROR_INVALID_DATA;
+}

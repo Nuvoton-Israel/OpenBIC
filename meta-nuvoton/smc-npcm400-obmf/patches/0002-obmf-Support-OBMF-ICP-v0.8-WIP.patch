@@ -1,0 +1,37 @@
+From 36fa9180686b7c38ab55f0426cef62c09b9b34e5 Mon Sep 17 00:00:00 2001
+From: Mia Lin <mimi05633@gmail.com>
+Date: Thu, 30 Apr 2026 09:42:56 +0000
+Subject: [PATCH] obmf: Support OBMF-ICP v0.8 WIP
+
+Signed-off-by: Mia Lin <mimi05633@gmail.com>
+---
+ subsys/usb/class/obmf.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/subsys/usb/class/obmf.c b/subsys/usb/class/obmf.c
+index 3c282ab81f3..d88f6f8e466 100644
+--- a/subsys/usb/class/obmf.c
++++ b/subsys/usb/class/obmf.c
+@@ -124,7 +124,7 @@ struct usb_obmf_iface_str_descr obmf_iface_str = {
+ 		.wMaxRdTransferSize = sys_cpu_to_le16(rd_size), \
+ 		.wMaxWrInterruptSize = sys_cpu_to_le16(wr_int_size), \
+ 		.wMaxRdInterruptSize = sys_cpu_to_le16(rd_int_size), \
+-		.bcdOCPOBMFVersion = sys_cpu_to_le16(0x0100), /* 1.0 */ \
++		.bcdOCPOBMFVersion = sys_cpu_to_le16(0x0080), /* 0.80 */ \
+ 	}
+ 
+ #define INITIALIZER_EP_DESC(addr, attr, mps, interval) \
+@@ -198,8 +198,8 @@ void usb_obmf_register_device(const struct device *dev, const struct obmf_ops *o
+ 		&usb_obmf_devlist);
+ }
+ 
+-/* Minimum OBMF-ICP message size (header only, 3 bytes) */
+-#define OBMF_ICP_HEADER_SIZE 3
++/* Minimum OBMF-ICP message size (common header, 5 bytes) */
++#define OBMF_ICP_HEADER_SIZE 5
+ 
+ static void obmf_out_cb(uint8_t ep, enum usb_dc_ep_cb_status_code ep_status)
+ {
+-- 
+2.43.0
+
