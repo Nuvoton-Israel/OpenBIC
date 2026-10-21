@@ -34,7 +34,7 @@ To view the debug log, connect a UART-to-USB adapter to the UART pins on the boa
 ### Building the Project
 Run the following command to build the OpenBIC firmware for NPCM400:
 ```bash
-west -z zephyr_nuvoton build -p always -b npcm400f_evb openbic/meta-nuvoton/smc-mn/
+west -z zephyr_nuvoton build -p always -b npcm400f_evb openbic/meta-nuvoton/smc-npcm400/
 ```
 
 ### Flash Programming
@@ -91,7 +91,7 @@ The NPCM400F supports J-Link flash programming.
    ```
 
 5. **Sensor Data (SDR)**:
-   If PLDM sensors are enabled in [plat_def.h](https://github.com/Nuvoton-Israel/OpenBIC/blob/npcm_main_rebase/meta-nuvoton/smc-mn/src/platform/plat_def.h), retrieve ADC data via BMC:
+   If PLDM sensors are enabled in [plat_def.h](https://github.com/Nuvoton-Israel/OpenBIC/blob/npcm_main_rebase/meta-nuvoton/smc-npcm400/src/platform/plat_def.h), retrieve ADC data via BMC:
    ```bash
    ipmitool sdr
    ```
@@ -110,7 +110,7 @@ The NPCM400F supports J-Link flash programming.
    ```bash
    python3 pldm_fwup_pkg_creator.py SMCNPCM_signed_with_header.bin npcm400.json SMCNPCM_signed.bin
    ```
-   The `npcm400.json` you can find from "[meta-nuvoton/smc-mn/pldm_fw_package/npcm400.json](https://github.com/Nuvoton-Israel/OpenBIC/blob/npcm_main_rebase/meta-nuvoton/smc-mn/pldm_fw_package/npcm400.json)"
+   The `npcm400.json` you can find from "[meta-nuvoton/smc-npcm400/pldm_fw_package/npcm400.json](https://github.com/Nuvoton-Israel/OpenBIC/blob/npcm_main_rebase/meta-nuvoton/smc-npcm400/pldm_fw_package/npcm400.json)"
 
 2. **Transfer to BMC**:
    ```bash

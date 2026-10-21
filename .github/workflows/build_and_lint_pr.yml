@@ -17,7 +17,7 @@ jobs:
         # This job matrix will generate a separate job for all platforms listed.
         # Add platforms in alphabetical order.
         platform: [
-          smc-mn,
+          smc-npcm400,
         ]
         # Need to set this to false otherwise it will cancel all platform builds if one fails.
       fail-fast: false

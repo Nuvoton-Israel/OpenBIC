@@ -18,7 +18,7 @@ The board configuration files can be found in the `configs/` directory.
 The currently supported boards are:
 * NPCM400 EVB
 
-For Nuvoton SMC specific documentation, please refer to [meta-nuvoton/smc-mn/README.md](meta-nuvoton/smc-mn/README.md).
+For Nuvoton SMC specific documentation, please refer to [meta-nuvoton/smc-npcm400/README.md](meta-nuvoton/smc-npcm400/README.md).
 
 ## Build Instructions
 
@@ -75,7 +75,7 @@ chmod +x zephyr-sdk-0.12.4-x86_64-linux-setup.run
 
 Clean build application and Zephyr code
 ```
-west -z zephyr_nuvoton build -p always -b npcm400f_evb openbic/meta-nuvoton/smc-mn/
+west -z zephyr_nuvoton build -p always -b npcm400f_evb openbic/meta-nuvoton/smc-npcm400/
 ```
 
 ## Contributing
