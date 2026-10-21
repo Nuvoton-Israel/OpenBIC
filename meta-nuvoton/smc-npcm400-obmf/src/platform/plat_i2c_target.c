@@ -42,9 +42,16 @@ const bool I2C_TARGET_ENABLE_TABLE[MAX_TARGET_NUM] = {
 	TARGET_DISABLE, TARGET_DISABLE, TARGET_DISABLE, TARGET_DISABLE,
 };
 
-/* I2C target init-config table, 8-bit address */
+/*
+ * I2C target init-config table, 8-bit address.
+ *
+ * The address is the host (BMC) address on the OBMF I2C Controller virtual
+ * adaptor, i.e. the source address the BMC puts in its SMBus requests. A
+ * device behind the OBMF I2C Controller channel writes its response to it,
+ * so it must not collide with any device address on the same bus.
+ */
 const struct _i2c_target_config I2C_TARGET_CONFIG_TABLE[MAX_TARGET_NUM] = {
-	{ 0x20, 0xA }, { 0x20, 0xA }, { 0xFF, 0xA }, { 0xFF, 0xA },
+	{ 0x24, 0xA }, { 0x28, 0xA }, { 0xFF, 0xA }, { 0xFF, 0xA },
 	{ 0xFF, 0xA }, { 0xFF, 0xA }, { 0xFF, 0xA }, { 0xFF, 0xA },
 	{ 0xFF, 0xA }, { 0xFF, 0xA }, { 0xFF, 0xA }, { 0xFF, 0xA },
 	{ 0xFF, 0xA }, { 0xFF, 0xA }, { 0xFF, 0xA }, { 0xFF, 0xA },
