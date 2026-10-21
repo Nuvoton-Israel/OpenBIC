@@ -78,4 +78,5 @@
 #define DISABLE_TMP431
 #define DISABLE_MP2971
 #define DISABLE_INTEL_PECI
+#define DISABLE_TPS25990
 #endif
