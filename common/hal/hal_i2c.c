@@ -173,6 +173,12 @@ int i2c_master_read(I2C_MSG *msg, uint8_t retry)
 			LOG_HEXDUMP_DBG(msg->data, msg->rx_len, "rxbuf");
 			break;
 		}
+#ifdef CONFIG_USB_DEVICE_OBMF
+		/* Only retry when the bus is busy, report other errors right away */
+		else if (ret != -EAGAIN) {
+			break;
+		}
+#endif
 	}
 
 	if (i > retry)
@@ -227,6 +233,12 @@ int i2c_master_write(I2C_MSG *msg, uint8_t retry)
 		ret = i2c_write(dev_i2c[msg->bus], txbuf, msg->tx_len, msg->target_addr);
 		if (ret == 0) // i2c write success
 			break;
+#ifdef CONFIG_USB_DEVICE_OBMF
+		/* Only retry when the bus is busy, report other errors right away */
+		else if (ret != -EAGAIN) {
+			break;
+		}
+#endif
 	}
 
 	if (i > retry)

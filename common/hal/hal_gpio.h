@@ -182,6 +182,7 @@ void gpio_show(void);
 int gpio_get(uint8_t);
 int gpio_set(uint8_t, uint8_t);
 bool pal_load_gpio_config(void);
+void plat_obmf_gpio_irq_cb(uint8_t gpio_num);
 int gpio_init(const struct device *args);
 int gpio_interrupt_conf(uint8_t, gpio_flags_t);
 uint8_t gpio_get_reg_value(uint8_t gpio_num, uint8_t reg_offset);

@@ -79,7 +79,7 @@ uint8_t mctp_ctrl_cmd_set_endpoint_id(void *mctp_inst, uint8_t *buf, uint16_t le
 		for (uint8_t i = 0; i < plat_mctp_port_count; i++) {
 			mctp_port *port = plat_get_mctp_port(i);
 			if (port != NULL) {
-				if (port->mctp_inst->medium_type == inst->medium_type) {
+				if (port->mctp_inst == inst) {
 					port->mctp_inst->endpoint = req->eid;
 					break;
 				}

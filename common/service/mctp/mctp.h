@@ -91,6 +91,7 @@ typedef enum {
 	MCTP_MEDIUM_TYPE_CONTROLLER_I3C,
 	MCTP_MEDIUM_TYPE_TARGET_I3C,
 	MCTP_MEDIUM_TYPE_USB,
+	MCTP_MEDIUM_TYPE_OBMF_I2C,
 	MCTP_MEDIUM_TYPE_MAX
 } MCTP_MEDIUM_TYPE;
 
@@ -291,6 +292,8 @@ uint8_t mctp_bridge_msg(mctp *mctp_inst, uint8_t *buf, uint16_t len, mctp_ext_pa
 /* medium init/deinit */
 uint8_t mctp_smbus_init(mctp *mctp_inst, mctp_medium_conf medium_conf);
 uint8_t mctp_smbus_deinit(mctp *mctp_inst);
+uint8_t mctp_obmf_i2c_init(mctp *mctp_inst, mctp_medium_conf medium_conf);
+uint8_t mctp_obmf_i2c_deinit(mctp *mctp_inst);
 uint8_t mctp_i3c_controller_init(mctp *mctp_instance, mctp_medium_conf medium_conf);
 uint8_t mctp_i3c_target_init(mctp *mctp_instance, mctp_medium_conf medium_conf);
 uint8_t mctp_i3c_deinit(mctp *mctp_instance);

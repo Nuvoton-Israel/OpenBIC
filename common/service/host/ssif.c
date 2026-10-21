@@ -214,6 +214,7 @@ static bool ssif_pec_check(uint8_t addr, uint8_t *data, uint16_t len, uint8_t *i
 	return true;
 }
 
+#ifdef ENABLE_SSIF_RSP_PEC
 /**
  * @brief SSIF pec get function
  *
@@ -239,6 +240,7 @@ static uint8_t ssif_pec_get(uint8_t addr, uint8_t smb_cmd, uint8_t *data, uint16
 	/** pec byte use 7-degree polynomial with 0 init value and false reverse **/
 	return crc8(pec_buf, sizeof(pec_buf), 0x07, 0x00, false);
 }
+#endif
 
 static bool ssif_state_machine(ssif_dev *ssif_inst, ssif_status_t status)
 {
@@ -500,7 +502,7 @@ static bool ssif_data_handle(ssif_dev *ssif_inst, ssif_action_t action, uint8_t 
 
 				ipmi_msg_cfg ssif_rsp = { 0 };
 				ssif_rsp.buffer = msg;
-				ssif_rsp.buffer.netfn = ssif_rsp.buffer.netfn << 2;
+				ssif_rsp.buffer.netfn = (ssif_rsp.buffer.netfn | BIT(0)) << 2;
 				if (ssif_set_data(ssif_inst->index, &ssif_rsp) == false) {
 					LOG_ERR("SSIF[%d] failed to write ssif response data",
 						ssif_inst->index);

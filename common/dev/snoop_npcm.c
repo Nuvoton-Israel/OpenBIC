@@ -16,6 +16,9 @@
 #include "util_sys.h"
 #include "pldm_oem.h"
 #include "plat_mctp.h"
+#ifdef CONFIG_USB_DEVICE_OBMF
+#include "obmf.h"
+#endif
 
 #define POST_CODE_SIZE 4
 
@@ -119,12 +122,26 @@ bool pldm_send_post_code_to_bmc(uint16_t send_index)
 static void process_postcode(void *arvg0, void *arvg1, void *arvg2)
 {
 	uint16_t send_index = 0;
+#ifdef CONFIG_USB_DEVICE_OBMF
+	int ret;
+#endif
+
 	while (1) {
 		k_sem_take(&get_postcode_sem, K_FOREVER);
 		uint16_t current_read_index = snoop_read_index;
 		for (; send_index != current_read_index;
 		     send_index = (send_index + 1) % SNOOP_BUFFER_LEN) {
+#ifdef CONFIG_USB_DEVICE_OBMF
+			uint32_t post_val = snoop_read_buffer[send_index];
+			uint32_t write_len = proc_4byte_postcode_ok ?
+					     sizeof(uint32_t) : sizeof(uint8_t);
+			ret = obmf_io_write(OBMF_IO_POST_CODE_PORT,
+					    write_len, (uint8_t *)&post_val, true);
+			if (ret != 0 && ret != -ENETDOWN)
+				LOG_ERR("obmf_io_write failed: %d", ret);
+#else
 			pldm_send_post_code_to_bmc(send_index);
+#endif
 
 			k_yield();
 		}

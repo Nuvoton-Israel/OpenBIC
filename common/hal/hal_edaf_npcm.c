@@ -17,6 +17,9 @@
 #include "util_sys.h"
 #include "pldm_oem.h"
 #include "plat_mctp.h"
+#ifdef CONFIG_USB_DEVICE_OBMF
+#include "obmf.h"
+#endif
 
 LOG_MODULE_REGISTER(hal_edaf_npcm);
 #define safs_isr_STACK_SIZE 2048
@@ -173,7 +176,48 @@ static void safs_isr(void *arvg0, void *arvg1, void *arvg2)
 				LOG_ERR("Failed to write %u.", addr);
 			}
 		}
+#elif defined(CONFIG_USB_DEVICE_OBMF)
+		if (!obmf_channel_is_enabled(OBMF_ICP_MEM_DEV_CHANNEL)) {
+			LOG_WRN("flash cyc=%u len=%u: OBMF Mem Dev down, UNSUC", cyc, len);
+			resp_ioc.pkt[1] = ESPI_FLASH_UNSUC_CMPLT;
+		} else if (ESPI_FLASH_READ_CYCLE_TYPE == cyc) {
+			rc = obmf_mem_dev_read(addr, len, &resp_ioc.pkt[4]);
+			if (rc != 0) {
+				resp_ioc.pkt[1] = ESPI_FLASH_UNSUC_CMPLT;
+			} else {
+				resp_ioc.pkt[0] = ESPI_FLASH_RESP_LEN + len;
+				resp_ioc.pkt[1] = ESPI_FLASH_SUC_CMPLT_D_ONLY;
+				resp_ioc.pkt[2] = tag << 4 | (rwe_pkt->len_h & 0x0F);
+				resp_ioc.pkt[3] = rwe_pkt->len_l & 0xff;
+			}
+		} else if (ESPI_FLASH_WRITE_CYCLE_TYPE == cyc) {
+			rc = obmf_mem_dev_write(addr, rwe_pkt->data, len);
+			if (rc != 0) {
+				resp_ioc.pkt[1] = ESPI_FLASH_UNSUC_CMPLT;
+			}
+		} else if (ESPI_FLASH_ERASE_CYCLE_TYPE == cyc) {
+			uint32_t erase_size = 0;
 
+			switch (len) {
+			case ESPI_FLASH_ERASE_4K:
+				erase_size = 0x1000;
+				break;
+			case ESPI_FLASH_ERASE_64K:
+				erase_size = 0x10000;
+				break;
+			default:
+				resp_ioc.pkt[1] = ESPI_FLASH_UNSUC_CMPLT;
+				break;
+			}
+			if (erase_size) {
+				rc = obmf_mem_dev_erase(addr, erase_size);
+				if (rc != 0) {
+					resp_ioc.pkt[1] = ESPI_FLASH_UNSUC_CMPLT;
+				}
+			}
+		} else {
+			resp_ioc.pkt[1] = ESPI_FLASH_UNSUC_CMPLT;
+		}
 #else
 #ifdef ENABLE_EDAF_OVER_MCTP
 		if (rwe_pkt->cyc == ESPI_FLASH_READ_CYCLE_TYPE) {

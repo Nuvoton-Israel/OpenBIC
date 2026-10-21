@@ -35,6 +35,10 @@
 #include "ipmb.h"
 #include "util_sys.h"
 
+#ifdef CONFIG_USB_DEVICE_OBMF
+#include "obmf.h"
+#endif
+
 #ifdef ENABLE_PLDM
 #include "plat_mctp.h"
 #include "pldm_smbios.h"
@@ -42,6 +46,33 @@
 #endif
 
 LOG_MODULE_REGISTER(kcs);
+
+#ifdef CONFIG_USB_DEVICE_OBMF
+/* OBMF IPMI synchronous response context */
+static struct k_sem obmf_ipmi_rsp_sem;
+static struct {
+	uint8_t netfn_lun;
+	uint8_t cmd;
+	uint8_t cc;
+	uint8_t data[KCS_BUFF_SIZE];
+	uint16_t data_len;
+} obmf_ipmi_rsp_ctx;
+
+static void kcs_obmf_ipmi_rsp_cb(uint8_t netfn_lun, uint8_t cmd,
+				 uint8_t cc, const uint8_t *data,
+				 uint16_t data_len, void *ctx)
+{
+	ARG_UNUSED(ctx);
+	obmf_ipmi_rsp_ctx.netfn_lun = netfn_lun;
+	obmf_ipmi_rsp_ctx.cmd = cmd;
+	obmf_ipmi_rsp_ctx.cc = cc;
+	obmf_ipmi_rsp_ctx.data_len = MIN(data_len, sizeof(obmf_ipmi_rsp_ctx.data));
+	if (data && obmf_ipmi_rsp_ctx.data_len > 0) {
+		memcpy(obmf_ipmi_rsp_ctx.data, data, obmf_ipmi_rsp_ctx.data_len);
+	}
+	k_sem_give(&obmf_ipmi_rsp_sem);
+}
+#endif /* CONFIG_USB_DEVICE_OBMF */
 
 kcs_dev *kcs;
 static bool proc_kcs_ok = false;
@@ -433,7 +464,8 @@ static void kcs_read_task(void *arvg0, void *arvg1, void *arvg2)
 {
 	int rc = 0;
 	uint8_t ibuf[KCS_BUFF_SIZE];
-#if (!defined(ENABLE_PLDM) || defined(ENABLE_OEM_PLDM))
+#if !defined(CONFIG_USB_DEVICE_OBMF) && \
+	(!defined(ENABLE_PLDM) || defined(ENABLE_OEM_PLDM))
 	ipmi_msg bridge_msg;
 #if MAX_IPMB_ID
 	ipmb_error status;
@@ -581,7 +613,56 @@ static void kcs_read_task(void *arvg0, void *arvg1, void *arvg2)
 				}
 			}
 			SAFE_FREE(kcs_buff); // SAFE FREE kcs_buff
-#if (!defined(ENABLE_PLDM) || defined(ENABLE_OEM_PLDM))
+#ifdef CONFIG_USB_DEVICE_OBMF
+			/* Bridge IPMI request via OBMF ICP channel */
+			{
+				uint8_t netfn_lun = (netfn_no_lun << 2);
+				uint16_t data_len = (rc > 2) ? (rc - 2) : 0;
+				int ret;
+
+				ret = obmf_ipmi_send(netfn_lun, req->cmd,
+						     data_len ? &ibuf[2] : NULL,
+						     data_len);
+				if (ret < 0) {
+					if (ret != -ENETDOWN) {
+						LOG_ERR("obmf_ipmi_send fail, rc=%d", ret);
+					}
+					continue;
+				}
+
+				/* Wait for response with timeout */
+				if (k_sem_take(&obmf_ipmi_rsp_sem,
+					       K_MSEC(5000)) != 0) {
+					LOG_ERR("OBMF IPMI response timeout");
+					continue;
+				}
+
+				/* Write response back to KCS */
+				uint8_t *obmf_kcs_buff;
+				uint32_t rsp_total = 3 + obmf_ipmi_rsp_ctx.data_len;
+				obmf_kcs_buff = malloc(rsp_total);
+				if (obmf_kcs_buff == NULL) {
+					LOG_ERR("Memory allocation failed");
+					continue;
+				}
+				obmf_kcs_buff[0] = ((obmf_ipmi_rsp_ctx.netfn_lun >> 2)
+					       | BIT(0)) << 2;
+				obmf_kcs_buff[1] = obmf_ipmi_rsp_ctx.cmd;
+				obmf_kcs_buff[2] = obmf_ipmi_rsp_ctx.cc;
+				if (obmf_ipmi_rsp_ctx.data_len > 0) {
+					memcpy(&obmf_kcs_buff[3],
+					       obmf_ipmi_rsp_ctx.data,
+					       obmf_ipmi_rsp_ctx.data_len);
+				}
+
+				if (!pal_immediate_respond_from_HOST(netfn_no_lun,
+								    req->cmd)) {
+					kcs_write(kcs_inst->index, obmf_kcs_buff,
+						  rsp_total);
+				}
+				SAFE_FREE(obmf_kcs_buff);
+			}
+#elif (!defined(ENABLE_PLDM) || defined(ENABLE_OEM_PLDM))
 			bridge_msg.data_len = rc - 2; // exclude netfn, cmd
 			bridge_msg.seq_source = 0xff; // No seq for KCS
 			bridge_msg.InF_source = HOST_KCS_1 + kcs_inst->index;
@@ -654,6 +735,12 @@ static void kcs_read_task(void *arvg0, void *arvg1, void *arvg2)
 void kcs_device_init(char **config, uint8_t size)
 {
 	uint8_t i;
+
+#ifdef CONFIG_USB_DEVICE_OBMF
+	k_sem_init(&obmf_ipmi_rsp_sem, 0, 1);
+	obmf_register_ipmi_rsp_cb(kcs_obmf_ipmi_rsp_cb, NULL);
+#endif
+
 	kcs = (kcs_dev *)malloc(size * sizeof(*kcs));
 	if (!kcs)
 		return;

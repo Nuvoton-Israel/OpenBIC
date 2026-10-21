@@ -126,6 +126,7 @@ enum Channel_Target {
 	/* 54h-5Fh are reserved for KCS */
 	HOST_SSIF_1 = 0x60,
 	/* 61h-6Fh are reserved for SSIF */
+	OBMF = 0x70,
 	RESERVED,
 };
 

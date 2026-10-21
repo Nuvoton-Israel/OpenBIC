@@ -1263,7 +1263,17 @@ __weak void OEM_1S_GET_SET_BIC_VGPIO(ipmi_msg *msg)
 			return;
 		}
 
+#ifdef CONFIG_GPIO_NPCM4XX_VW
+		int vgpio_val = vw_gpio_get(msg->data[1]);
+		if (vgpio_val >= 0) {
+			/* data[2]: direction (0=input if pin>=64, 1=output if pin<64) */
+			msg->data[2] = (msg->data[1] < VW_GPIO_INPUT_START) ?
+					VW_GPIO_OUTPUT : VW_GPIO_INPUT;
+			/* data[3]: current pin value */
+			msg->data[3] = (uint8_t)vgpio_val;
+#else
 		if (vw_gpio_get(msg->data[1], &msg->data[2])) {
+#endif
 			msg->completion_code = CC_SUCCESS;
 			msg->data_len = 4;
 		} else {
@@ -1279,7 +1289,11 @@ __weak void OEM_1S_GET_SET_BIC_VGPIO(ipmi_msg *msg)
 			return;
 		}
 
+#ifdef CONFIG_GPIO_NPCM4XX_VW
+		if (vw_gpio_set(msg->data[1], msg->data[2]) == 0) {
+#else
 		if (vw_gpio_set(msg->data[1], msg->data[2])) {
+#endif
 			msg->completion_code = CC_SUCCESS;
 			msg->data_len = 1;
 		} else {

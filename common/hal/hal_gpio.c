@@ -41,6 +41,23 @@ static K_THREAD_STACK_DEFINE(gpio_work_stack, GPIO_STACK_SIZE);
 
 struct k_work gpio_work[TOTAL_GPIO_NUM];
 
+#ifdef CONFIG_USB_DEVICE_OBMF
+struct obmf_gpio_irq_work_item {
+	struct k_work work;
+	uint8_t gpio_num;
+};
+
+static struct obmf_gpio_irq_work_item obmf_gpio_irq_work[TOTAL_GPIO_NUM];
+
+static void obmf_gpio_irq_work_handler(struct k_work *work)
+{
+	struct obmf_gpio_irq_work_item *item =
+		CONTAINER_OF(work, struct obmf_gpio_irq_work_item, work);
+
+	plat_obmf_gpio_irq_cb(item->gpio_num);
+}
+#endif
+
 uint8_t gpio_ind_to_num_table[TOTAL_GPIO_NUM];
 uint8_t gpio_ind_to_num_table_cnt;
 
@@ -170,6 +187,13 @@ __weak bool plat_gpio_immediate_int_cb(uint8_t gpio_num)
 	return false;
 }
 
+#ifdef CONFIG_USB_DEVICE_OBMF
+__weak void plat_obmf_gpio_irq_cb(uint8_t gpio_num)
+{
+	ARG_UNUSED(gpio_num);
+}
+#endif
+
 void irq_callback(const struct device *dev, struct gpio_callback *cb, uint32_t pins)
 {
 	uint8_t index, gpio_num;
@@ -199,6 +223,13 @@ void irq_callback(const struct device *dev, struct gpio_callback *cb, uint32_t p
 	}
 	gpio_num = (group * GPIO_GROUP_SIZE) + pins;
 
+#ifdef CONFIG_USB_DEVICE_OBMF
+	if (plat_gpio_immediate_int_cb(gpio_num))
+		plat_obmf_gpio_irq_cb(gpio_num);
+	else
+		k_work_submit_to_queue(&gpio_work_queue, &obmf_gpio_irq_work[gpio_num].work);
+	return;
+#else
 	if (gpio_cfg[gpio_num].int_cb == NULL) {
 		LOG_ERR("Callback function pointer NULL for gpio num %d", gpio_num);
 		return;
@@ -208,6 +239,7 @@ void irq_callback(const struct device *dev, struct gpio_callback *cb, uint32_t p
 		gpio_cfg[gpio_num].int_cb();
 	else
 		k_work_submit_to_queue(&gpio_work_queue, &gpio_work[gpio_num]);
+#endif
 }
 
 static void gpio_init_cb(uint8_t gpio_num)
@@ -251,7 +283,12 @@ void gpio_cb_irq_init(uint8_t gpio_num, gpio_flags_t flags)
 	gpio_add_cb(gpio_num);
 	gpio_interrupt_conf(gpio_num, flags);
 
+#ifdef CONFIG_USB_DEVICE_OBMF
+	obmf_gpio_irq_work[gpio_num].gpio_num = gpio_num;
+	k_work_init(&obmf_gpio_irq_work[gpio_num].work, obmf_gpio_irq_work_handler);
+#else
 	k_work_init(&gpio_work[gpio_num], gpio_cfg[gpio_num].int_cb);
+#endif
 }
 
 int gpio_conf(uint8_t gpio_num, int dir)
