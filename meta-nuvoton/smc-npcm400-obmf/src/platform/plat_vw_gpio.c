@@ -1,14 +1,11 @@
 #include "plat_vw_gpio.h"
-#include "plat_isr.h"
 
 #include <devicetree.h>
 #include <logging/log.h>
 #include <sys/util.h>
 #include <stdio.h>
 
-#ifdef CONFIG_USB_DEVICE_OBMF
 #include "obmf.h"
-#endif
 
 LOG_MODULE_REGISTER(plat_vw_gpio);
 
@@ -69,19 +66,12 @@ LOG_MODULE_REGISTER(plat_vw_gpio);
 		VW_GPIO_BANK_LINE_NAMES(prefix, 14), VW_GPIO_BANK_LINE_NAMES(prefix, 15), \
 	}
 
-struct vw_gpio_cb_override {
-	uint8_t pin;
-	vw_gpio_irq_cb_t int_cb;
-};
-
 struct vw_gpio_cfg {
 	const char *vwgpsm_dev_names[VW_GPIO_NUM_BANKS];
 	const char *vwgpms_dev_names[VW_GPIO_NUM_BANKS];
 	/* Per-bank/per-bit line names from DTS gpio-line-names: [bank][bit]. */
 	const char *vwgpsm_line_names[VW_GPIO_NUM_BANKS][VW_GPIO_PINS_PER_BANK];
 	const char *vwgpms_line_names[VW_GPIO_NUM_BANKS][VW_GPIO_PINS_PER_BANK];
-	struct vw_gpio_cb_override cb_overrides[2];
-	uint8_t cb_override_count;
 };
 
 static const struct vw_gpio_cfg vw_gpio_cfg = {
@@ -89,10 +79,6 @@ static const struct vw_gpio_cfg vw_gpio_cfg = {
 	.vwgpms_dev_names = VW_GPIO_GROUP_DEV_NAMES(vwgpms),
 	.vwgpsm_line_names = VW_GPIO_ALL_BANK_LINE_NAMES(vwgpsm),
 	.vwgpms_line_names = VW_GPIO_ALL_BANK_LINE_NAMES(vwgpms),
-	.cb_overrides = {
-		{ .pin = 127, .int_cb = ISR_POST_COMPLETE },
-	},
-	.cb_override_count = 1,
 };
 
 static const char *vw_gpio_get_dts_line_name(uint16_t pin)
@@ -120,23 +106,6 @@ static const char *vw_gpio_get_dts_line_name(uint16_t pin)
 	return line_names[bank][bit];
 }
 
-#ifndef CONFIG_USB_DEVICE_OBMF
-static vw_gpio_irq_cb_t vw_gpio_get_override_cb(uint8_t gpio_index)
-{
-	if (gpio_index >= VW_GPIO_COUNT) {
-		return NULL;
-	}
-
-	for (int i = 0; i < vw_gpio_cfg.cb_override_count; i++) {
-		if (vw_gpio_cfg.cb_overrides[i].pin == gpio_index) {
-			return vw_gpio_cfg.cb_overrides[i].int_cb;
-		}
-	}
-
-	return NULL;
-}
-#endif
-
 /* =====================================================================
  * VW GPIO via Zephyr GPIO driver (nuvoton,npcm4xx-vw-gpio)
  *   Pin 0~63:   Output (VWGPSM, BIC to Host)
@@ -147,29 +116,16 @@ static vw_gpio_irq_cb_t vw_gpio_get_override_cb(uint8_t gpio_index)
 
 static void vw_gpio_cb_handler(uint8_t gpio_val, uint8_t gpio_index)
 {
-#ifdef CONFIG_USB_DEVICE_OBMF
-	{
-		uint16_t gpio_indices[1] = { gpio_index };
-		uint8_t gpio_values[1] = { gpio_val > 0 ? OBMF_GPIO_VALUE_HIGH
-						  : OBMF_GPIO_VALUE_LOW };
-		int ret;
+	uint16_t gpio_indices[1] = { gpio_index };
+	uint8_t gpio_values[1] = { gpio_val > 0 ? OBMF_GPIO_VALUE_HIGH : OBMF_GPIO_VALUE_LOW };
+	int ret;
 
-		ret = obmf_gpio_set_values(gpio_indices, gpio_values, 1, OBMF_ICP_VW_GPIO_CHANNEL);
-		if (ret != 0 && ret != -ENETDOWN) {
-			LOG_ERR("obmf_gpio_set_values failed: %d", ret);
-		}
+	ret = obmf_gpio_set_values(gpio_indices, gpio_values, 1, OBMF_ICP_VW_GPIO_CHANNEL);
+	if (ret != 0 && ret != -ENETDOWN) {
+		LOG_ERR("obmf_gpio_set_values failed: %d", ret);
 	}
-#else
-	vw_gpio_irq_cb_t cb = vw_gpio_get_override_cb(gpio_index);
-	if (cb != NULL) {
-		cb((uint8_t)gpio_val, gpio_index);
-	}
-
-#endif
 }
 
-
-#ifdef CONFIG_USB_DEVICE_OBMF
 static uint8_t obmf_gpio_get_cb(uint16_t index, void *ctx)
 {
 	LOG_DBG("obmf_gpio_get_cb: index=%d", index);
@@ -250,7 +206,6 @@ static void obmf_gpio_config_init(void)
 		entries[i].gpio_input_debounce = 0;        /* unspecified */
 	}
 }
-#endif /* CONFIG_USB_DEVICE_OBMF */
 
 bool pal_load_vw_gpio_config(void)
 {
@@ -262,9 +217,7 @@ bool pal_load_vw_gpio_config(void)
 		return false;
 	}
 
-#ifdef CONFIG_USB_DEVICE_OBMF
 	obmf_gpio_config_init();
-#endif
 
 	return true;
 }

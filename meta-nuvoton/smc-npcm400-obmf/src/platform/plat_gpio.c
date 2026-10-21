@@ -20,12 +20,9 @@
 #include "cmsis_os.h"
 #include "hal_gpio.h"
 #include "plat_gpio.h"
-#include "plat_isr.h"
 #include <logging/log.h>
 
-#ifdef CONFIG_USB_DEVICE_OBMF
 #include "obmf.h"
-#endif
 
 LOG_MODULE_REGISTER(plat_gpio);
 
@@ -34,11 +31,6 @@ char *gpio_name[] = { name_gpio0 name_gpio1 name_gpio2 name_gpio3 name_gpio4 nam
 			      name_gpio7 name_gpio8 name_gpio9 name_gpioA name_gpioB name_gpioC
 				      name_gpioD name_gpioE name_gpioF };
 #undef gpio_name_to_num
-
-void gpio_int_default()
-{
-	return;
-}
 
 GPIO_CFG plat_gpio_cfg[] = {
 	//  chip,      number,   is_init, is_latch, direction,    status,     property,    int_type,              int_cb
@@ -88,7 +80,7 @@ GPIO_CFG plat_gpio_cfg[] = {
 	{ CHIP_GPIO, 21, DISABLE, DISABLE, GPIO_INPUT, GPIO_LOW, PUSH_PULL, GPIO_INT_DISABLE,
 	  NULL },
 	{ CHIP_GPIO, 22, DISABLE, DISABLE, GPIO_INPUT, GPIO_LOW, PUSH_PULL, GPIO_INT_DISABLE,
-	  ISR_TEST },
+	  NULL },
 	{ CHIP_GPIO, 23, DISABLE, DISABLE, GPIO_INPUT, GPIO_LOW, PUSH_PULL, GPIO_INT_DISABLE,
 	  NULL },
 	// GPIO 3 group
@@ -267,15 +259,15 @@ GPIO_CFG plat_gpio_cfg[] = {
 	{ CHIP_GPIO, 105, DISABLE, DISABLE, GPIO_INPUT, GPIO_LOW, PUSH_PULL, GPIO_INT_DISABLE,
 	  NULL },
 	{ CHIP_GPIO, 106, ENABLE, DISABLE, GPIO_INPUT, GPIO_LOW, PUSH_PULL, GPIO_INT_EDGE_BOTH,
-	  ISR_TEST },
+	  NULL },
 	{ CHIP_GPIO, 107, ENABLE, DISABLE, GPIO_OUTPUT, GPIO_LOW, PUSH_PULL, GPIO_INT_DISABLE,
 	  NULL },
 	{ CHIP_GPIO, 108, ENABLE, DISABLE, GPIO_INPUT, GPIO_LOW, PUSH_PULL, GPIO_INT_EDGE_BOTH,
-	  ISR_TEST },
+	  NULL },
 	{ CHIP_GPIO, 109, ENABLE, DISABLE, GPIO_OUTPUT, GPIO_LOW, PUSH_PULL, GPIO_INT_DISABLE,
 	  NULL },
 	{ CHIP_GPIO, 110, ENABLE, DISABLE, GPIO_INPUT, GPIO_LOW, PUSH_PULL, GPIO_INT_EDGE_BOTH,
-	  ISR_TEST },
+	  NULL },
 	{ CHIP_GPIO, 111, ENABLE, DISABLE, GPIO_OUTPUT, GPIO_LOW, PUSH_PULL, GPIO_INT_DISABLE,
 	  NULL },
 	// GPIO E group
@@ -312,7 +304,6 @@ bool pal_load_gpio_config(void)
 	return 1;
 };
 
-#ifdef CONFIG_USB_DEVICE_OBMF
 static bool obmf_gpio_num_to_index(uint8_t gpio_num, uint16_t *gpio_index)
 {
 	if (gpio_index == NULL) {
@@ -443,9 +434,3 @@ bool pal_load_obmf_smc_gpio_config(void)
 	obmf_smc_gpio_config_init();
 	return true;
 }
-#else
-bool pal_load_obmf_smc_gpio_config(void)
-{
-	return true;
-}
-#endif

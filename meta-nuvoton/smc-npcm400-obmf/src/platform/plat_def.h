@@ -24,12 +24,8 @@
 //#define ENABLE_MCTP_I3C
 #define ENABLE_MCTP_OBMF_I2C
 #define ENABLE_PLDM
-//#define ENABLE_PLDM_SENSOR
 #define ENABLE_OEM_PLDM
 #define MCTP_I3C_PEC_ENABLE 1
-//#define ENABLE_SSIF
-#define SSIF_TIMEOUT_MS 10000 // i2c bus drop off maximum time
-//#define ENABLE_SSIF_RSP_PEC
 
 #define DISABLE_AST_ADC
 #define DISABLE_NVME

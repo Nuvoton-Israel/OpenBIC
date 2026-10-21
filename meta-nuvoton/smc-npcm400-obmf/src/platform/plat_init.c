@@ -14,49 +14,24 @@
  * limitations under the License.
  */
 
+#include <logging/log.h>
 #include "hal_gpio.h"
 #include "plat_gpio.h"
-
-#include "plat_led.h"
 #include "plat_class.h"
-#include "plat_isr.h"
-#include "plat_vw_gpio.h"
-#include "plat_sgpio.h"
-#include "plat_i2c_target.h"
-#include "ipmi.h"
-#include "pldm.h"
-#include "rg3mxxb12.h"
-#include "plat_mctp.h"
 #include "plat_i2c.h"
-#include "plat_i3c.h"
+#include "plat_i2c_target.h"
 #include "plat_kcs.h"
-#include "plat_ssif.h"
+#include "plat_led.h"
+#include "plat_mctp.h"
+#include "plat_sgpio.h"
+#include "plat_vw_gpio.h"
 #include "snoop_npcm.h"
 #include "obmf.h"
-#include <logging/log.h>
-#include <drivers/uart.h>
-#include <usb/usb_device.h>
+
+LOG_MODULE_REGISTER(plat_init);
 
 extern void plat_uart_bridge_init(void);
 extern void edaf_npcm_init(void);
-
-#define LOG_LEVEL CONFIG_USB_DEVICE_LOG_LEVEL
-#include <logging/log.h>
-LOG_MODULE_REGISTER(palt_init);
-
-/* No IPMI sensors or SDR on this platform, keep the common tables empty */
-const int SENSOR_CONFIG_SIZE = 0;
-const int SDR_TABLE_SIZE = 0;
-
-void load_sensor_config(void)
-{
-	return;
-}
-
-void load_sdr_table(void)
-{
-	return;
-}
 
 void pal_pre_init()
 {
@@ -71,37 +46,7 @@ void pal_pre_init()
 				1);
 	}
 
-#if 0
-	/* Since i3c hub only support 1.0v ~ 1.8v, default use I3C_BUS_CONTROLLER_TO_HUB i3c bus */
-	I3C_MSG i3c_msg = { 0 };
-	i3c_msg.bus = I3C_BUS_CONTROLLER_TO_HUB;
-	i3c_msg.target_addr = I3C_STATIC_ADDR_HUB;
-
-	const int rstdaa_count = 2;
-	int ret = 0;
-
-	for (int i = 0; i < rstdaa_count; i++) {
-		ret = i3c_brocast_ccc(&i3c_msg, I3C_CCC_RSTDAA, I3C_BROADCAST_ADDR);
-		if (ret != 0) {
-			printf("Error to reset daa. count = %d\n", i);
-		}
-	}
-
-	ret = i3c_brocast_ccc(&i3c_msg, I3C_CCC_SETAASA, I3C_BROADCAST_ADDR);
-	if (ret != 0) {
-		printf("Error to set daa\n");
-	}
-
-	i3c_attach(&i3c_msg);
-
-	// Initialize I3C HUB
-	if (!rg3mxxb12_i3c_mode_only_init(&i3c_msg, LDO_VOLT)) {
-		printk("failed to initialize 1ou rg3mxxb12\n");
-	}
-#endif
-
 	gpio_set(FM_SMC_FLASH_MUX_SEL, 0);
-
 }
 
 void pal_post_init()
@@ -109,21 +54,19 @@ void pal_post_init()
 	plat_mctp_init();
 	snoop_init();
 	kcs_init();
-	ssif_init();
-	plat_isr_init();
 	edaf_npcm_init();
 	plat_led_init();
 	obmf_service_init();
 	if (!pal_load_obmf_smc_gpio_config()) {
-		printk("failed to initialize obmf smc gpio channel\n");
+		LOG_ERR("failed to initialize obmf smc gpio channel");
 	}
 #ifdef CONFIG_SGPIO_NPCM4XX
 	if (!pal_load_sgpio_config()) {
-		printk("failed to initialize sgpio\n");
+		LOG_ERR("failed to initialize sgpio");
 	}
 #endif
 	if (!pal_load_vw_gpio_config()) {
-		printk("failed to initialize vw gpio\n");
+		LOG_ERR("failed to initialize vw gpio");
 	}
 	obmf_i2c_set_controller_bus(OBMF_ICP_I2C_CONTROLLER_CHANNEL_0, I2C_BUS1);
 	obmf_i2c_set_controller_bus(OBMF_ICP_I2C_CONTROLLER_CHANNEL_1, I2C_BUS2);
@@ -143,7 +86,6 @@ void pal_device_init()
 void pal_set_sys_status()
 {
 }
-
 
 #define DEF_PROJ_GPIO_PRIORITY 61
 

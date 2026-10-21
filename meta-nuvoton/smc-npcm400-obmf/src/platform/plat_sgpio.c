@@ -24,9 +24,7 @@
 #include "hal_sgpio.h"
 #include "plat_sgpio.h"
 
-#ifdef CONFIG_USB_DEVICE_OBMF
 #include "obmf.h"
-#endif
 
 #include <logging/log.h>
 LOG_MODULE_REGISTER(plat_sgpio, LOG_LEVEL_DBG);
@@ -89,16 +87,9 @@ LOG_MODULE_REGISTER(plat_sgpio, LOG_LEVEL_DBG);
 		SGPIO_BANK_LINE_NAMES(prefix, e), SGPIO_BANK_LINE_NAMES(prefix, f), \
 	}
 
-struct sgpio_cb_override {
-	uint16_t pin;
-	sgpio_int_cb_t int_cb;
-};
-
 struct sgpio_group_cfg {
 	const char *dev_names[PLAT_SGPIO_GROUP_DEV_COUNT];
 	const char *line_names[PLAT_SGPIO_GROUP_DEV_COUNT][SGPIO_PINS_PER_PORT];
-	struct sgpio_cb_override cb_overrides[2];
-	uint8_t cb_override_count;
 };
 
 static const struct sgpio_group_cfg sgpio_group_cfgs[] = {
@@ -141,22 +132,6 @@ static const struct sgpio_group_cfg *sgpio_get_group_cfg(uint8_t group)
 	return &sgpio_group_cfgs[group];
 }
 
-static sgpio_int_cb_t sgpio_get_override_cb(uint16_t pin, uint8_t group)
-{
-	const struct sgpio_group_cfg *cfg = sgpio_get_group_cfg(group);
-	if (cfg == NULL) {
-		return NULL;
-	}
-
-	for (int i = 0; i < cfg->cb_override_count; i++) {
-		if (cfg->cb_overrides[i].pin == pin) {
-			return cfg->cb_overrides[i].int_cb;
-		}
-	}
-
-	return NULL;
-}
-
 static void init_sgpio_dev_name_table(void)
 {
 	for (int i = 0; i < PLAT_SGPIO_GROUP_DEV_COUNT; i++) {
@@ -180,23 +155,19 @@ static void init_dual_sgpio_cfg(void)
 		plat_sgpio_cfg_all[idx].status = GPIO_LOW;
 		plat_sgpio_cfg_all[idx].int_type =
 			is_input ? GPIO_INT_EDGE_BOTH : GPIO_INT_DISABLE;
-		plat_sgpio_cfg_all[idx].int_cb =
-			sgpio_get_override_cb(local_pin, group);
+		plat_sgpio_cfg_all[idx].int_cb = NULL;
 		plat_sgpio_cfg_all[idx].name = NULL;
 	}
 }
 
-#ifdef CONFIG_USB_DEVICE_OBMF
 static bool sgpio_hw_pin_to_obmf_index(uint8_t group, uint16_t hw_pin,
-					   uint16_t *obmf_index);
-#endif
+				       uint16_t *obmf_index);
 
 static void sgpio_cb_handler(uint8_t sgpio_group, uint8_t gpio_val,
 			     uint8_t gpio_index)
 {
 	LOG_DBG("SGPIO CB: g=%d pin=%d val=%d", sgpio_group, gpio_index, gpio_val);
 
-#ifdef CONFIG_USB_DEVICE_OBMF
 	/* Notify OBMF (one pin at a time for clarity) */
 	uint8_t gpio_value = (gpio_val > 0) ? OBMF_GPIO_VALUE_HIGH
 						: OBMF_GPIO_VALUE_LOW;
@@ -217,21 +188,12 @@ static void sgpio_cb_handler(uint8_t sgpio_group, uint8_t gpio_val,
 	if (ret != 0 && ret != -ENETDOWN) {
 		LOG_ERR("obmf_gpio_set_values failed: %d", ret);
 	}
-#else
-	sgpio_int_cb_t cb = sgpio_get_override_cb(gpio_index, sgpio_group);
-
-	if (cb != NULL) {
-		cb();
-	}
-#endif
 }
 
 /* =====================================================================
  * OBMF SGPIO channel (channel 6) - same pattern as obmf_gpio_config_init
  * in plat_vw_gpio.c
  * ===================================================================== */
-#ifdef CONFIG_USB_DEVICE_OBMF
-
 #define SGPIO_OBMF_INVALID_INDEX UINT16_MAX
 
 static uint16_t sgpio_obmf_to_hw_pin[2][OBMF_GPIO_MAX_ENTRIES];
@@ -512,7 +474,6 @@ static void obmf_sgpio_config_init(void)
 		obmf_sgpio_init_group(&groups[i]);
 	}
 }
-#endif /* CONFIG_USB_DEVICE_OBMF */
 
 /*
  * pal_load_sgpio_config - entry point called from plat_init.c pal_post_init().
@@ -532,9 +493,7 @@ bool pal_load_sgpio_config(void)
 		return false;
 	}
 
-#ifdef CONFIG_USB_DEVICE_OBMF
 	obmf_sgpio_config_init();
-#endif
 
 	return true;
 }

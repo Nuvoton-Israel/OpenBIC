@@ -29,7 +29,4 @@
 
 #define I2C_BUS_MAX_NUM 5
 
-#define SSIF_I2C_BUS I2C_BUS1
-#define SSIF_I2C_ADDR 0x20 //8bit
-
 #endif

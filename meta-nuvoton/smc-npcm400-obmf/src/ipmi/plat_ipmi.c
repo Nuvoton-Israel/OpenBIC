@@ -22,7 +22,6 @@
 #include "libutil.h"
 #include "ipmb.h"
 #include "ipmi.h"
-#include "plat_ipmi.h"
 
 bool pal_request_msg_to_BIC_from_HOST(uint8_t netfn, uint8_t cmd)
 {

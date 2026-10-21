@@ -49,7 +49,7 @@
 	gpio_name_to_num(Reserve_GPIO23) \
 	gpio_name_to_num(Reserve_GPIO24) \
 	gpio_name_to_num(Reserve_GPIO25) \
-	gpio_name_to_num(ALERT_TEST) \
+	gpio_name_to_num(Reserve_GPIO26) \
 	gpio_name_to_num(Reserve_GPIO27)
 
 #define name_gpio3	\
