@@ -56,18 +56,17 @@ static mctp_port plat_mctp_port[] = {
 #endif
 		.medium_type = MCTP_MEDIUM_TYPE_TARGET_I3C
 	},
-/*
-	{
-		.conf.smbus_conf.addr = I2C_ADDR_BIC,
-		.conf.smbus_conf.bus = I2C_BUS_TARGET_TO_BMC,
-		.medium_type = MCTP_MEDIUM_TYPE_SMBUS
-	},
-*/
 	{
 		.channel_target = PLDM, 
 		.conf.usb_conf.addr = 0,
 		.conf.usb_conf.bus = 0,
 		.medium_type = MCTP_MEDIUM_TYPE_USB
+	},
+	/* keep after USB, both use bus 0 and find_mctp_by_bus() returns the first */
+	{
+		.conf.smbus_conf.addr = I2C_ADDR_BIC,
+		.conf.smbus_conf.bus = I2C_BUS_TARGET_TO_BMC,
+		.medium_type = MCTP_MEDIUM_TYPE_SMBUS
 	},
 #ifdef TEST_I3C_CONTROLLER_BIC
 	{
@@ -84,9 +83,9 @@ static mctp_port plat_mctp_port[] = {
 };
 
 static mctp_route_entry plat_mctp_route_tbl[] = {
-	//{ MCTP_EID_BMC_I2C, I2C_BUS_TARGET_TO_BMC, I2C_ADDR_BMC, .set_endpoint = false},
+	{ MCTP_EID_BMC_I2C, I2C_BUS_TARGET_TO_BMC, I2C_ADDR_BMC, .set_endpoint = false},
 	{ MCTP_EID_BMC_I3C, I3C_BUS_TARGET_TO_BMC, I3C_STATIC_ADDR_BMC, .set_endpoint = false},
-	{ MCTP_EID_BMC_SERIAL, 0x0, 0x0, .set_endpoint = false},
+	{ MCTP_EID_BMC_SERIAL, MCTP_USB_ROUTE_BUS, MCTP_USB_ROUTE_ADDR, .set_endpoint = false},
 #ifdef TEST_I3C_CONTROLLER_BIC
 	{ MCTP_EID_BIC_I3C_WF, I3C_BUS_CONTROLLER_TO_BIC, I3C_STATIC_ADDR_BIC_WF, .set_endpoint = true},
 	{ MCTP_EID_BIC_I3C_FF, I3C_BUS_CONTROLLER_TO_BIC, I3C_STATIC_ADDR_BIC_FF, .set_endpoint = true},
@@ -218,6 +217,60 @@ static uint8_t mctp_msg_recv(void *mctp_p, uint8_t *buf, uint32_t len, mctp_ext_
 	return MCTP_SUCCESS;
 }
 
+/*
+ * I2C_BUS1 is bus 0 as well, so the route bus alone cannot tell USB from
+ * SMBus; USB routes are the ones with neither a bus nor an address.
+ */
+static uint8_t get_route_medium_type(const mctp_route_entry *p)
+{
+	if (p->bus == MCTP_USB_ROUTE_BUS && p->addr == MCTP_USB_ROUTE_ADDR)
+		return MCTP_MEDIUM_TYPE_USB;
+	if (p->bus == I3C_BUS_TARGET_TO_BMC)
+		return MCTP_MEDIUM_TYPE_TARGET_I3C;
+#ifdef TEST_I3C_CONTROLLER_BIC
+	if (p->bus == I3C_BUS_CONTROLLER_TO_BIC)
+		return MCTP_MEDIUM_TYPE_CONTROLLER_I3C;
+#endif
+
+	return MCTP_MEDIUM_TYPE_SMBUS;
+}
+
+static mctp *find_mctp_by_route(const mctp_route_entry *p, uint8_t medium_type)
+{
+	for (uint8_t i = 0; i < ARRAY_SIZE(plat_mctp_port); i++) {
+		mctp_port *port = plat_mctp_port + i;
+		if (port->medium_type != medium_type)
+			continue;
+
+		if (medium_type == MCTP_MEDIUM_TYPE_SMBUS) {
+			if (p->bus == port->conf.smbus_conf.bus)
+				return port->mctp_inst;
+		} else if (medium_type == MCTP_MEDIUM_TYPE_USB) {
+			if (p->bus == port->conf.usb_conf.bus)
+				return port->mctp_inst;
+		} else if (medium_type == MCTP_MEDIUM_TYPE_CONTROLLER_I3C) {
+			if (p->bus == port->conf.i3c_conf.bus && p->addr == port->conf.i3c_conf.addr)
+				return port->mctp_inst;
+		} else if (p->bus == port->conf.i3c_conf.bus) {
+			return port->mctp_inst;
+		}
+	}
+
+	return NULL;
+}
+
+static void set_route_ext_params(const mctp_route_entry *p, uint8_t medium_type,
+				 mctp_ext_params *ext_params)
+{
+	ext_params->type = medium_type;
+	if (medium_type == MCTP_MEDIUM_TYPE_USB)
+		ext_params->usb_ext_params.dummy = p->addr;
+	else if (medium_type == MCTP_MEDIUM_TYPE_SMBUS)
+		ext_params->smbus_ext_params.addr = p->addr;
+	else
+		ext_params->i3c_ext_params.addr = p->addr;
+}
+
 static uint8_t get_mctp_route_info(uint8_t dest_endpoint, void **mctp_inst,
 				   mctp_ext_params *ext_params)
 {
@@ -230,20 +283,9 @@ static uint8_t get_mctp_route_info(uint8_t dest_endpoint, void **mctp_inst,
 	for (i = 0; i < ARRAY_SIZE(plat_mctp_route_tbl); i++) {
 		mctp_route_entry *p = plat_mctp_route_tbl + i;
 		if (p->endpoint == dest_endpoint) {
-			*mctp_inst = find_mctp_by_addr_and_bus(p->addr, p->bus);
-			if (p->bus == 0) {
-				ext_params->type = MCTP_MEDIUM_TYPE_USB;
-				ext_params->usb_ext_params.dummy = p->addr;
-			} else if (p->bus == I3C_BUS_CONTROLLER_TO_BIC) {
-				ext_params->type = MCTP_MEDIUM_TYPE_CONTROLLER_I3C;
-				ext_params->i3c_ext_params.addr = p->addr;
-			} else if (p->bus != I3C_BUS_TARGET_TO_BMC) {
-				ext_params->type = MCTP_MEDIUM_TYPE_SMBUS;
-				ext_params->smbus_ext_params.addr = p->addr;
-			} else {
-				ext_params->type = MCTP_MEDIUM_TYPE_TARGET_I3C;
-				ext_params->i3c_ext_params.addr = p->addr;
-			}
+			uint8_t medium_type = get_route_medium_type(p);
+			*mctp_inst = find_mctp_by_route(p, medium_type);
+			set_route_ext_params(p, medium_type, ext_params);
 			rc = MCTP_SUCCESS;
 			break;
 		}
@@ -263,17 +305,9 @@ uint8_t get_mctp_info(uint8_t dest_endpoint, mctp **mctp_inst, mctp_ext_params *
 	for (i = 0; i < ARRAY_SIZE(plat_mctp_route_tbl); i++) {
 		mctp_route_entry *p = plat_mctp_route_tbl + i;
 		if (p->endpoint == dest_endpoint) {
-			*mctp_inst = find_mctp_by_bus(p->bus);
-			if (p->bus == 0x0) {
-				ext_params->type = MCTP_MEDIUM_TYPE_USB;
-				ext_params->usb_ext_params.dummy = p->addr;
-			} else if (p->bus != I3C_BUS_TARGET_TO_BMC) {
-				ext_params->type = MCTP_MEDIUM_TYPE_SMBUS;
-				ext_params->smbus_ext_params.addr = p->addr;
-			} else {
-				ext_params->type = MCTP_MEDIUM_TYPE_TARGET_I3C;
-				ext_params->i3c_ext_params.addr = p->addr;
-			}
+			uint8_t medium_type = get_route_medium_type(p);
+			*mctp_inst = find_mctp_by_route(p, medium_type);
+			set_route_ext_params(p, medium_type, ext_params);
 			ext_params->ep = p->endpoint;
 			rc = MCTP_SUCCESS;
 			break;

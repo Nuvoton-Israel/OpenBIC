@@ -33,6 +33,10 @@
 #define I2C_BUS_PLDM I2C_BUS1
 #define I2C_BUS_TARGET_TO_BMC	I2C_BUS1
 
+/* usb route entries carry no bus/address */
+#define MCTP_USB_ROUTE_BUS	0x0
+#define MCTP_USB_ROUTE_ADDR	0x0
+
 /* mctp endpoint */
 #define MCTP_EID_CXL_I2C	0x2E
 #define MCTP_EID_BMC_I2C	0x15
@@ -54,7 +58,7 @@
 
 /* i3c dev bus */
 /* Normal use bus, BMC (1.8v) <-> BIC (1.8v) */
-#define I3C_BUS_TARGET_TO_BMC		5
+#define I3C_BUS_TARGET_TO_BMC		4
 
 /* Test use bus, BIC (3.3v) <-> BIC (3.3v) */
 #define I3C_BUS_CONTROLLER_TO_BIC	4
