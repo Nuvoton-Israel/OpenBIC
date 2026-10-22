@@ -30,19 +30,28 @@ LOG_MODULE_DECLARE(obmf);
 /* Retry count for hal_i3c calls */
 #define OBMF_I3C_HAL_RETRY  3
 
-/* ── Physical bus binding ───────────────────────────────────────────────── */
-
-static uint8_t i3c_controller_bus = 0xFF; /* 0xFF = not configured */
-
-void obmf_i3c_set_controller_bus(uint8_t bus)
-{
-	i3c_controller_bus = bus;
-}
-
 /* ── Symbols exported from hal_i3c.c (same pattern as plat_i3c.c) ──────── */
 
 extern const struct device *dev_i3c[I3C_MAX_NUM];
 extern struct k_mutex mutex_dev[I3C_MAX_NUM];
+
+/* ── Physical bus binding ───────────────────────────────────────────────── */
+
+static uint8_t i3c_controller_bus = 0xFF; /* 0xFF = not configured */
+
+#ifdef i3c_master_register_hj_callback
+static void i3c_hotjoin_cb(const struct device *dev, void *user_data);
+#endif
+
+void obmf_i3c_set_controller_bus(uint8_t bus)
+{
+	i3c_controller_bus = bus;
+
+#ifdef i3c_master_register_hj_callback
+	if (bus < I3C_MAX_NUM && dev_i3c[bus])
+		i3c_master_register_hj_callback(dev_i3c[bus], i3c_hotjoin_cb, NULL);
+#endif
+}
 
 /* ── Internal helpers ────────────────────────────────────────────────────── */
 
@@ -1036,6 +1045,49 @@ static void ibi_ctx_refresh(uint8_t bus)
 		i3c_master_request_ibi(desc, &ctx->callbacks);
 	}
 }
+
+/* ── I3C_EVT_HOTJOIN_NOTIFICATION ──────────────────────────────────────── */
+
+#ifdef i3c_master_register_hj_callback
+/*
+ * Called by the driver (system workqueue) after the DAA it runs for a
+ * Hot-Join request. Re-register the IBIs of re-attached devices, then tell
+ * the BMC, which re-enumerates the bus with DO_DAA. The event carries no
+ * parameters or payload (spec section 4.8.1).
+ */
+static void i3c_hotjoin_cb(const struct device *dev, void *user_data)
+{
+	ARG_UNUSED(dev);
+	ARG_UNUSED(user_data);
+
+	uint8_t tx_buf[OBMF_HEADER_SIZE + OBMF_I3C_REQ_HDR_SIZE] = { 0 };
+	obmf_i3c_request_hdr_t *req =
+		(obmf_i3c_request_hdr_t *)(tx_buf + OBMF_HEADER_SIZE);
+	int retries = OBMF_REQUEST_MAX_RETRY;
+	int rc;
+
+	ibi_ctx_refresh(i3c_controller_bus);
+
+	req->command = OBMF_I3C_EVT_HOTJOIN_NOTIFICATION;
+
+	do {
+		rc = obmf_send_request(OBMF_ICP_I3C_CONTROLLER_CHANNEL,
+				       tx_buf, sizeof(tx_buf));
+		if (rc == -EBUSY) {
+			k_msleep(OBMF_REQUEST_RETRY_DELAY_MS);
+		}
+	} while (rc == -EBUSY && --retries > 0);
+
+	if (rc != 0 && retries == 0) {
+		LOG_ERR("I3C Hot-Join: send notification failed after retries: %d", rc);
+		channel_tags[OBMF_ICP_I3C_CONTROLLER_CHANNEL].is_outstanding = false;
+	} else if (rc != 0 && rc != -ENETDOWN) {
+		LOG_ERR("I3C Hot-Join: send notification failed: %d", rc);
+	} else if (rc == 0) {
+		LOG_INF("I3C Hot-Join: notified BMC");
+	}
+}
+#endif
 
 /* ── I3C_EVT_IBI_NOTIFICATION response handler ─────────────────────────── */
 
