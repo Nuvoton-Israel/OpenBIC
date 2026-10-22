@@ -73,7 +73,7 @@ void pal_post_init()
 	obmf_i2c_set_controller_bus(OBMF_ICP_I2C_CONTROLLER_CHANNEL_1, I2C_BUS2);
 	obmf_i2c_set_controller_bus(OBMF_ICP_I2C_CONTROLLER_CHANNEL_2, I2C_BUS3);
 	obmf_i2c_set_controller_bus(OBMF_ICP_I2C_CONTROLLER_CHANNEL_3, I2C_BUS5);
-	obmf_i3c_set_controller_bus(I3C_BUS_CONTROLLER_TO_HUB);
+	obmf_i3c_set_controller_bus(OBMF_ICP_I3C_CONTROLLER_CHANNEL, I3C_BUS_CONTROLLER_TO_HUB);
 
 	gpio_set(FM_SMC_FW_READY, 1);
 

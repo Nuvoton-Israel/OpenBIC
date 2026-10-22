@@ -245,8 +245,8 @@ typedef struct __attribute__((packed)) {
 	/* Channel offsets follow at 0x2C, 4 bytes each */
 } obmf_ch0_base_t;
 
-/* Channels currently allocated up to ch18 (includes Serial1, SPI1, I3C). */
-#define OBMF_MAX_CHANNELS 18
+/* Channels currently allocated up to ch19 (includes Serial1, SPI1, I3C x2). */
+#define OBMF_MAX_CHANNELS 19
 
 /**
  * @brief Channel Configuration Space Common Header (v1.0.0 RC1 spec section 4.13)
@@ -516,6 +516,11 @@ typedef struct __attribute__((packed)) {
 #define OBMF_ICP_I2C_TARGET_CHANNEL_1     15 /* I2C Target channel 1 (bus2) */
 
 #define OBMF_ICP_I3C_CONTROLLER_CHANNEL   18 /* I3C Controller channel */
+#define OBMF_ICP_I3C_CONTROLLER_CHANNEL_1 19 /* Second I3C Controller channel */
+#define OBMF_MAX_I3C_CONTROLLER_CHANNELS  2
+/* Map an I3C Controller channel number to its 0-based index */
+#define OBMF_I3C_CTRL_CHAN_IDX(ch) \
+	((ch) == OBMF_ICP_I3C_CONTROLLER_CHANNEL_1 ? 1 : 0)
 #define OBMF_MAX_I2C_TARGET_CHANNELS      2  /* Number of I2C Target channels */
 /* Map target channel index (0-based) ↔ channel number */
 #define OBMF_I2C_TGT_CHAN_NUM(idx) (OBMF_ICP_I2C_TARGET_CHANNEL_0 + (idx))
@@ -1268,6 +1273,7 @@ typedef struct __attribute__((packed)) {
 	obmf_i2c_target_channel_config_t i2c_target_channel_configs[OBMF_MAX_I2C_TARGET_CHANNELS]; /* ch14-ch15: I2C Target */
 	obmf_i3c_channel_config_t        i3c_channel_config;        /* ch17: I3C Controller */
 	obmf_mem_dev_channel_config_t    mem_dev_channel_config;    /* ch4: Memory Device */
+	obmf_i3c_channel_config_t        i3c1_channel_config;       /* ch19: I3C Controller 1 */
 } obmf_discovery_structure_t;
 
 /* Offsets within discovery struct for each channel config */
@@ -1305,6 +1311,8 @@ typedef struct __attribute__((packed)) {
 	offsetof(obmf_discovery_structure_t, i3c_channel_config)
 #define CH0_MEM_DEV_CHAN_CONFIG_OFFSET \
 	offsetof(obmf_discovery_structure_t, mem_dev_channel_config)
+#define CH0_I3C1_CHAN_CONFIG_OFFSET \
+	offsetof(obmf_discovery_structure_t, i3c1_channel_config)
 
 /* =====================================================================
  * Callback types for interface-optimized channels
@@ -1480,10 +1488,12 @@ int obmf_mem_dev_erase(uint32_t addr, uint32_t erase_sz);
 void obmf_i2c_set_controller_bus(uint8_t channel, uint8_t bus);
 
 /**
- * @brief Bind the OBMF I3C Controller channel to a physical I3C bus.
- * @param bus Physical I3C bus index used by hal_i3c.
+ * @brief Bind an OBMF I3C Controller channel to a physical I3C bus.
+ * @param channel OBMF_ICP_I3C_CONTROLLER_CHANNEL or
+ *                OBMF_ICP_I3C_CONTROLLER_CHANNEL_1.
+ * @param bus     Physical I3C bus index used by hal_i3c.
  */
-void obmf_i3c_set_controller_bus(uint8_t bus);
+void obmf_i3c_set_controller_bus(uint8_t channel, uint8_t bus);
 
 /* =====================================================================
  * I2C Target channel API (Consumer - we forward target writes to host)

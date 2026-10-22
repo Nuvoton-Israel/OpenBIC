@@ -118,6 +118,7 @@ static inline uint8_t obmf_icp_get_channel_type(uint8_t channel)
 	case OBMF_ICP_I2C_TARGET_CHANNEL_1:
 		return OBMF_ICP_CHANNEL_TYPE_I2C_TARGET;
 	case OBMF_ICP_I3C_CONTROLLER_CHANNEL:
+	case OBMF_ICP_I3C_CONTROLLER_CHANNEL_1:
 		return OBMF_ICP_CHANNEL_TYPE_I3C_CONTROLLER;
 	default:
 		return OBMF_ICP_CHANNEL_TYPE_MMIO;
@@ -661,6 +662,8 @@ static obmf_channel_config_header_t *obmf_chan_cfg_hdr(uint8_t channel)
 			OBMF_I2C_TGT_CHAN_IDX(channel)].header;
 	case OBMF_ICP_I3C_CONTROLLER_CHANNEL:
 		return &discovery_struct.i3c_channel_config.header;
+	case OBMF_ICP_I3C_CONTROLLER_CHANNEL_1:
+		return &discovery_struct.i3c1_channel_config.header;
 	default:
 		return NULL;
 	}
@@ -996,7 +999,7 @@ void obmf_service_init(void)
 	discovery_struct.base.device_id = 0x0001;
 	strncpy(discovery_struct.base.device_name, "OpenBIC-OBMF",
 		OBMF_DEVICE_NAME_SIZE - 1);
-	discovery_struct.base.num_of_channels = OBMF_MAX_CHANNELS; /* MMIO, Serial×2, IPMI, SPI, GPIO×4, I/O, I2C×4+Target×2, I3C */
+	discovery_struct.base.num_of_channels = OBMF_MAX_CHANNELS; /* MMIO, Serial×2, IPMI, SPI, GPIO×4, I/O, I2C×4+Target×2, I3C×2 */
 	discovery_struct.base.config_status = 0;
 	discovery_struct.base.vendor_config_offset = 0; /* Not supported */
 
@@ -1040,6 +1043,8 @@ void obmf_service_init(void)
 		CH0_SERIAL_CHAN_1_CONFIG_OFFSET;
 	discovery_struct.channel_offsets[OBMF_ICP_I3C_CONTROLLER_CHANNEL - 1] =
 		CH0_I3C_CHAN_CONFIG_OFFSET;
+	discovery_struct.channel_offsets[OBMF_ICP_I3C_CONTROLLER_CHANNEL_1 - 1] =
+		CH0_I3C1_CHAN_CONFIG_OFFSET;
 
 	/* MMIO Channel Configuration Space */
 	obmf_mmio_channel_config_t *mmio_cfg =
@@ -1235,24 +1240,35 @@ void obmf_service_init(void)
 			tgt->config.target_address_count;
 	}
 
-	/* I3C Controller Channel Configuration Space (ch17) */
-	obmf_i3c_channel_config_t *i3c_cfg =
-		&discovery_struct.i3c_channel_config;
-	i3c_cfg->header.channel_type = OBMF_ICP_CHANNEL_TYPE_I3C_CONTROLLER;
-	i3c_cfg->header.channel_number = OBMF_ICP_I3C_CONTROLLER_CHANNEL;
-	strncpy(i3c_cfg->header.channel_name, "I3C0", 15);
-	i3c_cfg->header.channel_status = CHAN_HEALTH_READY;
-	i3c_cfg->header.channel_control = 0; /* Disabled by default */
-	i3c_cfg->header.config_size = sizeof(obmf_i3c_config_data_t);
-	i3c_cfg->config.dev_nack_retry_count = 0;
-	i3c_cfg->config.i3c_feature_flags = OBMF_I3C_FEATURE_IBI_PRIV_READ;
-	i3c_cfg->config.max_chained_ops = 16;
-	i3c_cfg->config.max_scl_pp_khz = 12500;  /* 12.5 MHz */
-	i3c_cfg->config.max_scl_od_khz = 400;    /* 400 kHz */
-	i3c_cfg->config.max_read_turnaround = 1000; /* 1 ms */
-	i3c_cfg->config.max_dev_nack_retry = 3;
-	i3c_cfg->config.max_payload_size = 256;   /* I3C_MAX_DATA_SIZE */
-	i3c_cfg->config.max_ibi_payload_size = 128; /* IBI_PAYLOAD_SIZE */
+	/* I3C Controller Channels Configuration Space (ch18, ch19) */
+	static const uint8_t i3c_chans[OBMF_MAX_I3C_CONTROLLER_CHANNELS] = {
+		OBMF_ICP_I3C_CONTROLLER_CHANNEL,
+		OBMF_ICP_I3C_CONTROLLER_CHANNEL_1,
+	};
+	static const char * const i3c_names[OBMF_MAX_I3C_CONTROLLER_CHANNELS] = {
+		"I3C0",
+		"I3C1",
+	};
+	for (int i = 0; i < OBMF_MAX_I3C_CONTROLLER_CHANNELS; i++) {
+		obmf_i3c_channel_config_t *i3c_cfg = (i == 0) ?
+			&discovery_struct.i3c_channel_config :
+			&discovery_struct.i3c1_channel_config;
+		i3c_cfg->header.channel_type = OBMF_ICP_CHANNEL_TYPE_I3C_CONTROLLER;
+		i3c_cfg->header.channel_number = i3c_chans[i];
+		strncpy(i3c_cfg->header.channel_name, i3c_names[i], 15);
+		i3c_cfg->header.channel_status = CHAN_HEALTH_READY;
+		i3c_cfg->header.channel_control = 0; /* Disabled by default */
+		i3c_cfg->header.config_size = sizeof(obmf_i3c_config_data_t);
+		i3c_cfg->config.dev_nack_retry_count = 0;
+		i3c_cfg->config.i3c_feature_flags = OBMF_I3C_FEATURE_IBI_PRIV_READ;
+		i3c_cfg->config.max_chained_ops = 16;
+		i3c_cfg->config.max_scl_pp_khz = 12500;  /* 12.5 MHz */
+		i3c_cfg->config.max_scl_od_khz = 400;    /* 400 kHz */
+		i3c_cfg->config.max_read_turnaround = 1000; /* 1 ms */
+		i3c_cfg->config.max_dev_nack_retry = 3;
+		i3c_cfg->config.max_payload_size = 256;   /* I3C_MAX_DATA_SIZE */
+		i3c_cfg->config.max_ibi_payload_size = 128; /* IBI_PAYLOAD_SIZE */
+	}
 
 	/* MAX_REQUEST/RESPONSE_PAYLOAD_SIZE: bounded by the shared internal
 	 * response buffer (OBMF_RSP_BUF_SIZE) for every channel.
@@ -1459,7 +1475,8 @@ int obmf_get_response(uint8_t *msg, uint32_t len,
 					   rsp_buf, rsp_len);
 			break;
 		}
-		case OBMF_ICP_I3C_CONTROLLER_CHANNEL: {
+		case OBMF_ICP_I3C_CONTROLLER_CHANNEL:
+		case OBMF_ICP_I3C_CONTROLLER_CHANNEL_1: {
 			/* Host (BMC) drives an I3C transaction through us
 			 * (Producer side) */
 			handle_i3c_request(hdr, payload, payload_len,
@@ -1523,6 +1540,7 @@ int obmf_get_response(uint8_t *msg, uint32_t len,
 			handle_i2c_target_response(hdr, payload, payload_len);
 			break;
 		case OBMF_ICP_I3C_CONTROLLER_CHANNEL:
+		case OBMF_ICP_I3C_CONTROLLER_CHANNEL_1:
 			handle_i3c_response(hdr, payload, payload_len);
 			break;
 		default:
@@ -1822,6 +1840,8 @@ static void handle_ch0_write_req(obmf_icp_header_t *req_hdr,
 		{ CH0_SERIAL_CHAN_1_CONFIG_OFFSET,
 		  sizeof(obmf_serial_config_data_t) },
 		{ CH0_I3C_CHAN_CONFIG_OFFSET,
+		  sizeof(obmf_i3c_config_data_t) },
+		{ CH0_I3C1_CHAN_CONFIG_OFFSET,
 		  sizeof(obmf_i3c_config_data_t) },
 	};
 

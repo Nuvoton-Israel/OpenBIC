@@ -37,20 +37,32 @@ extern struct k_mutex mutex_dev[I3C_MAX_NUM];
 
 /* ── Physical bus binding ───────────────────────────────────────────────── */
 
-static uint8_t i3c_controller_bus = 0xFF; /* 0xFF = not configured */
+/* Physical bus of each I3C Controller channel; 0xFF = not configured */
+static uint8_t i3c_controller_bus[OBMF_MAX_I3C_CONTROLLER_CHANNELS] = { 0xFF, 0xFF };
 
 #ifdef i3c_master_register_hj_callback
 static void i3c_hotjoin_cb(const struct device *dev, void *user_data);
 #endif
 
-void obmf_i3c_set_controller_bus(uint8_t bus)
+void obmf_i3c_set_controller_bus(uint8_t channel, uint8_t bus)
 {
-	i3c_controller_bus = bus;
+	i3c_controller_bus[OBMF_I3C_CTRL_CHAN_IDX(channel)] = bus;
 
 #ifdef i3c_master_register_hj_callback
 	if (bus < I3C_MAX_NUM && dev_i3c[bus])
-		i3c_master_register_hj_callback(dev_i3c[bus], i3c_hotjoin_cb, NULL);
+		i3c_master_register_hj_callback(dev_i3c[bus], i3c_hotjoin_cb,
+						(void *)(uintptr_t)channel);
 #endif
+}
+
+/* I3C Controller channel bound to a physical bus, or 0 if none is. */
+static uint8_t i3c_channel_of_bus(uint8_t bus)
+{
+	if (i3c_controller_bus[0] == bus)
+		return OBMF_ICP_I3C_CONTROLLER_CHANNEL;
+	if (i3c_controller_bus[1] == bus)
+		return OBMF_ICP_I3C_CONTROLLER_CHANNEL_1;
+	return 0;
 }
 
 /* ── Internal helpers ────────────────────────────────────────────────────── */
@@ -919,12 +931,18 @@ static void ibi_worker(struct k_work *work)
 		       ctx->ibi_buf, ibi_len);
 	}
 
+	uint8_t channel = i3c_channel_of_bus(ctx->bus);
 	int retries = OBMF_REQUEST_MAX_RETRY;
 	int rc;
 
+	if (!channel) {
+		LOG_ERR("I3C IBI: bus %u has no I3C Controller channel", ctx->bus);
+		free(tx_buf);
+		return;
+	}
+
 	do {
-		rc = obmf_send_request(OBMF_ICP_I3C_CONTROLLER_CHANNEL,
-				       tx_buf, total_len);
+		rc = obmf_send_request(channel, tx_buf, total_len);
 		if (rc == -EBUSY) {
 			k_msleep(OBMF_REQUEST_RETRY_DELAY_MS);
 		}
@@ -933,7 +951,7 @@ static void ibi_worker(struct k_work *work)
 	if (rc != 0 && retries == 0) {
 		LOG_ERR("I3C IBI: send notification failed after retries (dev@%02x): %d",
 			ctx->desc->info.dynamic_addr, rc);
-		channel_tags[OBMF_ICP_I3C_CONTROLLER_CHANNEL].is_outstanding = false;
+		channel_tags[channel].is_outstanding = false;
 	} else if (rc != 0 && rc != -ENETDOWN) {
 		LOG_ERR("I3C IBI: send notification failed (dev@%02x): %d",
 			ctx->desc->info.dynamic_addr, rc);
@@ -952,7 +970,7 @@ static void ibi_worker(struct k_work *work)
  *     a pending read) then sends an OBMF_I3C_EVT_IBI_NOTIFICATION event to the
  *     BMC via obmf_send_request().
  *
- * @param bus          Physical I3C bus index (must match i3c_controller_bus).
+ * @param bus          Physical I3C bus index (bound to an I3C Controller channel).
  * @param dynamic_addr 7-bit dynamic address of the target device.
  * @return 0 on success, negative errno on failure.
  */
@@ -1058,33 +1076,33 @@ static void ibi_ctx_refresh(uint8_t bus)
 static void i3c_hotjoin_cb(const struct device *dev, void *user_data)
 {
 	ARG_UNUSED(dev);
-	ARG_UNUSED(user_data);
 
+	uint8_t channel = (uint8_t)(uintptr_t)user_data;
 	uint8_t tx_buf[OBMF_HEADER_SIZE + OBMF_I3C_REQ_HDR_SIZE] = { 0 };
 	obmf_i3c_request_hdr_t *req =
 		(obmf_i3c_request_hdr_t *)(tx_buf + OBMF_HEADER_SIZE);
 	int retries = OBMF_REQUEST_MAX_RETRY;
 	int rc;
 
-	ibi_ctx_refresh(i3c_controller_bus);
+	ibi_ctx_refresh(i3c_controller_bus[OBMF_I3C_CTRL_CHAN_IDX(channel)]);
 
 	req->command = OBMF_I3C_EVT_HOTJOIN_NOTIFICATION;
 
 	do {
-		rc = obmf_send_request(OBMF_ICP_I3C_CONTROLLER_CHANNEL,
-				       tx_buf, sizeof(tx_buf));
+		rc = obmf_send_request(channel, tx_buf, sizeof(tx_buf));
 		if (rc == -EBUSY) {
 			k_msleep(OBMF_REQUEST_RETRY_DELAY_MS);
 		}
 	} while (rc == -EBUSY && --retries > 0);
 
 	if (rc != 0 && retries == 0) {
-		LOG_ERR("I3C Hot-Join: send notification failed after retries: %d", rc);
-		channel_tags[OBMF_ICP_I3C_CONTROLLER_CHANNEL].is_outstanding = false;
+		LOG_ERR("I3C CH%d Hot-Join: send notification failed after retries: %d",
+			channel, rc);
+		channel_tags[channel].is_outstanding = false;
 	} else if (rc != 0 && rc != -ENETDOWN) {
-		LOG_ERR("I3C Hot-Join: send notification failed: %d", rc);
+		LOG_ERR("I3C CH%d Hot-Join: send notification failed: %d", channel, rc);
 	} else if (rc == 0) {
-		LOG_INF("I3C Hot-Join: notified BMC");
+		LOG_INF("I3C CH%d Hot-Join: notified BMC", channel);
 	}
 }
 #endif
@@ -1114,7 +1132,7 @@ void handle_i3c_response(obmf_icp_header_t *rsp_hdr,
  * @brief Main I3C Controller Channel request handler.
  *
  * Called from the OBMF RX thread when the host sends an I3C request on
- * OBMF_ICP_I3C_CONTROLLER_CHANNEL.
+ * an I3C Controller channel.
  */
 void handle_i3c_request(obmf_icp_header_t *req_hdr,
 			uint8_t *payload, uint32_t payload_len,
@@ -1122,14 +1140,14 @@ void handle_i3c_request(obmf_icp_header_t *req_hdr,
 {
 	uint8_t channel = OBMF_ICP_GET_CHANNEL(req_hdr);
 
-	if (i3c_controller_bus == 0xFF) {
+	uint8_t bus = i3c_controller_bus[OBMF_I3C_CTRL_CHAN_IDX(channel)];
+
+	if (bus == 0xFF) {
 		LOG_ERR("I3C CH%d: bus not configured", channel);
 		build_i3c_response(channel, OBMF_ICP_STATUS_INVALID_CMD,
 				   0, 0, 0, rsp_buf, rsp_len);
 		return;
 	}
-
-	uint8_t bus = i3c_controller_bus;
 
 	if (!dev_i3c[bus]) {
 		LOG_ERR("I3C CH%d: dev_i3c[%u] not initialised", channel, bus);
