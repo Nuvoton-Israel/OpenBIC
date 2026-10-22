@@ -32,7 +32,7 @@
 /* i3c dev bus, BMC (1.8v) <-> SMC (1.8v) */
 #define I3C_BUS_TARGET_TO_BMC		5
 /* i3c bus used by the OBMF I3C Controller channel */
-#define I3C_BUS_CONTROLLER_TO_HUB	5
+#define I3C_BUS_CONTROLLER_TO_HUB	4
 
 void plat_mctp_init(void);
 mctp *find_mctp_by_bus(uint8_t bus);

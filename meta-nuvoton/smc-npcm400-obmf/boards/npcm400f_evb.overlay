@@ -95,7 +95,7 @@
 	status = "disabled";
 };
 
-#if 1
+#if 0
 /* Use for I3C_5 controller */
 &i3c5 {
 	status = "okay";
@@ -109,6 +109,11 @@
 	enable-hj;
 };
 #endif
+
+/* The OBMF I3C Controller channel uses i3c4 (A9/B9) */
+&i3c5 {
+	status = "disabled";
+};
 
 #if 0
 &i3c5 {
@@ -135,8 +140,14 @@
 /* Use for I3C_4 controller */
 &i3c4 {
 	status = "okay";
+	compatible = "nuvoton,npcm4-i3c";
+	reg = <0x40004800 0x200
+	       0x4000d000 0x20
+	       0x40015000 0x490>;
+	reg-names = "i3c", "pmc", "pdma";
 	i2c-scl-hz = <100000>;
 	i3c-scl-hz = <12500000>;
+	enable-hj;
 };
 #endif
 
