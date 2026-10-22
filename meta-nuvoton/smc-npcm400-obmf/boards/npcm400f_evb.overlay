@@ -4,7 +4,7 @@
 
 		/* UARTs bridged to OBMF Serial channel 0 / 1 */
 		openbic,obmf-serial-0 = &uart1;
-		//openbic,obmf-serial-1 = &uart2;
+		openbic,obmf-serial-1 = &uart2;
 	};
 };
 
@@ -19,12 +19,10 @@
 	ext-loopback;
 };
 
-#if 0
 &uart2 {
 	status = "okay";
 	current-speed = <115200>;
 };
-#endif
 
 &twd0 {
        status = "okay";
