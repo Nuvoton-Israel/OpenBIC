@@ -1,0 +1,106 @@
+From a76c665b3de2203e7838bcd4a50750b881357f3e Mon Sep 17 00:00:00 2001
+From: Joseph Liu <kwliu@nuvoton.com>
+Date: Thu, 22 Oct 2026 12:20:13 +0800
+Subject: [PATCH] drivers: i3c: npcm4: add a Hot-Join completion callback
+
+When a target Hot-Joins, the controller runs DAA in hj_work and
+re-attaches the device, possibly at a new dynamic address and with a
+new descriptor. Users of the controller have no way to learn about it,
+so they keep addressing the device at its old address and lose the
+IBI callbacks they registered on the old descriptor.
+
+Add i3c_master_register_hj_callback() to register a callback that runs
+in the system workqueue once hj_work has assigned the addresses and
+registered the devices.
+
+Signed-off-by: Joseph Liu <kwliu@nuvoton.com>
+---
+ drivers/i3c/i3c_npcm4.c   | 22 ++++++++++++++++++++++
+ include/drivers/i3c/i3c.h | 10 ++++++++++
+ 2 files changed, 32 insertions(+)
+
+diff --git a/drivers/i3c/i3c_npcm4.c b/drivers/i3c/i3c_npcm4.c
+index 8d921d21705..e4c49a96224 100644
+--- a/drivers/i3c/i3c_npcm4.c
++++ b/drivers/i3c/i3c_npcm4.c
+@@ -245,6 +245,9 @@ struct i3c_npcm4_obj {
+ 
+ 	/* Work item for DAA process triggered by hot-join event */
+ 	struct k_work hj_work;
++	/* Called once hj_work has run DAA */
++	i3c_hj_callback_t hj_cb;
++	void *hj_cb_data;
+ 
+ 	/* DMA structure */
+ 	uint8_t *dma_buf;
+@@ -1629,6 +1632,9 @@ static void i3c_npcm4_hj_work_handler(struct k_work *work)
+ 			printk("Fail to register i3c dev@%02x\n", addrs[i]);
+ 		}
+ 	}
++
++	if (obj->hj_cb)
++		obj->hj_cb(obj->dev, obj->hj_cb_data);
+ }
+ 
+ /**
+@@ -1804,6 +1810,22 @@ struct i3c_dev_desc *i3c_npcm4_master_get_desc(const struct device *dev, uint8_t
+ 	return i3c_npcm4_master_dev_from_addr(obj, addr);
+ }
+ 
++/**
++ * @brief Register a callback run after the DAA triggered by a hot-join event
++ *
++ * The callback runs in the system workqueue. Pass NULL to unregister.
++ */
++int i3c_npcm4_master_register_hj_callback(const struct device *dev, i3c_hj_callback_t cb,
++					   void *user_data)
++{
++	struct i3c_npcm4_obj *obj = DEV_DATA(dev);
++
++	obj->hj_cb_data = user_data;
++	obj->hj_cb = cb;
++
++	return 0;
++}
++
+ /**
+  * @brief Attach an I3C device to the controller
+  */
+diff --git a/include/drivers/i3c/i3c.h b/include/drivers/i3c/i3c.h
+index 38f49119ebf..d825f545dd3 100644
+--- a/include/drivers/i3c/i3c.h
++++ b/include/drivers/i3c/i3c.h
+@@ -131,6 +131,13 @@ struct i3c_ibi_callbacks {
+ 	void (*write_done)(struct i3c_dev_desc *i3cdev);
+ };
+ 
++/**
++ * @brief Hot-Join callback, called after the controller has run DAA for a Hot-Join request
++ * @param dev the I3C controller
++ * @param user_data the pointer passed when the callback was registered
++ */
++typedef void (*i3c_hj_callback_t)(const struct device *dev, void *user_data);
++
+ /* slave driver structure */
+ struct i3c_slave_payload {
+ 	int size;
+@@ -192,6 +199,8 @@ int i3c_npcm4_master_enable_ibi(struct i3c_dev_desc *i3cdev);
+ int i3c_npcm4_master_send_entdaa(struct i3c_dev_desc *i3cdev);
+ int i3c_npcm4_master_do_daa(const struct device *dev, uint8_t *addrs, int *count);
+ struct i3c_dev_desc *i3c_npcm4_master_get_desc(const struct device *dev, uint8_t addr);
++int i3c_npcm4_master_register_hj_callback(const struct device *dev, i3c_hj_callback_t cb,
++					   void *user_data);
+ int i3c_npcm4_slave_register(const struct device *dev, struct i3c_slave_setup *slave_data);
+ int i3c_npcm4_is_slave_mode(const struct device *dev);
+ 
+@@ -341,6 +350,7 @@ int i3c_master_register_i3c_dev(const struct device *master, uint8_t addr);
+ #define i3c_master_send_entdaa		i3c_npcm4_master_send_entdaa
+ #define i3c_master_do_daa		i3c_npcm4_master_do_daa
+ #define i3c_master_get_desc		i3c_npcm4_master_get_desc
++#define i3c_master_register_hj_callback	i3c_npcm4_master_register_hj_callback
+ #define i3c_slave_register		i3c_npcm4_slave_register
+ #define i3c_slave_set_static_addr	i3c_npcm4_slave_set_static_addr
+ #define i3c_slave_send_sir		i3c_npcm4_slave_send_sir
+-- 
+2.43.0
+
