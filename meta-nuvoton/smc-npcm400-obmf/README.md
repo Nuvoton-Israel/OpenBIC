@@ -12,8 +12,7 @@ This repository provides support for the Nuvoton NPCM400 Evaluation Board (EVB) 
     - [Method 1: J-Link](#j-link)
     - [Method 2: NpcmFwProg](#npcmfwprog)
 - [Features & Verification](#features--verification)
-  - [PLDM over MCTP over USB](#pldm-over-mctp-over-usb)
-  - [PLDM Firmware Update](#pldm-firmware-update)
+  - [OBMF](#obmf)
 - [Contact Information](#contact-information)
 
 ---
@@ -63,73 +62,8 @@ The NPCM400F supports J-Link flash programming.
 
 ## Features & Verification
 
-### PLDM over MCTP over USB
-
-1. **Physical Connection**: Connect the SMC USB device to the BMC USB HOST.
-   - Ensure the BMC uses the [latest OpenBMC image](https://github.com/Nuvoton-Israel/openbmc).
-   - if you connect the SMC after BMC is booted, you need to run `systemctl restart xyz.openbmc_project.mctpreactor.service` in the OpenBMC.
-
-2. **Verify MCTP Link**:
-   ```bash
-   mctp link
-   # Expected: dev mctpusb0 index 9 address none net 1 mtu 68 up
-   ```
-
-3. **Verify MCTP Route**:
-   ```bash
-   mctp route
-   # Expected: eid min 10 max 10 net 1 dev mctpusb0 mtu 68
-   ```
-
-4. **Query PLDM Info**:
-   ```bash
-   # Get PLDM Types
-   pldmtool base GetPLDMTypes -m 10
-
-   # Get Firmware Parameters
-   pldmtool fw_update GetFwParams -m 10
-   ```
-
-5. **Sensor Data (SDR)**:
-   If PLDM sensors are enabled in [plat_def.h](https://github.com/Nuvoton-Israel/OpenBIC/blob/npcm_main_rebase/meta-nuvoton/smc-npcm400-obmf/src/platform/plat_def.h), retrieve ADC data via BMC:
-   ```bash
-   ipmitool sdr
-   ```
-   *Example Output:*
-   ```text
-   NPCM_AVSB        | 3.28 Volts        | ok
-   NPCM_VCC         | 3.29 Volts        | ok
-   NPCM_VHIF        | 1.93 Volts        | cr
-   NPCM_VSB         | 3.28 Volts        | ok
-   ```
-
-### PLDM Firmware Update
-
-1. **Generate PLDM Package**:
-   Use [pldm_fwup_pkg_creator.py](https://github.com/openbmc/pldm/tree/master/tools/fw-update):
-   ```bash
-   python3 pldm_fwup_pkg_creator.py SMCNPCM_signed_with_header.bin npcm400.json SMCNPCM_signed.bin
-   ```
-   The `npcm400.json` you can find from "[meta-nuvoton/smc-npcm400-obmf/pldm_fw_package/npcm400.json](https://github.com/Nuvoton-Israel/OpenBIC/blob/npcm_main_rebase/meta-nuvoton/smc-npcm400-obmf/pldm_fw_package/npcm400.json)"
-
-2. **Transfer to BMC**:
-   ```bash
-   cd /tmp/images/
-   tftp -g -r SMCNPCM_signed_with_header.bin <HOST_IP>
-   ```
-
-3. **Initiate Update**:
-   ```bash
-   busctl call \
-     xyz.openbmc_project.PLDM \
-     /xyz/openbmc_project/software/pldm \
-     xyz.openbmc_project.Software.Update \
-     StartUpdate \
-     hs \
-     3 \
-     "xyz.openbmc_project.Software.ApplyTime.RequestedApplyTimes.Immediate" \
-     3< /tmp/images/SMCNPCM_signed_with_header.bin
-   ```
+### OBMF
+For OBMF setup and verification steps, refer to the [OpenBMC NPCM845 EVB OBMF README](https://github.com/Nuvoton-Israel/openbmc/blob/npcm-master/meta-nuvoton-obmc/meta-evb-npcm845/README-OBMF.md).
 
 ---
 
