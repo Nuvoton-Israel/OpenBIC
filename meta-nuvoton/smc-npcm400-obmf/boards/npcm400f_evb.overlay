@@ -95,8 +95,7 @@
 	status = "disabled";
 };
 
-#if 0
-/* Use for I3C_5 controller */
+/* Second OBMF I3C Controller channel (ch19), on the I3C6 pins (A5/B5) */
 &i3c5 {
 	status = "okay";
 	compatible = "nuvoton,npcm4-i3c";
@@ -107,12 +106,6 @@
 	i2c-scl-hz = <100000>;
 	i3c-scl-hz = <8000000>;
 	enable-hj;
-};
-#endif
-
-/* The OBMF I3C Controller channel uses i3c4 (A9/B9) */
-&i3c5 {
-	status = "disabled";
 };
 
 #if 0
