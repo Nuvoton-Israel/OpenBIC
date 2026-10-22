@@ -18,8 +18,6 @@
 
 LOG_MODULE_DECLARE(obmf);
 
-/* Local flash device targeted by the Producer role (ch17) */
-#define SHD_DEV_NAME "spi_fiu0_cs1"
 static const struct device *shd_dev;
 
 /* starts the low-priority flash erase / write worker thread */
@@ -27,9 +25,16 @@ static void spi_flash_worker_init(void);
 
 void obmf_spi_producer_init(void)
 {
-	shd_dev = device_get_binding(SHD_DEV_NAME);
+#if DT_NODE_HAS_STATUS(DT_NODELABEL(spi_fiu0_cs1), okay)
+	shd_dev = DEVICE_DT_GET(DT_NODELABEL(spi_fiu0_cs1));
+#else
+	shd_dev = NULL;
+#endif
 	if (!shd_dev) {
-		LOG_WRN("SPI producer: shd_dev '%s' not found", SHD_DEV_NAME);
+		LOG_WRN("SPI producer: spi_fiu0_cs1 node not available");
+	} else if (!device_is_ready(shd_dev)) {
+		LOG_WRN("SPI producer: spi_fiu0_cs1 not ready");
+		shd_dev = NULL;
 	}
 
 	spi_flash_worker_init();
