@@ -13,6 +13,7 @@ This repository provides support for the Nuvoton NPCM400 Evaluation Board (EVB) 
     - [Method 2: NpcmFwProg](#npcmfwprog)
 - [Features & Verification](#features--verification)
   - [OBMF](#obmf)
+  - [OBMF Channel Mapping](#obmf-channel-mapping)
 - [Contact Information](#contact-information)
 
 ---
@@ -64,6 +65,36 @@ The NPCM400F supports J-Link flash programming.
 
 ### OBMF
 For OBMF setup and verification steps, refer to the [OpenBMC NPCM845 EVB OBMF README](https://github.com/Nuvoton-Israel/openbmc/blob/npcm-master/meta-nuvoton-obmc/meta-evb-npcm845/README-OBMF.md).
+
+### OBMF Channel Mapping
+The table below lists every OBMF-ICP channel this firmware exposes and the NPCM400 hardware behind it. Channel numbers are defined in [`meta-nuvoton/common/service/obmf/obmf.h`](../common/service/obmf/obmf.h); the bus bindings are set in [`src/platform/plat_init.c`](src/platform/plat_init.c) and [`boards/npcm400f_evb.overlay`](boards/npcm400f_evb.overlay).
+
+**Direction:** *BMC → SMC* means the BMC sends requests and the SMC executes them on local hardware. *SMC → BMC* means the SMC sends requests to the BMC.
+
+| Ch | Type | Macro | NPCM400 hardware | Direction | Notes |
+| --- | --- | --- | --- | --- | --- |
+| 0 | Config | `OBMF_ICP_CONTROL_CHANNEL` | - | - | Channel discovery and configuration |
+| 1 | MMIO | `OBMF_ICP_MMIO_CHANNEL` | SMC local register state | Both | Also carries a POST code region |
+| 2 | Serial | `OBMF_ICP_SERIAL_CHANNEL_0` | `uart1` (eSPI UART B, `ext-loopback`) | Both | Bridged by `plat_uart_bridge.c` via the `openbic,obmf-serial-0` chosen node |
+| 3 | IPMI | `OBMF_ICP_IPMI_CHANNEL_NUM` | Host KCS (`KCS1`) | SMC → BMC | Host IPMI requests received on KCS are forwarded to the BMC |
+| 4 | Memory Device | `OBMF_ICP_MEM_DEV_CHANNEL` | Storage device exposed by the BMC (eSPI flash access path, EDAF) | SMC → BMC | Byte-addressable read/write/erase; 0x4000000 address range, LRU page cache |
+| 5 | GPIO | `OBMF_ICP_SMC_GPIO_CHANNEL` | SMC GPIOs | Both | Every GPIO enabled (`is_init`) in `plat_gpio.c`, indexed in table order |
+| 6 | GPIO | `OBMF_ICP_SGPIO0_CHANNEL` | SGPIO group 0 | Both | Requires `CONFIG_SGPIO_NPCM4XX` |
+| 7 | GPIO | `OBMF_ICP_SGPIO1_CHANNEL` | SGPIO group 1 | Both | Requires `CONFIG_SGPIO_NPCM4XX` |
+| 8 | GPIO | `OBMF_ICP_VW_GPIO_CHANNEL` | eSPI Virtual Wire GPIOs | Both | `plat_vw_gpio.c` |
+| 9 | I/O | `OBMF_ICP_IO_CHANNEL` | I/O ports 0x80-0x83 | BMC → SMC | POST code capture |
+| 10 | I2C Controller | `OBMF_ICP_I2C_CONTROLLER_CHANNEL_0` | `I2C_BUS1` (`i2c1a`) | BMC → SMC | |
+| 11 | I2C Controller | `OBMF_ICP_I2C_CONTROLLER_CHANNEL_1` | `I2C_BUS2` (`i2c2a`) | BMC → SMC | |
+| 12 | I2C Controller | `OBMF_ICP_I2C_CONTROLLER_CHANNEL_2` | `I2C_BUS3` (`i2c3a`) | BMC → SMC | |
+| 13 | I2C Controller | `OBMF_ICP_I2C_CONTROLLER_CHANNEL_3` | `I2C_BUS5` (`i2c5a`) | BMC → SMC | |
+| 14 | I2C Target | `OBMF_ICP_I2C_TARGET_CHANNEL_0` | `I2C_BUS1` (`i2c1a`), target address 0x24 (8-bit) | SMC → BMC | Writes from external controllers are passed through to the BMC |
+| 15 | I2C Target | `OBMF_ICP_I2C_TARGET_CHANNEL_1` | `I2C_BUS2` (`i2c2a`), target address 0x28 (8-bit) | SMC → BMC | Same as channel 14 |
+| 16 | Serial | `OBMF_ICP_SERIAL_CHANNEL_1` | `uart2` | Both | Bridged via the `openbic,obmf-serial-1` chosen node |
+| 17 | SPI Controller | `OBMF_ICP_SPI_CHANNEL` | SPI flash on FIU0 CS1 (`spi_fiu0_cs1`) | BMC → SMC | JEDEC ID, read, status, page program, 4K/32K/64K erase |
+| 18 | I3C Controller | `OBMF_ICP_I3C_CONTROLLER_CHANNEL` | `i3c4` (datasheet I3C5, balls A9/B9) | BMC → SMC | Hot-Join enabled |
+| 19 | I3C Controller | `OBMF_ICP_I3C_CONTROLLER_CHANNEL_1` | `i3c5` (datasheet I3C6, balls A5/B5) | BMC → SMC | Hot-Join enabled |
+
+> **Note:** The SMC's own firmware flash (`spi_spim0_cs0`) is not exposed through OBMF. It is updated through PLDM firmware update over MCTP.
 
 ---
 
