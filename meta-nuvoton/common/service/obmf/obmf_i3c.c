@@ -793,6 +793,7 @@ struct obmf_ibi_ctx {
 	struct i3c_ibi_payload    payload;
 	struct i3c_ibi_callbacks  callbacks;
 	uint8_t                   ibi_buf[OBMF_I3C_IBI_BUF_SIZE];
+	uint64_t                  pid;
 	uint8_t                   bus;
 	bool                      active;
 };
@@ -809,12 +810,29 @@ static struct obmf_ibi_ctx *ibi_ctx_find(struct i3c_dev_desc *desc)
 	return NULL;
 }
 
+/*
+ * Look up by PID, not descriptor or address: when the driver re-attaches a
+ * device (e.g. after a Hot-Join DAA) it replaces the descriptor and may
+ * assign a new dynamic address.
+ */
+static struct obmf_ibi_ctx *ibi_ctx_find_pid(uint8_t bus, uint64_t pid)
+{
+	for (int i = 0; i < OBMF_I3C_IBI_MAX_DEVS; i++) {
+		if (g_ibi_ctx[i].active && g_ibi_ctx[i].bus == bus &&
+		    g_ibi_ctx[i].pid == pid) {
+			return &g_ibi_ctx[i];
+		}
+	}
+	return NULL;
+}
+
 static struct obmf_ibi_ctx *ibi_ctx_alloc(struct i3c_dev_desc *desc, uint8_t bus)
 {
 	for (int i = 0; i < OBMF_I3C_IBI_MAX_DEVS; i++) {
 		if (!g_ibi_ctx[i].active) {
 			memset(&g_ibi_ctx[i], 0, sizeof(g_ibi_ctx[i]));
 			g_ibi_ctx[i].desc   = desc;
+			g_ibi_ctx[i].pid    = desc->info.pid;
 			g_ibi_ctx[i].bus    = bus;
 			g_ibi_ctx[i].active = true;
 			return &g_ibi_ctx[i];
@@ -952,9 +970,11 @@ int obmf_i3c_request_ibi(uint8_t bus, uint8_t dynamic_addr)
 	}
 
 	/* Reuse existing context if already registered for this device. */
-	struct obmf_ibi_ctx *ctx = ibi_ctx_find(desc);
+	struct obmf_ibi_ctx *ctx = ibi_ctx_find_pid(bus, desc->info.pid);
 
-	if (!ctx) {
+	if (ctx) {
+		ctx->desc = desc;
+	} else {
 		ctx = ibi_ctx_alloc(desc, bus);
 		if (!ctx) {
 			LOG_ERR("I3C request_ibi: no free IBI context slots");
@@ -986,6 +1006,35 @@ int obmf_i3c_request_ibi(uint8_t bus, uint8_t dynamic_addr)
 	LOG_INF("I3C IBI registered and enabled for dev@%02x on bus %u",
 		dynamic_addr, bus);
 	return 0;
+}
+
+/**
+ * @brief Re-register IBI callbacks for every device registered on a bus.
+ *
+ * A Hot-Join DAA run by the driver re-attaches the device with a fresh
+ * descriptor that carries no IBI callbacks, possibly at a new dynamic
+ * address, so its IBIs would be dropped. Find each device by PID among the
+ * attached descriptors (never through ctx->desc, which may have been freed)
+ * and register again. Re-registering only sets the callback pointers, so it
+ * is cheap enough to do before every request that may make the device raise
+ * an IBI.
+ */
+static void ibi_ctx_refresh(uint8_t bus)
+{
+	for (uint8_t addr = 0; addr < I3C_MAX_ADDR; addr++) {
+		struct i3c_dev_desc *desc = i3c_master_get_desc(dev_i3c[bus], addr);
+
+		if (!desc)
+			continue;
+
+		struct obmf_ibi_ctx *ctx = ibi_ctx_find_pid(bus, desc->info.pid);
+
+		if (!ctx)
+			continue;
+
+		ctx->desc = desc;
+		i3c_master_request_ibi(desc, &ctx->callbacks);
+	}
 }
 
 /* ── I3C_EVT_IBI_NOTIFICATION response handler ─────────────────────────── */
@@ -1047,6 +1096,10 @@ void handle_i3c_request(obmf_icp_header_t *req_hdr,
 
 	uint8_t command     = payload[0];
 	uint8_t parameter_1 = payload[1];
+
+	/* DO_DAA registers IBIs for the devices it assigns itself. */
+	if (command != OBMF_I3C_CMD_DO_DAA)
+		ibi_ctx_refresh(bus);
 
 	switch (command) {
 
