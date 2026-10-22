@@ -57,6 +57,11 @@ static mctp_port plat_mctp_port[] = {
 		.medium_type = MCTP_MEDIUM_TYPE_TARGET_I3C
 	},
 	{
+		.conf.i3c_conf.addr = I3C_STATIC_ADDR_BMC,
+		.conf.i3c_conf.bus = I3C_BUS_TARGET_TO_BMC_1,
+		.medium_type = MCTP_MEDIUM_TYPE_TARGET_I3C
+	},
+	{
 		.channel_target = PLDM, 
 		.conf.usb_conf.addr = 0,
 		.conf.usb_conf.bus = 0,
@@ -225,7 +230,7 @@ static uint8_t get_route_medium_type(const mctp_route_entry *p)
 {
 	if (p->bus == MCTP_USB_ROUTE_BUS && p->addr == MCTP_USB_ROUTE_ADDR)
 		return MCTP_MEDIUM_TYPE_USB;
-	if (p->bus == I3C_BUS_TARGET_TO_BMC)
+	if (p->bus == I3C_BUS_TARGET_TO_BMC || p->bus == I3C_BUS_TARGET_TO_BMC_1)
 		return MCTP_MEDIUM_TYPE_TARGET_I3C;
 #ifdef TEST_I3C_CONTROLLER_BIC
 	if (p->bus == I3C_BUS_CONTROLLER_TO_BIC)

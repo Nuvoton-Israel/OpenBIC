@@ -95,5 +95,7 @@ void init_platform_config(void)
 
 	/* Only SD BIC need set pid then trigger hot-join to BMC */
 	i3c_set_pid(&i3c_msg, slot_pid);
+	i3c_msg.bus = I3C_BUS_TARGET_TO_BMC_1;
+	i3c_set_pid(&i3c_msg, slot_pid);
 #endif
 }

@@ -59,6 +59,8 @@
 /* i3c dev bus */
 /* Normal use bus, BMC (1.8v) <-> BIC (1.8v) */
 #define I3C_BUS_TARGET_TO_BMC		4
+/* Second target link to BMC, on the I3C6 pins */
+#define I3C_BUS_TARGET_TO_BMC_1		5
 
 /* Test use bus, BIC (3.3v) <-> BIC (3.3v) */
 #define I3C_BUS_CONTROLLER_TO_BIC	4

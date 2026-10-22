@@ -91,8 +91,24 @@
  * DT node i3cN drives the I3C(N+1) pins: i3c4 is I3C5_SCL/SDA (B9/A9),
  * i3c5 is I3C6_SCL/SDA (A5/B5).
  */
+/* Second MCTP over I3C target to BMC, on the I3C6 pins */
 &i3c5 {
-	status = "disabled";
+	bcr = <0x66>;
+	dcr = <0xCC>;
+	part-id = <0x1234>;
+	vendor-def-id = <0x5607>;
+	slave;
+	secondary;
+	status = "okay";
+	i3c5_smq:i3c-slave-mqueue@21 {
+		compatible = "i3c-slave-mqueue";
+		reg = <0x21>;
+		msg-size = <256>;
+		num-of-msgs = <8>;
+		mandatory-data-byte = <0xae>;
+		label = "I3C_SMQ_5";
+		status = "okay";
+	};
 };
 
 /* MCTP over I3C target to BMC, on the I3C5 pins */
