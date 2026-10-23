@@ -1092,9 +1092,13 @@ static int obmf_channel_add(const struct obmf_plat_channel *pc)
 	hdr->device_role = obmf_channel_device_role(ch);
 	hdr->channel_status = CHAN_HEALTH_READY;
 	hdr->channel_control = 0; /* Disabled until the host enables it */
-	/* Bounded by the shared internal response buffer for every channel */
+	/*
+	 * Bounded by the shared internal response buffer for every channel.
+	 * A payload excludes the common header, which also lives in that
+	 * buffer.
+	 */
 	hdr->max_request_payload_size = OBMF_RSP_BUF_SIZE;
-	hdr->max_response_payload_size = OBMF_RSP_BUF_SIZE;
+	hdr->max_response_payload_size = OBMF_RSP_BUF_SIZE - OBMF_HEADER_SIZE;
 	hdr->config_size = size;
 
 	/* Channel offset table is indexed by (channel_number - 1) */
