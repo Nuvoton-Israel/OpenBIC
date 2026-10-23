@@ -1352,10 +1352,174 @@ typedef void (*obmf_i2c_target_rsp_cb_t)(uint8_t status, uint8_t command,
 					 void *ctx);
 
 /* =====================================================================
+ * Platform channel configuration
+ *
+ * The common service implements the OBMF-ICP protocol; the platform decides
+ * which channels exist, what they are called, how they are configured and
+ * which local bus backs them.  A platform describes its channels in a table
+ * and hands it to obmf_service_init():
+ *
+ *   static const struct obmf_plat_channel plat_obmf_channels[] = {
+ *       OBMF_CHANNEL_MMIO("MMIO", 64, 64),
+ *       OBMF_CHANNEL_SERIAL(OBMF_ICP_SERIAL_CHANNEL_0, "Serial", 115200),
+ *       OBMF_CHANNEL_I2C(OBMF_ICP_I2C_CONTROLLER_CHANNEL_0, "I2C0",
+ *                        I2C_BUS1, OBMF_I2C_SPEED_100KHZ),
+ *       OBMF_CHANNEL_I3C(OBMF_ICP_I3C_CONTROLLER_CHANNEL, "I3C0", 4),
+ *   };
+ *
+ *   static const struct obmf_plat_config plat_obmf_config =
+ *       OBMF_PLAT_CONFIG("OpenBIC-OBMF", plat_obmf_channels);
+ *
+ *   obmf_service_init(&plat_obmf_config);
+ *
+ * The channel number selects the channel type (see OBMF_ICP_*_CHANNEL).
+ * Channels that are not listed are not advertised to the host: their
+ * Channel 0 offset is 0 and requests to them fail with UNKNOWN_CHANNEL.
+ * ===================================================================== */
+
+/** Maximum channel name length (the 16-byte field is NUL-padded). */
+#define OBMF_CHANNEL_NAME_MAX 15
+
+/**
+ * @brief One channel provided by the platform.
+ *
+ * Only the member of @ref cfg matching the channel type is used.  Channel
+ * types without configuration data (IPMI) ignore it.
+ */
+struct obmf_plat_channel {
+	uint8_t channel;  /* OBMF_ICP_*_CHANNEL */
+	const char *name; /* Advertised name, at most OBMF_CHANNEL_NAME_MAX chars */
+	uint8_t bus;      /* I2C/I3C controller channels: local bus number */
+	union {
+		obmf_mmio_config_data_t mmio;
+		obmf_serial_config_data_t serial;
+		obmf_spi_config_data_t spi;
+		obmf_mem_dev_config_data_t mem_dev;
+		struct {
+			uint16_t count; /* Number of GPIOs exposed */
+		} gpio;
+		obmf_io_config_data_t io; /* io_range_count 0 = count enabled ranges */
+		obmf_i2c_config_data_t i2c;
+		struct {
+			uint8_t speed;  /* OBMF_I2C_SPEED_* */
+		} i2c_target;
+		obmf_i3c_config_data_t i3c;
+	} cfg;
+};
+
+/** @brief Platform description passed to obmf_service_init(). */
+struct obmf_plat_config {
+	const char *device_name; /* At most OBMF_DEVICE_NAME_SIZE - 1 chars */
+	uint16_t vendor_id;      /* PCI-SIG vendor ID, 0xFFFF = none */
+	uint16_t device_id;
+	const struct obmf_plat_channel *channels;
+	uint8_t num_channels;
+};
+
+#define OBMF_PLAT_CONFIG(_name, _channels)                                     \
+	{                                                                      \
+		.device_name = (_name), .vendor_id = 0xFFFF, .device_id = 0x0001, \
+		.channels = (_channels),                                       \
+		.num_channels = sizeof(_channels) / sizeof((_channels)[0]),    \
+	}
+
+/* --- Helpers for the channel table, one per channel type --- */
+
+/** MMIO channel (always channel 1); max read/write sizes in bytes. */
+#define OBMF_CHANNEL_MMIO(_name, _max_rd, _max_wr)                             \
+	{ .channel = OBMF_ICP_MMIO_CHANNEL, .name = (_name),                   \
+	  .cfg.mmio = { .max_mmio_read_size = (_max_rd),                       \
+			.max_mmio_write_size = (_max_wr) } }
+
+/** Serial channel, 8 data bits, 1 stop bit, no parity. */
+#define OBMF_CHANNEL_SERIAL(_ch, _name, _baud)                                 \
+	{ .channel = (_ch), .name = (_name),                                   \
+	  .cfg.serial = { .uart_speed_hz = (_baud), .uart_data_bits = 8,       \
+			  .uart_stop_bits = 1,                                 \
+			  .uart_line_control = OBMF_SERIAL_PARITY_NONE } }
+
+/** IPMI channel (no configuration data). */
+#define OBMF_CHANNEL_IPMI(_name)                                               \
+	{ .channel = OBMF_ICP_IPMI_CHANNEL_NUM, .name = (_name) }
+
+/** SPI controller channel; flags are OBMF_SPI_FLAG_*, clocks in Hz. */
+#define OBMF_CHANNEL_SPI(_name, _flags, _num_dev, _rd_hz, _wr_hz)              \
+	{ .channel = OBMF_ICP_SPI_CHANNEL, .name = (_name),                    \
+	  .cfg.spi = { .supported_config_flags = (_flags),                     \
+		       .num_devices = (_num_dev),                              \
+		       .rd_max_speed_hz = (_rd_hz),                            \
+		       .wr_max_speed_hz = (_wr_hz) } }
+
+/**
+ * Memory device channel; caps are OBMF_MEM_DEV_CAP_*, size in bytes,
+ * erase block in KB, read/write sizes in bytes.
+ */
+#define OBMF_CHANNEL_MEM_DEV(_name, _caps, _size, _erase_kb, _rd, _wr)         \
+	{ .channel = OBMF_ICP_MEM_DEV_CHANNEL, .name = (_name),                \
+	  .cfg.mem_dev = { .capabilities = (_caps), .device_size = (_size),    \
+			   .erase_size = (_erase_kb), .read_size = (_rd),      \
+			   .write_size = (_wr) } }
+
+/** GPIO channel exposing @p _count GPIOs. */
+#define OBMF_CHANNEL_GPIO(_ch, _name, _count)                                  \
+	{ .channel = (_ch), .name = (_name), .cfg.gpio = { .count = (_count) } }
+
+/** One I/O port range for OBMF_CHANNEL_IO() (OBMF_IO_SERVICE_* type). */
+#define OBMF_IO_RANGE(_start, _end, _service)                                  \
+	{ .range_flags = OBMF_IO_RANGE_ENABLE, .range_start = (_start),        \
+	  .range_end = (_end), .service_type = (_service) }
+
+/**
+ * I/O port channel; @p _types is a bitmap of OBMF_ICP_IO_TRANS_* bits and
+ * the remaining arguments are up to OBMF_IO_MAX_RANGES OBMF_IO_RANGE()s.
+ */
+#define OBMF_CHANNEL_IO(_name, _types, ...)                                    \
+	{ .channel = OBMF_ICP_IO_CHANNEL, .name = (_name),                     \
+	  .cfg.io = { .hdr = { .trans_types_supported = (_types) },            \
+		      .ranges = { __VA_ARGS__ } } }
+
+/** I2C controller channel on local bus @p _bus; speed is OBMF_I2C_SPEED_*. */
+#define OBMF_CHANNEL_I2C(_ch, _name, _bus, _speed)                             \
+	{ .channel = (_ch), .name = (_name), .bus = (_bus),                    \
+	  .cfg.i2c = { .controller_speed = (_speed) } }
+
+/**
+ * I2C target channel; speed is OBMF_I2C_SPEED_*.  Addresses are set at run
+ * time with obmf_i2c_target_set_address().
+ */
+#define OBMF_CHANNEL_I2C_TARGET(_ch, _name, _speed)                            \
+	{ .channel = (_ch), .name = (_name),                                   \
+	  .cfg.i2c_target = { .speed = (_speed) } }
+
+/** Default I3C controller capabilities (see obmf_i3c_config_data_t). */
+#define OBMF_I3C_DEFAULT_CONFIG                                                \
+	{ .i3c_feature_flags = OBMF_I3C_FEATURE_IBI_PRIV_READ,                 \
+	  .max_chained_ops = 16, .max_scl_pp_khz = 12500,                      \
+	  .max_scl_od_khz = 400, .max_read_turnaround = 1000,                  \
+	  .max_dev_nack_retry = 3, .max_payload_size = 256,                    \
+	  .max_ibi_payload_size = 128 }
+
+/** I3C controller channel on local bus @p _bus with default capabilities. */
+#define OBMF_CHANNEL_I3C(_ch, _name, _bus)                                     \
+	{ .channel = (_ch), .name = (_name), .bus = (_bus),                    \
+	  .cfg.i3c = OBMF_I3C_DEFAULT_CONFIG }
+
+/* =====================================================================
  * Public API
  * ===================================================================== */
 
-void obmf_service_init(void);
+/**
+ * @brief Build the discovery structure from @p cfg and start the service.
+ *
+ * @p cfg and its channel table must stay valid (normally static const).
+ * Invalid or duplicate table entries are logged and skipped.
+ *
+ * @return 0 on success, negative errno if the service could not start.
+ */
+int obmf_service_init(const struct obmf_plat_config *cfg);
+
+/** @brief True if the platform configured @p channel (Channel 0 is always). */
+bool obmf_channel_is_present(uint8_t channel);
 void obmf_message_handler(uint8_t *msg, uint32_t len);
 int obmf_get_response(uint8_t *req_buf, uint32_t req_len,
 		      uint8_t *rsp_buf, uint32_t *rsp_len);

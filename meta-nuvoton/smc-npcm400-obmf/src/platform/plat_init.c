@@ -23,6 +23,7 @@
 #include "plat_kcs.h"
 #include "plat_led.h"
 #include "plat_mctp.h"
+#include "plat_obmf.h"
 #include "plat_sgpio.h"
 #include "plat_vw_gpio.h"
 #include "snoop_npcm.h"
@@ -56,7 +57,7 @@ void pal_post_init()
 	kcs_init();
 	edaf_npcm_init();
 	plat_led_init();
-	obmf_service_init();
+	plat_obmf_init();
 	plat_i2c_target_passthrough_init();
 	if (!pal_load_obmf_smc_gpio_config()) {
 		LOG_ERR("failed to initialize obmf smc gpio channel");
@@ -69,13 +70,6 @@ void pal_post_init()
 	if (!pal_load_vw_gpio_config()) {
 		LOG_ERR("failed to initialize vw gpio");
 	}
-	obmf_i2c_set_controller_bus(OBMF_ICP_I2C_CONTROLLER_CHANNEL_0, I2C_BUS1);
-	obmf_i2c_set_controller_bus(OBMF_ICP_I2C_CONTROLLER_CHANNEL_1, I2C_BUS2);
-	obmf_i2c_set_controller_bus(OBMF_ICP_I2C_CONTROLLER_CHANNEL_2, I2C_BUS3);
-	obmf_i2c_set_controller_bus(OBMF_ICP_I2C_CONTROLLER_CHANNEL_3, I2C_BUS5);
-	obmf_i3c_set_controller_bus(OBMF_ICP_I3C_CONTROLLER_CHANNEL, I3C_BUS_CONTROLLER_TO_HUB);
-	obmf_i3c_set_controller_bus(OBMF_ICP_I3C_CONTROLLER_CHANNEL_1,
-				    I3C_BUS_CONTROLLER_TO_HUB_1);
 
 	gpio_set(FM_SMC_FW_READY, 1);
 

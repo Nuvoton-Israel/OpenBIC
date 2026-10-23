@@ -19,7 +19,8 @@
 
 LOG_MODULE_REGISTER(obmf);
 
-#define OBMF_DEFAULT_MAX_TRANS_SIZE 64
+/* Largest Channel 0 (discovery structure) read/write, in bytes */
+#define OBMF_CH0_MAX_TRANS_SIZE 64
 #define OBMF_PRIMARY_ENDPOINT 0
 #define OBMF_MIN_MSG_SIZE OBMF_HEADER_SIZE
 #define OBMF_RSP_BUF_SIZE 256
@@ -861,6 +862,9 @@ int obmf_i2c_target_set_address(uint8_t channel, uint8_t address)
 	    channel >= OBMF_I2C_TGT_CHAN_NUM(OBMF_MAX_I2C_TARGET_CHANNELS)) {
 		return -EINVAL;
 	}
+	if (!obmf_channel_is_present(channel)) {
+		return -ENODEV;
+	}
 
 	obmf_i2c_target_channel_config_t *tgt =
 		&discovery_struct.i2c_target_channel_configs[OBMF_I2C_TGT_CHAN_IDX(channel)];
@@ -941,18 +945,219 @@ void obmf_stop(void)
 	}
 }
 
-void obmf_service_init(void)
+/* Channels configured by the platform; bit N = channel N */
+static uint32_t obmf_present_mask = BIT(OBMF_ICP_CONTROL_CHANNEL);
+
+bool obmf_channel_is_present(uint8_t channel)
 {
-	const struct device *dev =
-		device_get_binding(CONFIG_USB_OBMF_DEVICE_NAME "_0");
-	if (dev) {
-		usb_obmf_register_device(dev, &obmf_usb_ops);
-	} else {
-		LOG_ERR("Failed to get OBMF USB device for"
-			" callback registration");
+	return channel <= OBMF_MAX_CHANNELS &&
+	       (obmf_present_mask & BIT(channel));
+}
+
+/* The direction of each channel is fixed by what the service implements */
+static uint8_t obmf_channel_device_role(uint8_t channel)
+{
+	switch (channel) {
+	case OBMF_ICP_IPMI_CHANNEL_NUM:
+	case OBMF_ICP_MEM_DEV_CHANNEL:
+	case OBMF_ICP_I2C_TARGET_CHANNEL_0:
+	case OBMF_ICP_I2C_TARGET_CHANNEL_1:
+		return OBMF_CH_DEVICE_ROLE_CONSUMER; /* SMC requests, BMC responds */
+	default:
+		return OBMF_CH_DEVICE_ROLE_PRODUCER;
+	}
+}
+
+/*
+ * Fill one channel's configuration space from a platform table entry.
+ * Returns the CONFIG_SIZE to advertise, or a negative errno.
+ */
+static int obmf_channel_config_fill(const struct obmf_plat_channel *pc,
+				    uint8_t *data)
+{
+	uint8_t ch = pc->channel;
+
+	switch (obmf_icp_get_channel_type(ch)) {
+	case OBMF_ICP_CHANNEL_TYPE_MMIO:
+		memcpy(data, &pc->cfg.mmio, sizeof(pc->cfg.mmio));
+		return sizeof(pc->cfg.mmio);
+	case OBMF_ICP_CHANNEL_TYPE_SERIAL:
+		memcpy(data, &pc->cfg.serial, sizeof(pc->cfg.serial));
+		return sizeof(pc->cfg.serial);
+	case OBMF_ICP_CHANNEL_TYPE_IPMI:
+		return 0;
+	case OBMF_ICP_CHANNEL_TYPE_SPI_CONTROLLER:
+		memcpy(data, &pc->cfg.spi, sizeof(pc->cfg.spi));
+		return sizeof(pc->cfg.spi);
+	case OBMF_ICP_CHANNEL_TYPE_MEM_DEVICE:
+		memcpy(data, &pc->cfg.mem_dev, sizeof(pc->cfg.mem_dev));
+		return sizeof(pc->cfg.mem_dev);
+	case OBMF_ICP_CHANNEL_TYPE_GPIO: {
+		obmf_gpio_config_data_t *gpio = (obmf_gpio_config_data_t *)data;
+
+		if (pc->cfg.gpio.count > OBMF_GPIO_MAX_ENTRIES) {
+			LOG_ERR("Channel %u: %u GPIOs, max %u", ch,
+				pc->cfg.gpio.count, OBMF_GPIO_MAX_ENTRIES);
+			return -EINVAL;
+		}
+		gpio->gpio_count = pc->cfg.gpio.count;
+		return sizeof(*gpio);
+	}
+	case OBMF_ICP_CHANNEL_TYPE_IO: {
+		obmf_io_config_data_t *io = (obmf_io_config_data_t *)data;
+
+		*io = pc->cfg.io;
+		if (io->hdr.io_range_count == 0) {
+			for (int i = 0; i < OBMF_IO_MAX_RANGES; i++) {
+				if (io->ranges[i].range_flags &
+				    OBMF_IO_RANGE_ENABLE) {
+					io->hdr.io_range_count = i + 1;
+				}
+			}
+		}
+		if (io->hdr.io_range_count > OBMF_IO_MAX_RANGES) {
+			LOG_ERR("Channel %u: %u I/O ranges, max %u", ch,
+				io->hdr.io_range_count, OBMF_IO_MAX_RANGES);
+			return -EINVAL;
+		}
+		return sizeof(*io);
+	}
+	case OBMF_ICP_CHANNEL_TYPE_I2C_CONTROLLER:
+		memcpy(data, &pc->cfg.i2c, sizeof(pc->cfg.i2c));
+		obmf_i2c_set_controller_bus(ch, pc->bus);
+		return sizeof(pc->cfg.i2c);
+	case OBMF_ICP_CHANNEL_TYPE_I2C_TARGET: {
+		obmf_i2c_target_config_data_t *tgt =
+			(obmf_i2c_target_config_data_t *)data;
+
+		/* Addresses are added later with obmf_i2c_target_set_address() */
+		tgt->target_speed = pc->cfg.i2c_target.speed;
+		tgt->target_address_count = 0;
+		return offsetof(obmf_i2c_target_config_data_t,
+				target_address_list);
+	}
+	case OBMF_ICP_CHANNEL_TYPE_I3C_CONTROLLER:
+		memcpy(data, &pc->cfg.i3c, sizeof(pc->cfg.i3c));
+		obmf_i3c_set_controller_bus(ch, pc->bus);
+		return sizeof(pc->cfg.i3c);
+	default:
+		return -ENOTSUP;
+	}
+}
+
+/* Add one platform channel to the Channel 0 discovery structure */
+static int obmf_channel_add(const struct obmf_plat_channel *pc)
+{
+	uint8_t ch = pc->channel;
+	obmf_channel_config_header_t *hdr = obmf_chan_cfg_hdr(ch);
+	int size;
+
+	if (!hdr) {
+		LOG_ERR("Channel %u is not supported by the OBMF service", ch);
+		return -EINVAL;
+	}
+	if (obmf_channel_is_present(ch)) {
+		LOG_ERR("Channel %u is defined twice", ch);
+		return -EEXIST;
 	}
 
-	/* Initialize ring buffer and semaphore */
+	size = obmf_channel_config_fill(pc, (uint8_t *)hdr +
+					CHAN_CFG_CONFIG_DATA_OFFSET);
+	if (size < 0) {
+		return size;
+	}
+
+	hdr->channel_type = obmf_icp_get_channel_type(ch);
+	hdr->channel_number = ch;
+	if (pc->name) {
+		if (strlen(pc->name) > OBMF_CHANNEL_NAME_MAX) {
+			LOG_WRN("Channel %u: name \"%s\" truncated to %u chars",
+				ch, pc->name, OBMF_CHANNEL_NAME_MAX);
+		}
+		strncpy(hdr->channel_name, pc->name, OBMF_CHANNEL_NAME_MAX);
+	} else {
+		snprintf(hdr->channel_name, sizeof(hdr->channel_name),
+			 "CH%u", ch);
+	}
+	hdr->device_role = obmf_channel_device_role(ch);
+	hdr->channel_status = CHAN_HEALTH_READY;
+	hdr->channel_control = 0; /* Disabled until the host enables it */
+	/* Bounded by the shared internal response buffer for every channel */
+	hdr->max_request_payload_size = OBMF_RSP_BUF_SIZE;
+	hdr->max_response_payload_size = OBMF_RSP_BUF_SIZE;
+	hdr->config_size = size;
+
+	/* Channel offset table is indexed by (channel_number - 1) */
+	discovery_struct.channel_offsets[ch - 1] =
+		(uint8_t *)hdr - (uint8_t *)&discovery_struct;
+	obmf_present_mask |= BIT(ch);
+
+	return 0;
+}
+
+/* Build the Channel 0 discovery structure from the platform description */
+static void obmf_discovery_init(const struct obmf_plat_config *cfg)
+{
+	memset(&discovery_struct, 0, sizeof(discovery_struct));
+	obmf_present_mask = BIT(OBMF_ICP_CONTROL_CHANNEL);
+
+	discovery_struct.base.version_minor_bcd = 0x00; /* v1.0 minor */
+	discovery_struct.base.version_major_bcd = 0x01; /* v1.0 major */
+	discovery_struct.base.vendor_id = cfg->vendor_id;
+	discovery_struct.base.device_id = cfg->device_id;
+	strncpy(discovery_struct.base.device_name,
+		cfg->device_name ? cfg->device_name : "OpenBIC-OBMF",
+		OBMF_DEVICE_NAME_SIZE - 1);
+	/*
+	 * Size of the channel offset table. Channels the platform did not
+	 * define keep offset 0, i.e. not implemented.
+	 */
+	discovery_struct.base.num_of_channels = OBMF_MAX_CHANNELS;
+	discovery_struct.base.config_status = 0;
+	discovery_struct.base.vendor_config_offset = 0; /* Not supported */
+
+	for (int i = 0; i < cfg->num_channels; i++) {
+		const struct obmf_plat_channel *pc = &cfg->channels[i];
+		int ret = obmf_channel_add(pc);
+
+		if (ret) {
+			LOG_ERR("Channel %u (%s) skipped: %d", pc->channel,
+				pc->name ? pc->name : "-", ret);
+		}
+	}
+
+	LOG_INF("OBMF channels: 0x%x", obmf_present_mask);
+}
+
+int obmf_service_init(const struct obmf_plat_config *cfg)
+{
+	if (!cfg || (cfg->num_channels && !cfg->channels)) {
+		LOG_ERR("No OBMF platform configuration");
+		return -EINVAL;
+	}
+
+	/* Everything the RX/TX threads use is set up before they start */
+	obmf_discovery_init(cfg);
+
+	for (int i = 0; i < OBMF_MAX_CHANNELS + 1; i++) {
+		channel_tags[i].is_outstanding = false;
+		/* First message on a channel shall use Tag = 0 */
+		channel_tags[i].producer_tag = 0;
+		channel_tags[i].consumer_tag = 0;
+	}
+
+	/* Initialize I2C Target channel message queues */
+	obmf_i2c_target_channels_init();
+
+	/* Initialize Serial channel response semaphores */
+	obmf_serial_channels_init();
+
+	/* Initialise SPI producer role (ch17: shd_dev binding) */
+	obmf_spi_producer_init();
+
+	/* Initialise Memory Device flash page cache (ch4) */
+	obmf_mem_dev_init();
+
 	k_sem_init(&obmf_rx_sem, 0, 1);
 
 	/* Create dedicated RX thread for OBMF BULK OUT processing */
@@ -964,7 +1169,7 @@ void obmf_service_init(void)
 	if (!obmf_rx_thread_id) {
 		LOG_ERR("Failed to create OBMF RX thread");
 		obmf_stop();
-		return;
+		return -ENOMEM;
 	}
 	k_thread_name_set(obmf_rx_thread_id, "obmf_rx");
 
@@ -977,324 +1182,22 @@ void obmf_service_init(void)
 	if (!obmf_tx_thread_id) {
 		LOG_ERR("Failed to create OBMF TX thread");
 		obmf_stop();
-		return;
+		return -ENOMEM;
 	}
 	k_thread_name_set(obmf_tx_thread_id, "obmf_tx");
 
-	/* Initialize I2C Target channel message queues */
-	obmf_i2c_target_channels_init();
-
-	/* Initialize Serial channel response semaphores */
-	obmf_serial_channels_init();
+	/* Register for USB traffic last, once there is someone to handle it */
+	const struct device *dev =
+		device_get_binding(CONFIG_USB_OBMF_DEVICE_NAME "_0");
+	if (!dev) {
+		LOG_ERR("Failed to get OBMF USB device for"
+			" callback registration");
+		return -ENODEV;
+	}
+	usb_obmf_register_device(dev, &obmf_usb_ops);
 
 	LOG_DBG("OBMF Secondary Service Initialized");
-
-	// --- Populate Channel 0 Discovery Structure (v0.9 format) ---
-	memset(&discovery_struct, 0, sizeof(discovery_struct));
-
-	/* Base registers */
-	discovery_struct.base.version_minor_bcd = 0x00; /* v1.0 minor */
-	discovery_struct.base.version_major_bcd = 0x01; /* v1.0 major */
-	discovery_struct.base.vendor_id = 0xFFFF; /* No PCI-SIG ID */
-	discovery_struct.base.device_id = 0x0001;
-	strncpy(discovery_struct.base.device_name, "OpenBIC-OBMF",
-		OBMF_DEVICE_NAME_SIZE - 1);
-	discovery_struct.base.num_of_channels = OBMF_MAX_CHANNELS; /* MMIO, Serial×2, IPMI, SPI, GPIO×4, I/O, I2C×4+Target×2, I3C×2 */
-	discovery_struct.base.config_status = 0;
-	discovery_struct.base.vendor_config_offset = 0; /* Not supported */
-
-	/*
-	 * Channel offset table is indexed by (channel_number - 1).
-	 * Keep this mapping aligned with OBMF_ICP_*_CHANNEL constants.
-	 */
-	discovery_struct.channel_offsets[OBMF_ICP_MMIO_CHANNEL - 1] =
-		CH0_MMIO_CHAN_CONFIG_OFFSET;
-	discovery_struct.channel_offsets[OBMF_ICP_SERIAL_CHANNEL_0 - 1] =
-		CH0_SERIAL_CHAN_CONFIG_OFFSET;
-	discovery_struct.channel_offsets[OBMF_ICP_IPMI_CHANNEL_NUM - 1] =
-		CH0_IPMI_CHAN_CONFIG_OFFSET;
-	discovery_struct.channel_offsets[OBMF_ICP_SPI_CHANNEL - 1] =
-		CH0_SPI_CHAN_CONFIG_OFFSET;
-	discovery_struct.channel_offsets[OBMF_ICP_MEM_DEV_CHANNEL - 1] =
-		CH0_MEM_DEV_CHAN_CONFIG_OFFSET;
-	discovery_struct.channel_offsets[OBMF_ICP_VW_GPIO_CHANNEL - 1] =
-		CH0_GPIO_CHAN_CONFIG_OFFSET;
-	discovery_struct.channel_offsets[OBMF_ICP_SGPIO1_CHANNEL - 1] =
-		CH0_SGPIO1_CHAN_CONFIG_OFFSET;
-	discovery_struct.channel_offsets[OBMF_ICP_SMC_GPIO_CHANNEL - 1] =
-		CH0_SMC_GPIO_CHAN_CONFIG_OFFSET;
-	discovery_struct.channel_offsets[OBMF_ICP_SGPIO0_CHANNEL - 1] =
-		CH0_SGPIO0_CHAN_CONFIG_OFFSET;
-	discovery_struct.channel_offsets[OBMF_ICP_IO_CHANNEL - 1] =
-		CH0_IO_CHAN_CONFIG_OFFSET;
-	discovery_struct.channel_offsets[OBMF_ICP_I2C_CONTROLLER_CHANNEL_0 - 1] =
-		CH0_I2C_CHAN_CONFIG_OFFSET;
-	discovery_struct.channel_offsets[OBMF_ICP_I2C_CONTROLLER_CHANNEL_1 - 1] =
-		CH0_I2C1_CHAN_CONFIG_OFFSET;
-	discovery_struct.channel_offsets[OBMF_ICP_I2C_CONTROLLER_CHANNEL_2 - 1] =
-		CH0_I2C2_CHAN_CONFIG_OFFSET;
-	discovery_struct.channel_offsets[OBMF_ICP_I2C_CONTROLLER_CHANNEL_3 - 1] =
-		CH0_I2C3_CHAN_CONFIG_OFFSET;
-	for (int i = 0; i < OBMF_MAX_I2C_TARGET_CHANNELS; i++) {
-		discovery_struct.channel_offsets[OBMF_I2C_TGT_CHAN_NUM(i) - 1] =
-			CH0_I2C_TARGET_CHAN_CONFIG_OFFSET(i);
-	}
-	discovery_struct.channel_offsets[OBMF_ICP_SERIAL_CHANNEL_1 - 1] =
-		CH0_SERIAL_CHAN_1_CONFIG_OFFSET;
-	discovery_struct.channel_offsets[OBMF_ICP_I3C_CONTROLLER_CHANNEL - 1] =
-		CH0_I3C_CHAN_CONFIG_OFFSET;
-	discovery_struct.channel_offsets[OBMF_ICP_I3C_CONTROLLER_CHANNEL_1 - 1] =
-		CH0_I3C1_CHAN_CONFIG_OFFSET;
-
-	/* MMIO Channel Configuration Space */
-	obmf_mmio_channel_config_t *mmio_cfg =
-		&discovery_struct.mmio_channel_config;
-	mmio_cfg->header.channel_type = OBMF_ICP_CHANNEL_TYPE_MMIO;
-	mmio_cfg->header.channel_number = OBMF_ICP_MMIO_CHANNEL;
-	strncpy(mmio_cfg->header.channel_name, "MMIO", 15);
-	mmio_cfg->header.channel_status = CHAN_HEALTH_READY;
-	mmio_cfg->header.channel_control = 0; /* Disabled by default */
-	mmio_cfg->header.config_size = sizeof(obmf_mmio_config_data_t);
-	mmio_cfg->config.max_mmio_read_size = OBMF_DEFAULT_MAX_TRANS_SIZE;
-	mmio_cfg->config.max_mmio_write_size = OBMF_DEFAULT_MAX_TRANS_SIZE;
-
-	/* Serial Channels Configuration Space (ch2, ch16) */
-	static const uint8_t serial_chans[OBMF_MAX_SERIAL_CHANNELS] = {
-		OBMF_ICP_SERIAL_CHANNEL_0,
-		OBMF_ICP_SERIAL_CHANNEL_1,
-	};
-	static const char * const serial_names[OBMF_MAX_SERIAL_CHANNELS] = {
-		"Serial",
-		"Serial_1",
-	};
-	for (int i = 0; i < OBMF_MAX_SERIAL_CHANNELS; i++) {
-		obmf_serial_channel_config_t *cfg =
-			&discovery_struct.serial_channel_configs[i];
-		cfg->header.channel_type = OBMF_ICP_CHANNEL_TYPE_SERIAL;
-		cfg->header.channel_number = serial_chans[i];
-		strncpy(cfg->header.channel_name, serial_names[i], 15);
-		cfg->header.channel_status = CHAN_HEALTH_READY;
-		cfg->header.channel_control = 0;
-		cfg->header.config_size = sizeof(obmf_serial_config_data_t);
-		cfg->config.uart_speed_hz = 115200;
-		cfg->config.uart_data_bits = 8;
-		cfg->config.uart_stop_bits = 1;
-		cfg->config.uart_line_control = OBMF_SERIAL_PARITY_NONE;
-	}
-
-	/* IPMI Channel Configuration Space */
-	obmf_ipmi_channel_config_t *ipmi_cfg =
-		&discovery_struct.ipmi_channel_config;
-	ipmi_cfg->header.channel_type = OBMF_ICP_CHANNEL_TYPE_IPMI;
-	ipmi_cfg->header.channel_number = OBMF_ICP_IPMI_CHANNEL_NUM;
-	strncpy(ipmi_cfg->header.channel_name, "IPMI", 15);
-	ipmi_cfg->header.device_role = OBMF_CH_DEVICE_ROLE_CONSUMER; /* SMC requests, BMC responds */
-	ipmi_cfg->header.channel_status = CHAN_HEALTH_READY;
-	ipmi_cfg->header.channel_control = 0;
-	ipmi_cfg->header.config_size = 0; /* No config data for IPMI */
-
-	/* SPI Controller Channel Configuration Space (ch17: Producer, BMC sends to SMC / shd_dev) */
-	obmf_spi_channel_config_t *spi_cfg = &discovery_struct.spi_channel_config;
-	spi_cfg->header.channel_type = OBMF_ICP_CHANNEL_TYPE_SPI_CONTROLLER;
-	spi_cfg->header.channel_number = OBMF_ICP_SPI_CHANNEL;
-	strncpy(spi_cfg->header.channel_name, "SPI_SHD", 15);
-	spi_cfg->header.device_role = OBMF_CH_DEVICE_ROLE_PRODUCER;
-	spi_cfg->header.channel_status = CHAN_HEALTH_READY;
-	spi_cfg->header.channel_control = 0;
-	spi_cfg->header.config_size = sizeof(obmf_spi_config_data_t);
-	spi_cfg->config.supported_config_flags =
-		OBMF_SPI_FLAG_CPHA | OBMF_SPI_FLAG_CPOL;
-	spi_cfg->config.config_flags = 0;
-	spi_cfg->config.num_devices = 1;
-	spi_cfg->config.rd_max_speed_hz = 50000000; /* 50 MHz */
-	spi_cfg->config.wr_max_speed_hz = 50000000;
-
-	/* Memory Device Channel Configuration Space (ch4: Consumer, SMC sends to BMC / eSPI-EDAF) */
-	obmf_mem_dev_channel_config_t *mem_dev_cfg =
-		&discovery_struct.mem_dev_channel_config;
-	mem_dev_cfg->header.channel_type = OBMF_ICP_CHANNEL_TYPE_MEM_DEVICE;
-	mem_dev_cfg->header.channel_number = OBMF_ICP_MEM_DEV_CHANNEL;
-	strncpy(mem_dev_cfg->header.channel_name, "MEM_EDAF", 15);
-	mem_dev_cfg->header.device_role = OBMF_CH_DEVICE_ROLE_CONSUMER;
-	mem_dev_cfg->header.channel_status = CHAN_HEALTH_READY;
-	mem_dev_cfg->header.channel_control = 0; /* Disabled by default */
-	mem_dev_cfg->header.config_size = sizeof(obmf_mem_dev_config_data_t);
-	mem_dev_cfg->config.capabilities = OBMF_MEM_DEV_CAP_WRITEABLE;
-	mem_dev_cfg->config.device_size = 0x4000000; /* 64 MB */
-	mem_dev_cfg->config.erase_size = 4;   /* 4 KB */
-	mem_dev_cfg->config.read_size = 960;
-	mem_dev_cfg->config.write_size = 256;
-
-	/* GPIO Channel Configuration Space (ch5: VW GPIO) */
-	obmf_gpio_channel_config_t *gpio_cfg =
-		&discovery_struct.gpio_channel_config;
-	gpio_cfg->header.channel_type = OBMF_ICP_CHANNEL_TYPE_GPIO;
-	gpio_cfg->header.channel_number = OBMF_ICP_VW_GPIO_CHANNEL;
-	strncpy(gpio_cfg->header.channel_name, "VW_GPIO", 15);
-	gpio_cfg->header.channel_status = CHAN_HEALTH_READY;
-	gpio_cfg->header.channel_control = 0;
-	gpio_cfg->header.config_size = sizeof(obmf_gpio_config_data_t);
-	gpio_cfg->config.gpio_count = 128; /* 0~63 output, 64~127 input */
-
-	/* SGPIO Channel Configuration Space (ch6: SGPIO1) */
-	obmf_gpio_channel_config_t *sgpio_cfg =
-		&discovery_struct.sgpio1_channel_config;
-	sgpio_cfg->header.channel_type = OBMF_ICP_CHANNEL_TYPE_GPIO;
-	sgpio_cfg->header.channel_number = OBMF_ICP_SGPIO1_CHANNEL;
-	strncpy(sgpio_cfg->header.channel_name, "SGPIO1", 15);
-	sgpio_cfg->header.channel_status = CHAN_HEALTH_READY;
-	sgpio_cfg->header.channel_control = 0;
-	sgpio_cfg->header.config_size = sizeof(obmf_gpio_config_data_t);
-	sgpio_cfg->config.gpio_count = 128; /* 0~63 output, 64~127 input */
-
-	/* Platform GPIO Channel Configuration Space (ch7: BMC GPIO) */
-	obmf_gpio_channel_config_t *smc_gpio_cfg =
-		&discovery_struct.smc_gpio_channel_config;
-	smc_gpio_cfg->header.channel_type = OBMF_ICP_CHANNEL_TYPE_GPIO;
-	smc_gpio_cfg->header.channel_number = OBMF_ICP_SMC_GPIO_CHANNEL;
-	strncpy(smc_gpio_cfg->header.channel_name, "SMC_GPIO", 15);
-	smc_gpio_cfg->header.channel_status = CHAN_HEALTH_READY;
-	smc_gpio_cfg->header.channel_control = 0;
-	smc_gpio_cfg->header.config_size = sizeof(obmf_gpio_config_data_t);
-	smc_gpio_cfg->config.gpio_count = 124;
-
-	/* SGPIO0 Channel Configuration Space (ch8: SGPIO0) */
-	obmf_gpio_channel_config_t *sgpio0_cfg =
-		&discovery_struct.sgpio0_channel_config;
-	sgpio0_cfg->header.channel_type = OBMF_ICP_CHANNEL_TYPE_GPIO;
-	sgpio0_cfg->header.channel_number = OBMF_ICP_SGPIO0_CHANNEL;
-	strncpy(sgpio0_cfg->header.channel_name, "SGPIO0", 15);
-	sgpio0_cfg->header.channel_status = CHAN_HEALTH_READY;
-	sgpio0_cfg->header.channel_control = 0;
-	sgpio0_cfg->header.config_size = sizeof(obmf_gpio_config_data_t);
-	sgpio0_cfg->config.gpio_count = 128;
-
-	/* I/O Port Channel Configuration Space (ch9: I/O Port) */
-	obmf_io_channel_config_t *io_cfg =
-		&discovery_struct.io_channel_config;
-	io_cfg->header.channel_type = OBMF_ICP_CHANNEL_TYPE_IO;
-	io_cfg->header.channel_number = OBMF_ICP_IO_CHANNEL;
-	strncpy(io_cfg->header.channel_name, "IO_PORT", 15);
-	io_cfg->header.channel_status = CHAN_HEALTH_READY;
-	io_cfg->header.channel_control = 0;
-	io_cfg->header.config_size = sizeof(obmf_io_config_data_t);
-	/*
-	 * Advertise support for Sequential and Fixed 8-bit read/write
-	 * (bits 0-1, 6-7) – the minimal set needed for POST code capture.
-	 */
-	io_cfg->config.hdr.trans_types_supported =
-		(1u << OBMF_ICP_IO_TRANS_SEQ_READ_8)  |
-		(1u << OBMF_ICP_IO_TRANS_SEQ_WRITE_8) |
-		(1u << OBMF_ICP_IO_TRANS_FIXED_READ_8) |
-		(1u << OBMF_ICP_IO_TRANS_FIXED_WRITE_8);
-	io_cfg->config.hdr.io_range_count = 1;
-	/* Range 0: POST code ports 0x80..0x83 */
-	io_cfg->config.ranges[0].range_flags = OBMF_IO_RANGE_ENABLE;
-	io_cfg->config.ranges[0].reserved    = 0;
-	io_cfg->config.ranges[0].range_start = OBMF_IO_POST_CODE_PORT;
-	io_cfg->config.ranges[0].range_end   = OBMF_IO_POST_CODE_PORT +
-					       OBMF_IO_POST_CODE_SIZE - 1;
-	io_cfg->config.ranges[0].range_mask  = 0x0000;
-	io_cfg->config.ranges[0].service_type = OBMF_IO_SERVICE_POST_CODE;
-
-	/* I2C Controller Channels 0-3 (ch10-ch13) */
-	static const uint8_t i2c_ctrl_chans[OBMF_MAX_I2C_CONTROLLER_CHANNELS] = {
-		OBMF_ICP_I2C_CONTROLLER_CHANNEL_0,
-		OBMF_ICP_I2C_CONTROLLER_CHANNEL_1,
-		OBMF_ICP_I2C_CONTROLLER_CHANNEL_2,
-		OBMF_ICP_I2C_CONTROLLER_CHANNEL_3,
-	};
-	static const char * const i2c_ctrl_names[OBMF_MAX_I2C_CONTROLLER_CHANNELS] = {
-		"I2C0", "I2C1", "I2C2", "I2C3",
-	};
-	for (int i = 0; i < OBMF_MAX_I2C_CONTROLLER_CHANNELS; i++) {
-		obmf_i2c_channel_config_t *cfg =
-			&discovery_struct.i2c_channel_configs[i];
-		cfg->header.channel_type = OBMF_ICP_CHANNEL_TYPE_I2C_CONTROLLER;
-		cfg->header.channel_number = i2c_ctrl_chans[i];
-		strncpy(cfg->header.channel_name, i2c_ctrl_names[i], 15);
-		cfg->header.channel_status = CHAN_HEALTH_READY;
-		cfg->header.channel_control = 0; /* Disabled by default */
-		cfg->header.config_size = sizeof(obmf_i2c_config_data_t);
-		cfg->config.controller_speed = OBMF_I2C_SPEED_100KHZ;
-		cfg->config.controller_options = 0;
-	}
-
-	/* I2C Target Channel Configuration Space (ch14-ch15) */
-	for (int i = 0; i < OBMF_MAX_I2C_TARGET_CHANNELS; i++) {
-		obmf_i2c_target_channel_config_t *tgt =
-			&discovery_struct.i2c_target_channel_configs[i];
-		tgt->header.channel_type = OBMF_ICP_CHANNEL_TYPE_I2C_TARGET;
-		tgt->header.channel_number = OBMF_I2C_TGT_CHAN_NUM(i);
-		snprintf(tgt->header.channel_name,
-			 sizeof(tgt->header.channel_name),
-			 "I2C_TGT%d", i);
-		tgt->header.device_role = OBMF_CH_DEVICE_ROLE_CONSUMER; /* SMC requests, BMC responds */
-		tgt->header.channel_status = CHAN_HEALTH_READY;
-		tgt->header.channel_control = 0; /* Disabled by default */
-		tgt->config.target_speed = OBMF_I2C_SPEED_100KHZ;
-		tgt->config.reserved = 0;
-		tgt->config.target_address_count = 0;
-		tgt->header.config_size =
-			offsetof(obmf_i2c_target_config_data_t, target_address_list) +
-			tgt->config.target_address_count;
-	}
-
-	/* I3C Controller Channels Configuration Space (ch18, ch19) */
-	static const uint8_t i3c_chans[OBMF_MAX_I3C_CONTROLLER_CHANNELS] = {
-		OBMF_ICP_I3C_CONTROLLER_CHANNEL,
-		OBMF_ICP_I3C_CONTROLLER_CHANNEL_1,
-	};
-	static const char * const i3c_names[OBMF_MAX_I3C_CONTROLLER_CHANNELS] = {
-		"I3C0",
-		"I3C1",
-	};
-	for (int i = 0; i < OBMF_MAX_I3C_CONTROLLER_CHANNELS; i++) {
-		obmf_i3c_channel_config_t *i3c_cfg = (i == 0) ?
-			&discovery_struct.i3c_channel_config :
-			&discovery_struct.i3c1_channel_config;
-		i3c_cfg->header.channel_type = OBMF_ICP_CHANNEL_TYPE_I3C_CONTROLLER;
-		i3c_cfg->header.channel_number = i3c_chans[i];
-		strncpy(i3c_cfg->header.channel_name, i3c_names[i], 15);
-		i3c_cfg->header.channel_status = CHAN_HEALTH_READY;
-		i3c_cfg->header.channel_control = 0; /* Disabled by default */
-		i3c_cfg->header.config_size = sizeof(obmf_i3c_config_data_t);
-		i3c_cfg->config.dev_nack_retry_count = 0;
-		i3c_cfg->config.i3c_feature_flags = OBMF_I3C_FEATURE_IBI_PRIV_READ;
-		i3c_cfg->config.max_chained_ops = 16;
-		i3c_cfg->config.max_scl_pp_khz = 12500;  /* 12.5 MHz */
-		i3c_cfg->config.max_scl_od_khz = 400;    /* 400 kHz */
-		i3c_cfg->config.max_read_turnaround = 1000; /* 1 ms */
-		i3c_cfg->config.max_dev_nack_retry = 3;
-		i3c_cfg->config.max_payload_size = 256;   /* I3C_MAX_DATA_SIZE */
-		i3c_cfg->config.max_ibi_payload_size = 128; /* IBI_PAYLOAD_SIZE */
-	}
-
-	/* MAX_REQUEST/RESPONSE_PAYLOAD_SIZE: bounded by the shared internal
-	 * response buffer (OBMF_RSP_BUF_SIZE) for every channel.
-	 */
-	for (int ch = 1; ch <= OBMF_MAX_CHANNELS; ch++) {
-		obmf_channel_config_header_t *hdr = obmf_chan_cfg_hdr(ch);
-
-		if (hdr) {
-			hdr->max_request_payload_size = OBMF_RSP_BUF_SIZE;
-			hdr->max_response_payload_size = OBMF_RSP_BUF_SIZE;
-		}
-	}
-
-	/* Initialize channel tags */
-	for (int i = 0; i < OBMF_MAX_CHANNELS + 1; i++) {
-		channel_tags[i].is_outstanding = false;
-		// First message on a channel shall use Tag = 0
-		channel_tags[i].producer_tag = 0;
-		channel_tags[i].consumer_tag = 0;
-	}
-
-	/* Initialise SPI producer role (ch17: shd_dev binding) */
-	obmf_spi_producer_init();
-
-	/* Initialise Memory Device flash page cache (ch4) */
-	obmf_mem_dev_init();
+	return 0;
 }
 
 int obmf_get_response(uint8_t *msg, uint32_t len,
@@ -1318,9 +1221,9 @@ int obmf_get_response(uint8_t *msg, uint32_t len,
 		return -1;
 	}
 
-	/* Check if channel is valid */
-	if (channel > OBMF_MAX_CHANNELS) {
-		LOG_ERR("Invalid channel %d", channel);
+	/* Check if channel is valid and configured by the platform */
+	if (!obmf_channel_is_present(channel)) {
+		LOG_ERR("Invalid or unconfigured channel %d", channel);
 		/* Only send error response for requests, not responses */
 		if (msg_type == OBMF_ICP_MSG_TYPE_REQUEST) {
 			obmf_build_err_response(hdr, OBMF_ICP_ERR_UNKNOWN_CHANNEL,
@@ -1659,12 +1562,7 @@ static void handle_ch0_read_req(obmf_icp_header_t *req_hdr,
 					  rsp_buf, rsp_len, true);
 	}
 
-	/*
-	 * Validate read_size against max transfer size per v0.9 spec:
-	 * Use MMIO channel config max_mmio_read_size
-	 */
-	uint32_t max_read =
-		discovery_struct.mmio_channel_config.config.max_mmio_read_size;
+	uint32_t max_read = OBMF_CH0_MAX_TRANS_SIZE;
 	if (read_size > max_read) {
 		LOG_ERR("CH0 read size %d exceeds max %d",
 			read_size, max_read);
@@ -1762,11 +1660,7 @@ static void handle_ch0_write_req(obmf_icp_header_t *req_hdr,
 					  rsp_buf, rsp_len, true);
 	}
 
-	/*
-	 * Validate write_size against max transfer size per v0.9 spec
-	 */
-	uint32_t max_write =
-		discovery_struct.mmio_channel_config.config.max_mmio_write_size;
+	uint32_t max_write = OBMF_CH0_MAX_TRANS_SIZE;
 	if (write_size > max_write) {
 		LOG_ERR("CH0 write size %d exceeds max %d",
 			write_size, max_write);
@@ -1850,6 +1744,14 @@ static void handle_ch0_write_req(obmf_icp_header_t *req_hdr,
 		uint32_t ctrl_off = cfg_base + CHAN_CFG_CONTROL_OFFSET;
 		uint32_t data_off = cfg_base + CHAN_CFG_CONFIG_DATA_OFFSET;
 		uint32_t data_end = data_off + chan_cfgs[ci].cfg_data_size;
+		const obmf_channel_config_header_t *slot =
+			(const obmf_channel_config_header_t *)
+			((uint8_t *)&discovery_struct + cfg_base);
+
+		/* Unconfigured slots are all zero, so channel_number is 0 */
+		if (slot->channel_number == OBMF_ICP_CONTROL_CHANNEL) {
+			continue;
+		}
 
 		if (addr == ctrl_off && write_size == 1) {
 			/* Write to CHANNEL_CONTROL register */
