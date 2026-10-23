@@ -1293,6 +1293,26 @@ int obmf_get_response(uint8_t *msg, uint32_t len,
 
 	LOG_HEXDUMP_DBG(msg, len, "BULK_OUT Data:");
 
+	/*
+	 * Reject requests larger than the channel advertises in
+	 * MAX_REQUEST_PAYLOAD_SIZE before any handler parses them.
+	 */
+	if (msg_type == OBMF_ICP_MSG_TYPE_REQUEST) {
+		const obmf_channel_config_header_t *cfg_hdr =
+			obmf_chan_cfg_hdr(channel);
+
+		if (cfg_hdr && len - OBMF_HEADER_SIZE >
+			       cfg_hdr->max_request_payload_size) {
+			LOG_ERR("CH%d request payload %u exceeds max %u",
+				channel, len - OBMF_HEADER_SIZE,
+				cfg_hdr->max_request_payload_size);
+			obmf_build_err_response(hdr,
+						OBMF_ICP_STATUS_SIZE_NOT_SUPPORTED,
+						rsp_buf, rsp_len, false);
+			return -1;
+		}
+	}
+
 	if (msg_type == OBMF_ICP_MSG_TYPE_REQUEST) {
 		// --- Handle incoming REQUESTS (we are the Producer) ---
 		LOG_DBG("Received OBMF request: Channel=%d, Type=0x%02x",
