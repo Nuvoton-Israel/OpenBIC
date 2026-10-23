@@ -1601,7 +1601,7 @@ static void handle_ch0_read_req(obmf_icp_header_t *req_hdr,
 	if (read_size > max_read) {
 		LOG_ERR("CH0 read size %d exceeds max %d",
 			read_size, max_read);
-		OBMF_BUILD_ERR_AND_RETURN(req_hdr, OBMF_ICP_ERR_ADDR_OUT_OF_RANGE,
+		OBMF_BUILD_ERR_AND_RETURN(req_hdr, OBMF_ICP_STATUS_SIZE_NOT_SUPPORTED,
 					  rsp_buf, rsp_len, true);
 	}
 
@@ -1741,7 +1741,7 @@ static void handle_ch0_write_req(obmf_icp_header_t *req_hdr,
 	if (write_size > max_write) {
 		LOG_ERR("CH0 write size %d exceeds max %d",
 			write_size, max_write);
-		OBMF_BUILD_ERR_AND_RETURN(req_hdr, OBMF_ICP_ERR_ADDR_OUT_OF_RANGE,
+		OBMF_BUILD_ERR_AND_RETURN(req_hdr, OBMF_ICP_STATUS_SIZE_NOT_SUPPORTED,
 					  rsp_buf, rsp_len, true);
 	}
 
