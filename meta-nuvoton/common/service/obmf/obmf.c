@@ -24,16 +24,15 @@ LOG_MODULE_REGISTER(obmf);
 #define OBMF_PRIMARY_ENDPOINT 0
 #define OBMF_MIN_MSG_SIZE OBMF_HEADER_SIZE
 #define OBMF_RSP_BUF_SIZE 256
-/* Short transactions use a 32-bit address, Long a 64-bit one; the
- * Read/Write Length field is 2 bytes in both cases.
+/* Short transactions use a 32-bit address, Long a 64-bit one.  Reads
+ * carry a 2-byte Read Length; writes carry no length field, the data runs
+ * to the end of the message (OBMF-ICP 1.0.0 Tables 8, 10, 12, 14).
  */
 #define OBMF_SHORT_ADDR_SIZE 4
 #define OBMF_LONG_ADDR_SIZE 8
 #define OBMF_SIZE_FIELD_LEN 2
 #define OBMF_SHORT_READ_REQ_SIZE (OBMF_SHORT_ADDR_SIZE + OBMF_SIZE_FIELD_LEN)
 #define OBMF_LONG_READ_REQ_SIZE (OBMF_LONG_ADDR_SIZE + OBMF_SIZE_FIELD_LEN)
-#define OBMF_SHORT_WRITE_MIN_SIZE (OBMF_SHORT_ADDR_SIZE + OBMF_SIZE_FIELD_LEN + 1)
-#define OBMF_LONG_WRITE_MIN_SIZE (OBMF_LONG_ADDR_SIZE + OBMF_SIZE_FIELD_LEN + 1)
 
 /* Error handling macro */
 #define OBMF_RETURN_ERR_IF(cond, fmt, ...) \
@@ -919,7 +918,7 @@ void obmf_build_err_response(obmf_icp_header_t *req_hdr,
 		obmf_icp_mmio_sub_header_t *rsp_sub =
 			(obmf_icp_mmio_sub_header_t *)(rsp_buf + OBMF_HEADER_SIZE);
 
-		*rsp_sub = *req_sub;
+		obmf_mmio_rsp_sub_header(rsp_sub, req_sub);
 		OBMF_ICP_SET_SIZE(rsp_hdr, OBMF_MMIO_SUB_HDR_SIZE);
 		*rsp_len = OBMF_FULL_MMIO_HDR_SIZE;
 	} else if (channel == OBMF_ICP_IO_CHANNEL) {
@@ -1249,7 +1248,7 @@ int obmf_get_response(uint8_t *msg, uint32_t len,
 	/*
 	 * Parse MMIO sub-header and payload.
 	 * CONFIG (0x00) and MMIO (0x01) channel types use the
-	 * MMIO sub-header format (Transaction + Tag).
+	 * 2-byte MMIO header (Transaction + Reserved, Table 5).
 	 * Interface-optimized channels (Serial, IPMI, SPI) do NOT have
 	 * MMIO sub-header - payload is directly after common header.
 	 */
@@ -1603,13 +1602,13 @@ static void handle_ch0_read_req(obmf_icp_header_t *req_hdr,
 	OBMF_ICP_SET_RQRESP_STATUS(rsp_hdr, OBMF_ICP_MSG_TYPE_RESPONSE,
 				   OBMF_ICP_SUCCESS);
 
-	/* Copy MMIO sub-header from request */
-	*rsp_sub = *req_sub;
+	/* Echo the MMIO header transaction */
+	obmf_mmio_rsp_sub_header(rsp_sub, req_sub);
 
 	/* v1.0.0 RC1 Read Response: data in payload */
 	memcpy(rsp_payload, (uint8_t *)&discovery_struct + addr, read_size);
 
-	/* Size = MMIO sub-header (2) + read_size */
+	/* Size = MMIO header + read_size */
 	OBMF_ICP_SET_SIZE(rsp_hdr, OBMF_MMIO_SUB_HDR_SIZE + read_size);
 
 	*rsp_len = OBMF_FULL_MMIO_HDR_SIZE + read_size;
@@ -1628,7 +1627,7 @@ static void handle_ch0_write_req(obmf_icp_header_t *req_hdr,
 	uint8_t trans_type = OBMF_ICP_MMIO_GET_TRANS(req_sub_w);
 	bool is_long = (trans_type == OBMF_ICP_TRANS_LONG_WRITE);
 	uint32_t addr_size = is_long ? OBMF_LONG_ADDR_SIZE : OBMF_SHORT_ADDR_SIZE;
-	uint32_t min_write_size = addr_size + OBMF_SIZE_FIELD_LEN + 1;
+	uint32_t min_write_size = addr_size + 1;
 
 	if (req_len < min_write_size) {
 		LOG_ERR("Invalid CH0 write request: payload_len=%d"
@@ -1648,31 +1647,12 @@ static void handle_ch0_write_req(obmf_icp_header_t *req_hdr,
 		addr = addr32;
 	}
 
-	uint16_t write_size;
-
-	memcpy(&write_size, &req_payload[addr_size], sizeof(uint16_t));
-
-	uint8_t *write_data = req_payload + addr_size + OBMF_SIZE_FIELD_LEN;
-
-	/* Validate total payload matches header + size + data */
-	if (req_len != addr_size + OBMF_SIZE_FIELD_LEN + write_size) {
-		LOG_ERR("CH0 write payload size mismatch: payload=%d,"
-			" expected=%d",
-			req_len,
-			(int)(addr_size + OBMF_SIZE_FIELD_LEN + write_size));
-		OBMF_BUILD_ERR_AND_RETURN(req_hdr, OBMF_ICP_ERR_CMD_NOT_SUPPORTED,
-					  rsp_buf, rsp_len, true);
-	}
+	/* The data runs from after the address to the end of the message */
+	uint16_t write_size = req_len - addr_size;
+	uint8_t *write_data = req_payload + addr_size;
 
 	LOG_DBG("CH0 %s Write Request: addr=0x%llx, size=%d",
 		is_long ? "Long" : "Short", addr, write_size);
-
-	/* Validate write_size > 0 */
-	if (write_size == 0) {
-		LOG_ERR("CH0 write size is 0");
-		OBMF_BUILD_ERR_AND_RETURN(req_hdr, OBMF_ICP_ERR_CMD_NOT_SUPPORTED,
-					  rsp_buf, rsp_len, true);
-	}
 
 	uint32_t max_write = OBMF_CH0_MAX_TRANS_SIZE;
 	if (write_size > max_write) {
@@ -1699,8 +1679,8 @@ static void handle_ch0_write_req(obmf_icp_header_t *req_hdr,
 	OBMF_ICP_SET_RQRESP_STATUS(rsp_hdr, OBMF_ICP_MSG_TYPE_RESPONSE,
 				   OBMF_ICP_SUCCESS);
 
-	/* Copy MMIO sub-header from request */
-	*rsp_sub = *req_sub_w;
+	/* Echo the MMIO header transaction */
+	obmf_mmio_rsp_sub_header(rsp_sub, req_sub_w);
 
 	/*
 	 * v0.9 Channel 0 writable fields:

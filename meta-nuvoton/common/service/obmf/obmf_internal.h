@@ -23,6 +23,14 @@
 #define OBMF_HEADER_SIZE sizeof(obmf_icp_header_t)
 #define OBMF_MMIO_SUB_HDR_SIZE sizeof(obmf_icp_mmio_sub_header_t)
 #define OBMF_FULL_MMIO_HDR_SIZE (OBMF_HEADER_SIZE + OBMF_MMIO_SUB_HDR_SIZE)
+
+/* Build a response MMIO header: same transaction, reserved bits zero */
+static inline void obmf_mmio_rsp_sub_header(obmf_icp_mmio_sub_header_t *rsp,
+					    const obmf_icp_mmio_sub_header_t *req)
+{
+	rsp->trans_rsvd = OBMF_ICP_MMIO_GET_TRANS(req);
+	rsp->reserved = 0;
+}
 #define OBMF_ICP_IO_SUB_HDR_SIZE sizeof(obmf_icp_io_sub_header_t)
 #define OBMF_FULL_IO_HDR_SIZE (OBMF_HEADER_SIZE + OBMF_ICP_IO_SUB_HDR_SIZE)
 

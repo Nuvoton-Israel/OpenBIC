@@ -68,12 +68,16 @@ typedef struct __attribute__((packed)) {
 } obmf_icp_header_t;
 
 /**
- * @brief OBMF-ICP MMIO Sub-Header (v1.0.0 RC1, 1 byte)
+ * @brief OBMF-ICP MMIO Channel header (OBMF-ICP 1.0.0 Table 5, 2 bytes)
  *
  * Byte 0: Transaction Type [2:0], Reserved [7:3]
+ * Byte 1: Reserved, set to 0
+ *
+ * Also used by Channel 0, which is accessed with MMIO Short Read/Write.
  */
 typedef struct __attribute__((packed)) {
-    uint8_t trans_rsvd;     /* Byte 0: [2:0]=Transaction, [7:3]=Reserved */
+	uint8_t trans_rsvd;     /* Byte 0: [2:0]=Transaction, [7:3]=Reserved */
+	uint8_t reserved;       /* Byte 1: Reserved, set to 0 */
 } obmf_icp_mmio_sub_header_t;
 
 /**
