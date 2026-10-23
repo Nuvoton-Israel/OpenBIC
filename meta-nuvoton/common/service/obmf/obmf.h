@@ -211,15 +211,12 @@ static inline bool obmf_icp_uses_mmio_subhdr(uint8_t channel_type)
 #define CHAN_STATUS_CONFIG_LOCKED      (1 << 6)
 #define CHAN_STATUS_ERROR_INDICATOR    (1 << 7)
 
-/* CHANNEL_STATUS health values */
+/* CHANNEL_STATUS health values (Table 65; 4-14 are reserved) */
 #define CHAN_HEALTH_UNKNOWN            0
 #define CHAN_HEALTH_READY              1
 #define CHAN_HEALTH_DISABLED           2
 #define CHAN_HEALTH_NOT_READY          3
-#define CHAN_HEALTH_BUSY               4
-#define CHAN_HEALTH_DEGRADED           5
-#define CHAN_HEALTH_RECOVERABLE_ERROR  14
-#define CHAN_HEALTH_FATAL_ERROR        15
+#define CHAN_HEALTH_ERROR              15
 
 /* CHANNEL_CONTROL bits (section 9.2) */
 #define CHAN_CONTROL_ENABLE            (1 << 0)
@@ -228,11 +225,12 @@ static inline bool obmf_icp_uses_mmio_subhdr(uint8_t channel_type)
 #define CHAN_CONTROL_MANUF_LOCK_REQ    (1 << 3)
 #define CHAN_CONTROL_CLEAR_ERROR       (1 << 4)
 
-/* CONFIG_STATUS bits */
-#define CH0_CONFIG_STATUS_MANUF_LOCKED      (1 << 0)
-#define CH0_CONFIG_STATUS_MANUF_LOCK_REQ    (1 << 1)
-#define CH0_CONFIG_STATUS_MANUF_VALID       (1 << 2)
-#define CH0_CONFIG_STATUS_RUNTIME_VALID     (1 << 3)
+/* CONFIG_STATUS bits (Table 64) */
+#define CH0_CONFIG_STATUS_MANUF_LOCK_SUPPORTED (1 << 0)
+#define CH0_CONFIG_STATUS_MANUF_LOCKED         (1 << 1)
+#define CH0_CONFIG_STATUS_MANUF_LOCK_REQ       (1 << 2)
+#define CH0_CONFIG_STATUS_MANUF_VALID          (1 << 3)
+#define CH0_CONFIG_STATUS_RUNTIME_APPLIED      (1 << 4)
 
 /**
  * @brief Channel 0 base registers (v1.0.0 RC1 spec section 4.13)

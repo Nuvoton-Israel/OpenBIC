@@ -1104,8 +1104,9 @@ static int obmf_channel_add(const struct obmf_plat_channel *pc)
 			 "CH%u", ch);
 	}
 	hdr->device_role = obmf_channel_device_role(ch);
-	hdr->channel_status = CHAN_HEALTH_READY;
-	hdr->channel_control = 0; /* Disabled until the host enables it */
+	/* Disabled until the host enables it; the default config is valid */
+	hdr->channel_status = CHAN_HEALTH_DISABLED | CHAN_STATUS_CONFIG_VALID;
+	hdr->channel_control = 0;
 	/*
 	 * Bounded by the shared internal response buffer for every channel.
 	 * A payload excludes the common header, which also lives in that
@@ -1635,6 +1636,67 @@ static void handle_ch0_read_req(obmf_icp_header_t *req_hdr,
 	*rsp_len = OBMF_FULL_MMIO_HDR_SIZE + read_size;
 }
 
+/*
+ * CHANNEL_CONTROL write (Table 65). Only CHANNEL_ENABLE is stored; RESET,
+ * APPLY_CONFIGURATION, MANUF_CONFIG_LOCK_REQUEST and CLEAR_CHANNEL_ERROR
+ * are write-1 self-clearing requests and the reserved bits read as 0.
+ */
+static void obmf_channel_control_write(obmf_channel_config_header_t *ch_hdr,
+				       uint8_t new_ctrl)
+{
+	uint8_t ch_no = ch_hdr->channel_number;
+	bool was_enabled = (ch_hdr->channel_control & CHAN_CONTROL_ENABLE) != 0;
+	bool now_enabled = (new_ctrl & CHAN_CONTROL_ENABLE) != 0;
+	uint8_t status = ch_hdr->channel_status;
+
+	ch_hdr->channel_control = new_ctrl & CHAN_CONTROL_ENABLE;
+
+	/* Explicit host intent overrides a pending resume restore */
+	obmf_suspended_mask &= ~BIT(ch_no);
+
+	if (new_ctrl & CHAN_CONTROL_RESET) {
+		/* Drop the outstanding request and any partial message */
+		LOG_INF("Channel %d reset", ch_no);
+		channel_tags[ch_no].is_outstanding = false;
+		if (obmf_frag_bufs[ch_no].buf) {
+			free(obmf_frag_bufs[ch_no].buf);
+			obmf_frag_bufs[ch_no].buf = NULL;
+		}
+		obmf_frag_bufs[ch_no].offset = 0;
+		status |= CHAN_STATUS_RESET_DONE;
+	}
+
+	/* Configuration Data writes take effect at once, so it is applied */
+	if (new_ctrl & CHAN_CONTROL_APPLY_CONFIG) {
+		status |= CHAN_STATUS_CONFIG_VALID;
+		discovery_struct.base.config_status |=
+			CH0_CONFIG_STATUS_RUNTIME_APPLIED;
+	}
+
+	/* Manufacturing Mode is not supported: a lock request has no effect */
+
+	/* No error condition is tracked, so it is never still present */
+	if (new_ctrl & CHAN_CONTROL_CLEAR_ERROR) {
+		status &= ~CHAN_STATUS_ERROR_INDICATOR;
+	}
+
+	if (was_enabled != now_enabled) {
+		LOG_INF("Channel %d %s", ch_no, now_enabled ? "enabled" : "disabled");
+		channel_tags[ch_no].is_outstanding = false;
+		if (now_enabled) {
+			channel_tags[ch_no].producer_tag = 0;
+			channel_tags[ch_no].consumer_tag = 0;
+		}
+	}
+
+	/* Health follows the enable state unless an error is still flagged */
+	if (!(status & CHAN_STATUS_ERROR_INDICATOR)) {
+		status = (status & ~CHAN_STATUS_HEALTH_MASK) |
+			 (now_enabled ? CHAN_HEALTH_READY : CHAN_HEALTH_DISABLED);
+	}
+	ch_hdr->channel_status = status;
+}
+
 static void handle_ch0_write_req(obmf_icp_header_t *req_hdr,
 				 uint8_t *req_payload,
 				 uint32_t req_len,
@@ -1769,39 +1831,10 @@ static void handle_ch0_write_req(obmf_icp_header_t *req_hdr,
 		}
 
 		if (addr == ctrl_off && write_size == 1) {
-			/* Write to CHANNEL_CONTROL register */
-			uint8_t new_ctrl = write_data[0];
-			uint8_t *ctrl_ptr = (uint8_t *)&discovery_struct + addr;
-			uint8_t old_ctrl = *ctrl_ptr;
-			obmf_channel_config_header_t *ch_hdr =
+			obmf_channel_control_write(
 				(obmf_channel_config_header_t *)
-				((uint8_t *)&discovery_struct + cfg_base);
-			uint8_t ch_no = ch_hdr->channel_number;
-
-			*ctrl_ptr = new_ctrl;
-
-			/* Explicit host intent overrides a pending resume restore */
-			obmf_suspended_mask &= ~BIT(ch_no);
-
-			/* Handle channel enable/disable */
-			bool was_enabled = (old_ctrl & CHAN_CONTROL_ENABLE) != 0;
-			bool now_enabled = (new_ctrl & CHAN_CONTROL_ENABLE) != 0;
-			if (was_enabled != now_enabled) {
-				if (now_enabled) {
-					LOG_INF("Channel %d enabled", ch_no);
-					channel_tags[ch_no].producer_tag = 0;
-					channel_tags[ch_no].consumer_tag = 0;
-					channel_tags[ch_no].is_outstanding = false;
-					ch_hdr->channel_status =
-						CHAN_HEALTH_READY |
-						CHAN_STATUS_CONFIG_VALID;
-				} else {
-					LOG_INF("Channel %d disabled", ch_no);
-					channel_tags[ch_no].is_outstanding = false;
-					ch_hdr->channel_status =
-						CHAN_HEALTH_DISABLED;
-				}
-			}
+				((uint8_t *)&discovery_struct + cfg_base),
+				write_data[0]);
 			goto success;
 		}
 
@@ -1812,6 +1845,15 @@ static void handle_ch0_write_req(obmf_icp_header_t *req_hdr,
 			       write_data, write_size);
 			goto success;
 		}
+	}
+
+	/*
+	 * CONFIG_STATUS: only MANUF_CONFIG_LOCK_REQUEST is writable, and this
+	 * device does not support Manufacturing Mode, so the request is
+	 * accepted and ignored; the bit reads back as 0.
+	 */
+	if (addr == offsetof(obmf_ch0_base_t, config_status) && write_size == 1) {
+		goto success;
 	}
 
 	/* No writable region matched */
