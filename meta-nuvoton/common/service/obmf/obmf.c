@@ -1228,7 +1228,7 @@ int obmf_get_response(uint8_t *msg, uint32_t len,
 		LOG_ERR("Invalid OBMF message length: %d", len);
 		/* Only send error response for requests, not responses */
 		if (msg_type == OBMF_ICP_MSG_TYPE_REQUEST) {
-			obmf_build_err_response(hdr, OBMF_ICP_ERR_OTHER,
+			obmf_build_err_response(hdr, OBMF_ICP_ERR_CMD_NOT_SUPPORTED,
 						rsp_buf, rsp_len, true);
 		}
 		return -1;
