@@ -67,7 +67,7 @@ The NPCM400F supports J-Link flash programming.
 For OBMF setup and verification steps, refer to the [OpenBMC NPCM845 EVB OBMF README](https://github.com/Nuvoton-Israel/openbmc/blob/npcm-master/meta-nuvoton-obmc/meta-evb-npcm845/README-OBMF.md).
 
 ### OBMF Channel Mapping
-The table below lists every OBMF-ICP channel this firmware exposes and the NPCM400 hardware behind it. Channel numbers are defined in [`meta-nuvoton/common/service/obmf/obmf.h`](../common/service/obmf/obmf.h); the bus bindings are set in [`src/platform/plat_init.c`](src/platform/plat_init.c) and [`boards/npcm400f_evb.overlay`](boards/npcm400f_evb.overlay).
+The table below lists every OBMF-ICP channel this firmware exposes and the NPCM400 hardware behind it. Channel numbers are defined in [`meta-nuvoton/common/service/obmf/obmf.h`](../common/service/obmf/obmf.h); the channel table and bus bindings are defined in [`src/platform/plat_obmf.c`](src/platform/plat_obmf.c) and [`boards/npcm400f_evb.overlay`](boards/npcm400f_evb.overlay).
 
 **Direction:** *BMC → SMC* means the BMC sends requests and the SMC executes them on local hardware. *SMC → BMC* means the SMC sends requests to the BMC.
 
@@ -93,6 +93,22 @@ The table below lists every OBMF-ICP channel this firmware exposes and the NPCM4
 | 17 | SPI Controller | `OBMF_ICP_SPI_CHANNEL` | SPI flash on FIU0 CS1 (`spi_fiu0_cs1`) | BMC → SMC | JEDEC ID, read, status, page program, 4K/32K/64K erase |
 | 18 | I3C Controller | `OBMF_ICP_I3C_CONTROLLER_CHANNEL` | `i3c4` (datasheet I3C5, balls A9/B9) | BMC → SMC | Hot-Join enabled |
 | 19 | I3C Controller | `OBMF_ICP_I3C_CONTROLLER_CHANNEL_1` | `i3c5` (datasheet I3C6, balls A5/B5) | BMC → SMC | Hot-Join enabled |
+
+#### Defining OBMF channels
+Each exposed channel is one entry in `plat_obmf_channels[]` in [`src/platform/plat_obmf.c`](src/platform/plat_obmf.c). The OBMF core builds the discovery structure from this table, so no core code needs to change:
+
+```c
+static const struct obmf_plat_channel plat_obmf_channels[] = {
+	OBMF_CHANNEL_SERIAL(OBMF_ICP_SERIAL_CHANNEL_0, "Serial", 115200),
+	OBMF_CHANNEL_I2C(OBMF_ICP_I2C_CONTROLLER_CHANNEL_0, "I2C0", I2C_BUS1, 100000),
+	OBMF_CHANNEL_I3C(OBMF_ICP_I3C_CONTROLLER_CHANNEL, "I3C0", I3C_BUS_CONTROLLER_TO_HUB),
+	/* ... */
+};
+```
+
+- To add a channel, add an `OBMF_CHANNEL_*()` entry. The helper macros are in [`obmf.h`](../common/service/obmf/obmf.h).
+- To bind a controller channel to a different bus, change the `bus` argument.
+- To hide a channel, remove its entry. The BMC then sees offset 0 for that channel and gets `UNKNOWN_CHANNEL` for any request to it.
 
 > **Note:** The SMC's own firmware flash (`spi_spim0_cs0`) is not exposed through OBMF. It is updated through PLDM firmware update over MCTP.
 
