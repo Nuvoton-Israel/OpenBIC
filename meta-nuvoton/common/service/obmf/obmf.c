@@ -267,6 +267,26 @@ static obmf_frag_msg_buf obmf_frag_bufs[OBMF_MAX_CHANNELS + 1];
 
 static void obmf_out_cb(const struct device *dev, uint32_t len, uint8_t *data);
 
+/* Hand a response to the TX thread; the caller keeps @buf */
+static void obmf_queue_response(const uint8_t *buf, uint32_t len)
+{
+	struct obmf_transport_msg msg;
+
+	msg.buf = (uint8_t *)malloc(len);
+	if (!msg.buf) {
+		LOG_ERR("Failed to allocate buffer for OBMF response (%d bytes)",
+			len);
+		return;
+	}
+	memcpy(msg.buf, buf, len);
+	msg.len = len;
+
+	if (k_msgq_put(&obmf_tx_msgq, &msg, K_NO_WAIT) != 0) {
+		LOG_WRN("Failed to queue OBMF response, queue full");
+		free(msg.buf);
+	}
+}
+
 /*
  * USB bus-reset / disconnect notification.
  *
@@ -466,6 +486,17 @@ static void obmf_rx_task(void *arg1, void *arg2, void *arg3)
 			LOG_ERR("Invalid OBMF channel: %u", channel);
 			LOG_HEXDUMP_ERR(fragment_buf, fragment_len,
 						 "Invalid fragment data:");
+			/* Answer the request once, on its last fragment */
+			if (OBMF_ICP_GET_RQRESP(hdr) == OBMF_ICP_MSG_TYPE_REQUEST &&
+			    fragment_len < CONFIG_OBMF_BULK_EP_MPS) {
+				uint8_t rsp_buf[OBMF_HEADER_SIZE];
+				uint32_t rsp_len = 0;
+
+				obmf_build_err_response(hdr,
+							OBMF_ICP_ERR_UNKNOWN_CHANNEL,
+							rsp_buf, &rsp_len, false);
+				obmf_queue_response(rsp_buf, rsp_len);
+			}
 			k_yield();
 			continue;
 		}
@@ -542,23 +573,7 @@ static void obmf_rx_task(void *arg1, void *arg2, void *arg3)
 
 			if (rsp_len > 0) {
 				/* Send response to TX thread for handling */
-				struct obmf_transport_msg msg;
-				msg.buf = (uint8_t *)malloc(rsp_len);
-				if (!msg.buf) {
-					LOG_ERR("Failed to allocate buffer for"
-						" OBMF response (%d bytes)",
-						rsp_len);
-				} else {
-					memcpy(msg.buf, rsp_buf, rsp_len);
-					msg.len = rsp_len;
-
-					if (k_msgq_put(&obmf_tx_msgq, &msg,
-						       K_NO_WAIT) != 0) {
-						LOG_WRN("Failed to queue OBMF "
-							"response, queue full");
-						free(msg.buf);
-					}
-				}
+				obmf_queue_response(rsp_buf, rsp_len);
 			}
 
 			/* Free fragment buffer (EOM cleanup) */
@@ -1340,10 +1355,16 @@ int obmf_get_response(uint8_t *msg, uint32_t len,
 		case OBMF_ICP_MEM_DEV_CHANNEL:
 		case OBMF_ICP_I2C_TARGET_CHANNEL_0:
 		case OBMF_ICP_I2C_TARGET_CHANNEL_1:
-			/* We are the Consumer (sender) on these channels;
-			 * incoming requests are not expected */
+			/*
+			 * We are the Consumer on these channels and the host,
+			 * as Producer, is not a Requester (Tables 29, 44, 59).
+			 * Still answer, so the host is not left waiting.
+			 */
 			LOG_WRN("Unexpected request on consumer channel %d",
 				channel);
+			obmf_build_err_response(hdr,
+						OBMF_ICP_ERR_CMD_NOT_SUPPORTED,
+						rsp_buf, rsp_len, false);
 			break;
 		case OBMF_ICP_SPI_CHANNEL: {
 			/* Host sends SPI flash requests to us (Producer side) */
