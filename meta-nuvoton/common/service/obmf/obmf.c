@@ -1625,7 +1625,9 @@ static void handle_ch0_read_req(obmf_icp_header_t *req_hdr,
 					  rsp_buf, rsp_len, true);
 	}
 
-	if (addr + read_size > sizeof(discovery_struct)) {
+	/* A 64-bit Long Read address must not wrap the sum below the end */
+	if (addr >= sizeof(discovery_struct) ||
+	    read_size > sizeof(discovery_struct) - addr) {
 		LOG_ERR("CH0 read out of bounds: addr=0x%llx, size=%d",
 			addr, read_size);
 		obmf_build_err_response(req_hdr, OBMF_ICP_ERR_ADDR_OUT_OF_RANGE,
@@ -1765,7 +1767,9 @@ static void handle_ch0_write_req(obmf_icp_header_t *req_hdr,
 					  rsp_buf, rsp_len, true);
 	}
 
-	if (addr + write_size > sizeof(discovery_struct)) {
+	/* A 64-bit Long Write address must not wrap the sum below the end */
+	if (addr >= sizeof(discovery_struct) ||
+	    write_size > sizeof(discovery_struct) - addr) {
 		LOG_ERR("CH0 write out of bounds: addr=0x%llx, size=%d",
 			addr, write_size);
 		obmf_build_err_response(req_hdr, OBMF_ICP_ERR_ADDR_OUT_OF_RANGE,
