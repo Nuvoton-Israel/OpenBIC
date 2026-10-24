@@ -26,6 +26,19 @@ static void              *gpio_get_cb_ctx[OBMF_MAX_CHANNELS + 1];
 /* Interrupt configuration set by the Consumer, per channel and GPIO index */
 static uint8_t gpio_int_cfg[OBMF_MAX_CHANNELS + 1][OBMF_GPIO_MAX_INT_INDEX];
 
+/* Most entries sent in one Interrupt Notify request */
+#define OBMF_GPIO_NOTIFY_MAX 64
+
+/*
+ * Interrupt Notify entries not delivered yet, per channel and GPIO index.
+ * obmf_gpio_report_level() marks an index; gpio_notify_work sends them.
+ */
+static atomic_t gpio_notify_pending[OBMF_MAX_CHANNELS + 1]
+				   [ATOMIC_BITMAP_SIZE(OBMF_GPIO_MAX_INT_INDEX)];
+
+static void gpio_notify_work_handler(struct k_work *work);
+static K_WORK_DELAYABLE_DEFINE(gpio_notify_work, gpio_notify_work_handler);
+
 /* Generic per-channel registration */
 void obmf_register_gpio_channel_get_cb(uint8_t channel,
 				       obmf_gpio_get_cb_t cb, void *ctx)
@@ -386,7 +399,6 @@ int obmf_gpio_notify(const uint16_t *indices, const uint8_t *values,
 
 int obmf_gpio_report_level(uint8_t channel, uint16_t index, bool high)
 {
-	const uint8_t data = 0; /* reserved for Interrupt Notify */
 	bool notify;
 
 	if (channel > OBMF_MAX_CHANNELS || index >= OBMF_GPIO_MAX_INT_INDEX) {
@@ -413,8 +425,103 @@ int obmf_gpio_report_level(uint8_t channel, uint16_t index, bool high)
 	if (!notify) {
 		return 0;
 	}
+	if (!obmf_channel_is_enabled(channel)) {
+		return -ENETDOWN;
+	}
 
-	return obmf_gpio_notify(&index, &data, 1, channel);
+	/* Delivered by gpio_notify_work, which retries while the channel is busy */
+	atomic_set_bit(gpio_notify_pending[channel], index);
+	obmf_channel_specific_status_set(channel, OBMF_GPIO_STS_INTERRUPT_PENDING,
+					 true);
+	k_work_reschedule(&gpio_notify_work, K_NO_WAIT);
+	return 0;
+}
+
+/* Send one Interrupt Notify with @count entries, without waiting or retrying */
+static int gpio_send_notify(uint8_t channel, const uint16_t *indices,
+			    uint16_t count)
+{
+	uint8_t tx_buf[OBMF_HEADER_SIZE + OBMF_GPIO_REQ_HDR_SIZE +
+		       OBMF_GPIO_NOTIFY_MAX * sizeof(obmf_gpio_entry_t)];
+	obmf_gpio_request_t *req =
+		(obmf_gpio_request_t *)(tx_buf + OBMF_HEADER_SIZE);
+	obmf_gpio_entry_t *entries =
+		(obmf_gpio_entry_t *)(tx_buf + OBMF_HEADER_SIZE +
+				      OBMF_GPIO_REQ_HDR_SIZE);
+
+	memset(tx_buf, 0, sizeof(tx_buf));
+	req->command = OBMF_GPIO_CMD_INT_NOTIFY;
+	for (uint16_t i = 0; i < count; i++) {
+		OBMF_GPIO_ENTRY_SET(&entries[i], indices[i], 0);
+	}
+	return obmf_send_request(channel, tx_buf,
+				 OBMF_HEADER_SIZE + OBMF_GPIO_REQ_HDR_SIZE +
+				 count * sizeof(obmf_gpio_entry_t));
+}
+
+static bool gpio_notify_any_pending(uint8_t channel)
+{
+	for (size_t w = 0; w < ARRAY_SIZE(gpio_notify_pending[channel]); w++) {
+		if (atomic_get(&gpio_notify_pending[channel][w])) {
+			return true;
+		}
+	}
+	return false;
+}
+
+/*
+ * Deliver the pending Interrupt Notify entries of every GPIO channel, as
+ * many per request as fit.  Only one request may be outstanding per
+ * channel, so a busy channel keeps its entries and is retried shortly, and
+ * again as soon as its outstanding request is answered.
+ */
+static void gpio_notify_work_handler(struct k_work *work)
+{
+	bool retry = false;
+
+	ARG_UNUSED(work);
+
+	for (uint8_t ch = 1; ch <= OBMF_MAX_CHANNELS; ch++) {
+		uint16_t indices[OBMF_GPIO_NOTIFY_MAX];
+		uint16_t n = 0;
+		int rc;
+
+		for (uint16_t i = 0; i < OBMF_GPIO_MAX_INT_INDEX &&
+		     n < OBMF_GPIO_NOTIFY_MAX; i++) {
+			if (atomic_test_and_clear_bit(gpio_notify_pending[ch],
+						      i)) {
+				indices[n++] = i;
+			}
+		}
+		if (!n) {
+			continue;
+		}
+
+		rc = gpio_send_notify(ch, indices, n);
+		if (rc == -ENETDOWN) {
+			/* Disabled by the host: nobody listens, drop them */
+			memset(gpio_notify_pending[ch], 0,
+			       sizeof(gpio_notify_pending[ch]));
+		} else if (rc) {
+			for (uint16_t i = 0; i < n; i++) {
+				atomic_set_bit(gpio_notify_pending[ch],
+					       indices[i]);
+			}
+			retry = true;
+			continue;
+		}
+		if (gpio_notify_any_pending(ch)) {
+			retry = true;
+		} else {
+			obmf_channel_specific_status_set(ch,
+				OBMF_GPIO_STS_INTERRUPT_PENDING, false);
+		}
+	}
+
+	if (retry) {
+		k_work_reschedule(&gpio_notify_work,
+				  K_MSEC(OBMF_REQUEST_RETRY_DELAY_MS));
+	}
 }
 
 /* =====================================================================
@@ -437,6 +544,11 @@ void handle_gpio_response(obmf_icp_header_t *rsp_hdr,
 	uint8_t status = OBMF_ICP_GET_STATUS(rsp_hdr);
 
 	channel_tags[channel].is_outstanding = false;
+
+	/* The channel is free again: send what queued up meanwhile */
+	if (gpio_notify_any_pending(channel)) {
+		k_work_reschedule(&gpio_notify_work, K_NO_WAIT);
+	}
 
 	if (payload_len < OBMF_GPIO_REQ_HDR_SIZE) {
 		LOG_ERR("GPIO response too short (%d bytes)", payload_len);

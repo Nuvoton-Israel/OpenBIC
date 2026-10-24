@@ -830,6 +830,20 @@ bool obmf_channel_is_enabled(uint8_t channel)
 	return hdr && (hdr->channel_control & CHAN_CONTROL_ENABLE);
 }
 
+void obmf_channel_specific_status_set(uint8_t channel, uint8_t bits, bool set)
+{
+	obmf_channel_config_header_t *hdr = obmf_chan_cfg_hdr(channel);
+
+	if (!hdr) {
+		return;
+	}
+	if (set) {
+		hdr->channel_specific_status |= bits;
+	} else {
+		hdr->channel_specific_status &= ~bits;
+	}
+}
+
 /*
  * Tags are deliberately left untouched: a plain USB suspend may be followed
  * by a resume without a bus reset, and the host's tag sequence continues.

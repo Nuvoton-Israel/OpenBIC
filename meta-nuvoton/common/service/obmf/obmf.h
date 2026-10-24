@@ -587,6 +587,10 @@ typedef struct __attribute__((packed)) {
 #define OBMF_GPIO_STATUS_INT_NOT_SUPPORTED     0x41
 #define OBMF_GPIO_STATUS_INVALID_OPERATION     0x42
 
+/* GPIO_STATUS bits (CHANNEL_SPECIFIC_STATUS of a GPIO channel, Table 67) */
+#define OBMF_GPIO_STS_INDEX_ERROR        (1 << 0)
+#define OBMF_GPIO_STS_INTERRUPT_PENDING  (1 << 1)
+
 /* GPIO entry: 2 bytes packed as [11:0]=Index, [15:12]=Data */
 typedef struct __attribute__((packed)) {
 	uint16_t raw;

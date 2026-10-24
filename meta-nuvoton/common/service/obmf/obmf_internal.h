@@ -97,6 +97,8 @@ void handle_i3c_request(obmf_icp_header_t *req_hdr,
 			uint8_t *rsp_buf, uint32_t *rsp_len);
 void handle_i3c_response(obmf_icp_header_t *rsp_hdr,
 			 uint8_t *payload, uint32_t payload_len);
+/* Set or clear bits of a channel's CHANNEL_SPECIFIC_STATUS (obmf.c) */
+void obmf_channel_specific_status_set(uint8_t channel, uint8_t bits, bool set);
 /* GPIO Configuration Data of a GPIO channel, or NULL (defined in obmf.c) */
 const obmf_gpio_config_data_t *obmf_gpio_channel_config(uint8_t channel);
 void obmf_i2c_target_channels_init(void);
