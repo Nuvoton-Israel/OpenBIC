@@ -1318,6 +1318,19 @@ int obmf_get_response(uint8_t *msg, uint32_t len,
 		}
 	}
 
+	/*
+	 * A channel serves requests only while the host has it enabled
+	 * (CHANNEL_CONTROL.CHANNEL_ENABLE); Channel 0 is always enabled.
+	 */
+	if (msg_type == OBMF_ICP_MSG_TYPE_REQUEST &&
+	    channel != OBMF_ICP_CONTROL_CHANNEL &&
+	    !obmf_channel_is_enabled(channel)) {
+		LOG_WRN("CH%d request while the channel is disabled", channel);
+		obmf_build_err_response(hdr, OBMF_ICP_STATUS_NOT_READY,
+					rsp_buf, rsp_len, false);
+		return -1;
+	}
+
 	if (msg_type == OBMF_ICP_MSG_TYPE_REQUEST) {
 		// --- Handle incoming REQUESTS (we are the Producer) ---
 		LOG_DBG("Received OBMF request: Channel=%d, Type=0x%02x",
