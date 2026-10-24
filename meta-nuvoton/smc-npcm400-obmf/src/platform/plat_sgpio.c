@@ -21,6 +21,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <devicetree.h>
+#include <sys/atomic.h>
 #include "hal_sgpio.h"
 #include "plat_sgpio.h"
 
@@ -233,6 +234,24 @@ static bool sgpio_hw_pin_to_obmf_index(uint8_t group, uint16_t hw_pin,
 	return true;
 }
 
+/*
+ * The SGPIO driver can only read the serial input shift register (XDIN),
+ * so an output pin cannot be read back from hardware. Remember the level
+ * last driven on each output pin instead. All outputs start low (see
+ * init_dual_sgpio_cfg()).
+ */
+static ATOMIC_DEFINE(sgpio_out_level, 2 * (SGPIO_OUTPUT_END + 1));
+
+static int sgpio_read_level(uint8_t group, uint16_t hw_pin)
+{
+	if (hw_pin <= SGPIO_OUTPUT_END) {
+		return atomic_test_bit(sgpio_out_level,
+				       group * (SGPIO_OUTPUT_END + 1) + hw_pin);
+	}
+
+	return sgpio_get_by_group(group, hw_pin);
+}
+
 static uint8_t obmf_sgpio_get_cb(uint16_t index, void *ctx)
 {
 	uint8_t group = (uint8_t)(uintptr_t)ctx;
@@ -242,7 +261,7 @@ static uint8_t obmf_sgpio_get_cb(uint16_t index, void *ctx)
 		return OBMF_GPIO_VALUE_HIGH;
 	}
 
-	int val = sgpio_get_by_group(group, hw_pin);
+	int val = sgpio_read_level(group, hw_pin);
 	if (val < 0)
 		return OBMF_GPIO_VALUE_HIGH;
 
@@ -264,12 +283,16 @@ static void obmf_sgpio_set_cb(uint16_t index, uint8_t value, void *ctx)
 		return;
 	}
 
-	int ret = sgpio_set_by_group(group, hw_pin,
-				     (value == OBMF_GPIO_VALUE_HIGH) ? 1 : 0);
+	bool high = (value == OBMF_GPIO_VALUE_HIGH);
+	int ret = sgpio_set_by_group(group, hw_pin, high ? 1 : 0);
 	if (ret < 0) {
 		LOG_ERR("OBMF SGPIO set failed g%d idx=%d hw=%d ret=%d",
 			group, index, hw_pin, ret);
+		return;
 	}
+
+	atomic_set_bit_to(sgpio_out_level,
+			  group * (SGPIO_OUTPUT_END + 1) + hw_pin, high);
 }
 
 struct obmf_sgpio_group_ctx {
@@ -343,7 +366,7 @@ static void obmf_sgpio_fill_entry(obmf_gpio_config_entry_t *entry, uint16_t pin,
 					 uint16_t exposed_index,
 					 const char *default_name_prefix)
 {
-	int cur_val = sgpio_get_by_group(group, pin);
+	int cur_val = sgpio_read_level(group, pin);
 	uint8_t default_output = (cur_val > 0) ? OBMF_GPIO_DEFAULT_HIGH
 					      : OBMF_GPIO_DEFAULT_LOW;
 	const char *dts_line_name = sgpio_get_line_name_by_group(group, pin);
