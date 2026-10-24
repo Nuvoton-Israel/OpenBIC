@@ -19,6 +19,11 @@
 /* Internal constants shared across channel files */
 #define OBMF_REQUEST_MAX_RETRY 2
 #define OBMF_REQUEST_RETRY_DELAY_MS 10
+/*
+ * A request still unanswered after this long is abandoned, so that a lost
+ * response cannot block its channel for good (matches the BMC driver).
+ */
+#define OBMF_REQUEST_TIMEOUT_MS 5000
 
 #define OBMF_HEADER_SIZE sizeof(obmf_icp_header_t)
 #define OBMF_MMIO_SUB_HDR_SIZE sizeof(obmf_icp_mmio_sub_header_t)
@@ -43,6 +48,7 @@ typedef struct {
 	bool is_outstanding;
 	uint8_t producer_tag; /* Only used for I/O channel */
 	uint8_t consumer_tag; /* Only used for I/O channel */
+	int64_t sent_at;	/* k_uptime_get() when the request was queued */
 } OBMF_Channel_Tags;
 
 extern OBMF_Channel_Tags channel_tags[];

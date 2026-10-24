@@ -1527,9 +1527,16 @@ int obmf_send_request(uint8_t channel, uint8_t *req_buf, uint32_t req_len)
 		return -ENETDOWN;
 	}
 
+	/* One outstanding request per channel, until it is answered or abandoned */
 	if (channel_tags[channel].is_outstanding) {
-		LOG_DBG("OBMF channel %d request is outstanding", channel);
-		return -EBUSY;
+		if (k_uptime_get() - channel_tags[channel].sent_at <
+		    OBMF_REQUEST_TIMEOUT_MS) {
+			LOG_DBG("OBMF channel %d request is outstanding",
+				channel);
+			return -EBUSY;
+		}
+		LOG_WRN("OBMF channel %d: request timed out, abandoned",
+			channel);
 	}
 
 	obmf_icp_header_t *hdr = (obmf_icp_header_t *)req_buf;
@@ -1548,23 +1555,26 @@ int obmf_send_request(uint8_t channel, uint8_t *req_buf, uint32_t req_len)
 		channel_tags[channel].consumer_tag ^= 1;
 	}
 
-	channel_tags[channel].is_outstanding = true;
-
 	/* Send request via TX thread message queue */
 	struct obmf_transport_msg msg;
 	msg.buf = (uint8_t *)malloc(req_len);
 	if (!msg.buf) {
 		LOG_ERR("Failed to allocate buffer for OBMF request (%d bytes)",
 			req_len);
-		return -1;
+		channel_tags[channel].is_outstanding = false;
+		return -ENOMEM;
 	}
 	memcpy(msg.buf, req_buf, req_len);
 	msg.len = req_len;
 
+	channel_tags[channel].is_outstanding = true;
+	channel_tags[channel].sent_at = k_uptime_get();
+
 	if (k_msgq_put(&obmf_tx_msgq, &msg, K_NO_WAIT) != 0) {
 		LOG_WRN("Failed to queue OBMF request, queue full");
+		channel_tags[channel].is_outstanding = false;
 		free(msg.buf);
-		return -1;
+		return -ENOBUFS;
 	}
 	return 0;
 }
