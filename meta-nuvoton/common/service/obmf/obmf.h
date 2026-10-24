@@ -270,11 +270,13 @@ typedef struct __attribute__((packed)) {
 } obmf_channel_config_header_t;
 
 /**
- * @brief MMIO Channel Configuration Data (v0.9 section 9.2.1)
+ * @brief MMIO Channel Configuration Data (OBMF-ICP 1.0.0 Table 75)
  */
 typedef struct __attribute__((packed)) {
 	uint16_t max_mmio_read_size;    /* 0x00: Max read transfer size (bytes) */
 	uint16_t max_mmio_write_size;   /* 0x02: Max write transfer size (bytes) */
+	uint32_t mmio_window_base_address; /* 0x04: MMIO window base (r) */
+	uint32_t mmio_window_size;      /* 0x08: MMIO window size in bytes (r) */
 } obmf_mmio_config_data_t;
 
 /**
@@ -488,6 +490,10 @@ typedef struct __attribute__((packed)) {
 typedef struct __attribute__((packed)) {
 	uint8_t post_code[OBMF_POST_CODE_REG_COUNT];
 } obmf_post_code_structure_t;
+
+/* The MMIO window starts at 0 and ends with the POST code region */
+#define OBMF_MMIO_WINDOW_SIZE \
+	(OBMF_MMIO_POST_CODE_BASE_OFFSET + sizeof(obmf_post_code_structure_t))
 
 /* TPM */
 #define OBMF_TPM_SPACE_SIZE 64
@@ -1450,7 +1456,9 @@ struct obmf_plat_config {
 #define OBMF_CHANNEL_MMIO(_name, _max_rd, _max_wr)                             \
 	{ .channel = OBMF_ICP_MMIO_CHANNEL, .name = (_name),                   \
 	  .cfg.mmio = { .max_mmio_read_size = (_max_rd),                       \
-			.max_mmio_write_size = (_max_wr) } }
+			.max_mmio_write_size = (_max_wr),                      \
+			.mmio_window_base_address = 0,                         \
+			.mmio_window_size = OBMF_MMIO_WINDOW_SIZE } }
 
 /** Serial channel, 8 data bits, 1 stop bit, no parity. */
 #define OBMF_CHANNEL_SERIAL(_ch, _name, _baud)                                 \

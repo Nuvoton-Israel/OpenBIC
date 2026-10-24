@@ -1907,8 +1907,9 @@ static bool ch0_cfg_byte_writable(uint8_t type, uint32_t off)
 
 	switch (type) {
 	case OBMF_ICP_CHANNEL_TYPE_MMIO:
-		/* MAX_MMIO_READ_SIZE and MAX_MMIO_WRITE_SIZE */
-		return true;
+		/* MAX_MMIO_READ/WRITE_SIZE; the window is read-only */
+		return o < offsetof(obmf_mmio_config_data_t,
+				    mmio_window_base_address);
 	case OBMF_ICP_CHANNEL_TYPE_GPIO:
 		/* GPIO_COUNT and each entry's trailing RESERVED are read-only */
 		if (o < offsetof(obmf_gpio_config_data_t, entries)) {
