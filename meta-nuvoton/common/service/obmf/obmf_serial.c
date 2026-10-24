@@ -21,7 +21,6 @@ LOG_MODULE_DECLARE(obmf);
 
 /* Serial channel partial-accept retry (spec §partial-accept retry rule) */
 #define OBMF_SERIAL_RSP_TIMEOUT_MS  1000  /* ms to wait for a serial response */
-#define OBMF_SERIAL_TX_MAX          448  /* max payload size for obmf_serial_send */
 
 /* Known Serial channels, in the order their state lives in serial_chs[]. */
 static const uint8_t serial_ch_nums[] = {
@@ -61,9 +60,9 @@ struct serial_ch_state {
 	 * without additional locking as long as a single sender thread drives
 	 * obmf_serial_send() for that channel.
 	 */
-	uint8_t staging[OBMF_SERIAL_TX_MAX];
+	uint8_t staging[OBMF_SERIAL_MAX_CHARS];
 	uint8_t tx_buf[OBMF_HEADER_SIZE + OBMF_SERIAL_REQ_HDR_SIZE +
-		       OBMF_SERIAL_TX_MAX];
+		       OBMF_SERIAL_MAX_CHARS];
 };
 
 static struct serial_ch_state serial_chs[OBMF_SERIAL_CH_COUNT];
@@ -243,9 +242,8 @@ int obmf_serial_send(uint8_t channel, const uint8_t *data, uint16_t len,
 	if (!data || len == 0)
 		return 0;
 
-	/* Clamp to staging buffer capacity */
-	if (len > OBMF_SERIAL_TX_MAX)
-		len = OBMF_SERIAL_TX_MAX;
+	if (len > OBMF_SERIAL_MAX_CHARS)
+		return -EMSGSIZE;
 
 	/* Load initial payload into staging buffer */
 	uint16_t buf_len = len;
@@ -254,7 +252,7 @@ int obmf_serial_send(uint8_t channel, const uint8_t *data, uint16_t len,
 
 	/* Opportunistically append queued data into the first packet */
 	if (refill) {
-		uint16_t space = OBMF_SERIAL_TX_MAX - buf_len;
+		uint16_t space = OBMF_SERIAL_MAX_CHARS - buf_len;
 
 		if (space > 0)
 			buf_len += refill(st->staging + buf_len, space, ctx);
@@ -344,7 +342,7 @@ int obmf_serial_send(uint8_t channel, const uint8_t *data, uint16_t len,
 		buf_len = tail;
 
 		if (refill) {
-			uint16_t space = OBMF_SERIAL_TX_MAX - buf_len;
+			uint16_t space = OBMF_SERIAL_MAX_CHARS - buf_len;
 
 			if (space > 0)
 				buf_len += refill(st->staging + buf_len,

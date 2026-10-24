@@ -58,7 +58,7 @@ void plat_uart_bridge_init(void)
 #define UART_BRIDGE_THREAD_PRIORITY 8
 #define UART_BRIDGE_UART_TX_PRIORITY 9
 
-#define OBMF_SEND_BUF_SIZE    255
+#define OBMF_SEND_BUF_SIZE    OBMF_SERIAL_MAX_CHARS
 #define OBMF_FLUSH_TIMEOUT_MS 50
 #define OBMF_TX_QUEUE_DEPTH   8
 

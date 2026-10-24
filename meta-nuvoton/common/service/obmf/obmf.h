@@ -693,6 +693,12 @@ typedef struct __attribute__((packed)) {
 
 #define OBMF_SERIAL_REQ_HDR_SIZE  sizeof(obmf_serial_request_t)
 
+/*
+ * An OBMF message carries at most 256 payload bytes, which bounds the
+ * characters a single Serial request can carry.
+ */
+#define OBMF_SERIAL_MAX_CHARS  (256 - OBMF_SERIAL_REQ_HDR_SIZE)
+
 /* Serial Channel Response (spec section 9.1.12.2) */
 typedef struct __attribute__((packed)) {
 	uint8_t ack_nack;          /* Byte 0: [0]=ACK(0)/NACK(1), [7:1]=Reserved */
@@ -1582,10 +1588,11 @@ typedef uint16_t (*obmf_serial_refill_cb_t)(uint8_t *buf, uint16_t space,
  *
  * @param channel OBMF_ICP_SERIAL_CHANNEL_0 or OBMF_ICP_SERIAL_CHANNEL_1.
  * @param data   Initial payload.
- * @param len    Number of bytes (clamped to OBMF_SERIAL_TX_MAX).
+ * @param len    Number of bytes, at most OBMF_SERIAL_MAX_CHARS.
  * @param refill Optional callback to append bytes on retry; NULL = none.
  * @param ctx    User context forwarded to @p refill.
- * @return 0 on full ACK, negative errno on error.
+ * @return 0 on full ACK, -EMSGSIZE if @p len is too large, negative errno
+ *         on other errors.
  */
 int obmf_serial_send(uint8_t channel, const uint8_t *data, uint16_t len,
 		     obmf_serial_refill_cb_t refill, void *ctx);
