@@ -288,7 +288,6 @@ int obmf_mmio_write(uint32_t offset, uint32_t len, uint8_t *buf)
 
 	if (rc != 0 && retries == 0) {
 		LOG_ERR("MMIO write request failed after retries: %d", rc);
-		channel_tags[OBMF_ICP_MMIO_CHANNEL].is_outstanding = false;
 	} else if (rc != 0 && rc != -ENETDOWN) {
 		LOG_ERR("MMIO write request failed: %d", rc);
 	}
