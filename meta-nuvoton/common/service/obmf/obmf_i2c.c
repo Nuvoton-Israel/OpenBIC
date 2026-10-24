@@ -23,9 +23,9 @@ LOG_MODULE_DECLARE(obmf);
 #define OBMF_I2C_HAL_RETRY 3
 
 /*
- * The OBMF response buffer in obmf.c is OBMF_RSP_BUF_SIZE (256) bytes; cap
- * read lengths so the I2C response always fits.  rx_len/tx_len in I2C_MSG are
- * uint8_t, so the transfer length is also bounded to 255.
+ * The OBMF response buffer in obmf.c is OBMF_RSP_BUF_SIZE (256) bytes, so a
+ * read can return at most 248 bytes.  rx_len/tx_len in I2C_MSG are uint8_t,
+ * so a write is bounded to 255 bytes.  Larger requests are rejected.
  */
 #define OBMF_I2C_RSP_BUF_SIZE 256
 #define OBMF_I2C_MAX_READ_LEN \
@@ -157,12 +157,18 @@ void handle_i2c_request(obmf_icp_header_t *req_hdr,
 	const uint8_t *write_data = payload + OBMF_I2C_REQ_HDR_SIZE;
 	uint16_t write_len = payload_len - OBMF_I2C_REQ_HDR_SIZE;
 
-	/* Cap lengths so the response fits and to the I2C_MSG buffer limits. */
-	if (read_len > OBMF_I2C_MAX_READ_LEN) {
-		read_len = OBMF_I2C_MAX_READ_LEN;
-	}
-	if (write_len > OBMF_I2C_MAX_XFER_LEN) {
-		write_len = OBMF_I2C_MAX_XFER_LEN;
+	/*
+	 * Reject transfers that do not fit the response buffer or the I2C_MSG
+	 * buffer.  Truncating them would silently drop write data or return
+	 * fewer read bytes than the host asked for.
+	 */
+	if (read_len > OBMF_I2C_MAX_READ_LEN ||
+	    write_len > OBMF_I2C_MAX_XFER_LEN) {
+		LOG_WRN("I2C CH%d: unsupported size (write %u, read %u)",
+			channel, write_len, read_len);
+		build_i2c_response(channel, OBMF_ICP_STATUS_SIZE_NOT_SUPPORTED,
+				   req->command, NULL, 0, rsp_buf, rsp_len);
+		return;
 	}
 
 	I2C_MSG msg = { 0 };
