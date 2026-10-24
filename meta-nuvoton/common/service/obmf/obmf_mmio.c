@@ -140,7 +140,7 @@ void handle_mmio_read_req(obmf_icp_header_t *req_hdr,
 	/* v1.0.0 RC1: Status in common header */
 	OBMF_ICP_SET_RQRESP_STATUS(rsp_hdr, OBMF_ICP_MSG_TYPE_RESPONSE,
 				   OBMF_ICP_SUCCESS);
-	*rsp_sub = *req_sub;
+	obmf_mmio_rsp_sub_header(rsp_sub, req_sub);
 
 	/* v1.0.0 RC1 Read Response: data only, no status byte in payload */
 	memcpy(rsp_payload, src, read_size);
@@ -162,8 +162,7 @@ void handle_mmio_write_req(obmf_icp_header_t *req_hdr,
 	uint8_t trans_type = OBMF_ICP_MMIO_GET_TRANS(req_sub);
 	bool is_long = (trans_type == OBMF_ICP_TRANS_LONG_WRITE);
 	uint32_t addr_size = is_long ? 8 : 4;
-	uint32_t size_field_len = 2;
-	uint32_t min_write_size = addr_size + size_field_len + 1;
+	uint32_t min_write_size = addr_size + 1;
 
 	if (req_len < min_write_size) {
 		OBMF_BUILD_ERR_AND_RETURN(req_hdr, OBMF_ICP_ERR_CMD_NOT_SUPPORTED,
@@ -180,17 +179,12 @@ void handle_mmio_write_req(obmf_icp_header_t *req_hdr,
 		addr = addr32;
 	}
 
-	uint16_t write_size;
-
-	memcpy(&write_size, &req_payload[addr_size], sizeof(uint16_t));
-
-	uint8_t *write_data = req_payload + addr_size + size_field_len;
-
-	if (write_size == 0 ||
-	    req_len != addr_size + size_field_len + write_size) {
-		OBMF_BUILD_ERR_AND_RETURN(req_hdr, OBMF_ICP_ERR_CMD_NOT_SUPPORTED,
-					  rsp_buf, rsp_len, true);
-	}
+	/*
+	 * Short/Long Write carry no length field: the data runs from after
+	 * the address to the end of the message (Tables 10 and 14).
+	 */
+	uint16_t write_size = req_len - addr_size;
+	uint8_t *write_data = req_payload + addr_size;
 
 	LOG_DBG("MMIO Write Request: addr=0x%llx, size=%d", addr, write_size);
 
@@ -216,7 +210,7 @@ void handle_mmio_write_req(obmf_icp_header_t *req_hdr,
 	/* v1.0.0 RC1: Status in common header, write response has no payload */
 	OBMF_ICP_SET_RQRESP_STATUS(rsp_hdr, OBMF_ICP_MSG_TYPE_RESPONSE,
 				   OBMF_ICP_SUCCESS);
-	*rsp_sub = *req_sub;
+	obmf_mmio_rsp_sub_header(rsp_sub, req_sub);
 
 	OBMF_ICP_SET_SIZE(rsp_hdr, OBMF_MMIO_SUB_HDR_SIZE);
 	*rsp_len = OBMF_FULL_MMIO_HDR_SIZE;
@@ -259,7 +253,8 @@ int obmf_mmio_read(uint32_t offset, uint32_t len, uint8_t *buf)
 
 int obmf_mmio_write(uint32_t offset, uint32_t len, uint8_t *buf)
 {
-	uint32_t total_len = OBMF_FULL_MMIO_HDR_SIZE + 8 + 2 + len;
+	/* Long Write: 64-bit address followed by the data, no length field */
+	uint32_t total_len = OBMF_FULL_MMIO_HDR_SIZE + 8 + len;
 	uint8_t *tx_buf = (uint8_t *)malloc(total_len);
 
 	if (!tx_buf) {
@@ -274,15 +269,11 @@ int obmf_mmio_write(uint32_t offset, uint32_t len, uint8_t *buf)
 	OBMF_ICP_MMIO_SET_TRANS(sub_hdr, OBMF_ICP_TRANS_LONG_WRITE);
 
 	uint8_t *addr = (uint8_t *)(tx_buf + OBMF_FULL_MMIO_HDR_SIZE);
-	uint8_t *write_len_ptr = (uint8_t *)(tx_buf + OBMF_FULL_MMIO_HDR_SIZE +
-					      sizeof(uint64_t));
 	uint8_t *data = (uint8_t *)(tx_buf + OBMF_FULL_MMIO_HDR_SIZE +
-				    sizeof(uint64_t) + sizeof(uint16_t));
+				    sizeof(uint64_t));
 
 	uint64_t addr_val = MMIO_SPACE_OFFSET + offset;
-	uint16_t write_len_val = len;
 	memcpy(addr, &addr_val, sizeof(uint64_t));
-	memcpy(write_len_ptr, &write_len_val, sizeof(uint16_t));
 	memcpy(data, buf, len);
 
 	int rc;
