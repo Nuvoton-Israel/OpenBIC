@@ -672,3 +672,43 @@ int obmf_gpio_set_values(const uint16_t *indices, const uint8_t *values,
 	free(tx_buf);
 	return rc;
 }
+
+#ifdef CONFIG_SHELL
+#include <shell/shell.h>
+
+/*
+ * Debug command that reports GPIO input changes exactly as the platform
+ * GPIO callbacks do, for testing Interrupt Notify without driving pins:
+ *   obmf_gpio report <channel> <first index> <count> <0|1>
+ */
+static int cmd_gpio_report(const struct shell *sh, size_t argc, char **argv)
+{
+	uint8_t channel = strtoul(argv[1], NULL, 0);
+	uint16_t first = strtoul(argv[2], NULL, 0);
+	uint16_t count = strtoul(argv[3], NULL, 0);
+	bool high = strtoul(argv[4], NULL, 0) != 0;
+	uint16_t done = 0;
+
+	for (uint16_t i = 0; i < count; i++) {
+		int rc = obmf_gpio_report_level(channel, first + i, high);
+
+		if (rc) {
+			shell_error(sh, "index %u: %d", first + i, rc);
+		} else {
+			done++;
+		}
+	}
+	shell_print(sh, "reported %u of %u, GPIO_STATUS 0x%02x", done, count,
+		    gpio_notify_any_pending(channel) ?
+		    OBMF_GPIO_STS_INTERRUPT_PENDING : 0);
+	return 0;
+}
+
+SHELL_STATIC_SUBCMD_SET_CREATE(sub_obmf_gpio_cmds,
+	SHELL_CMD_ARG(report, NULL, "report <channel> <first> <count> <0|1>",
+		      cmd_gpio_report, 5, 0),
+	SHELL_SUBCMD_SET_END);
+
+SHELL_CMD_REGISTER(obmf_gpio, &sub_obmf_gpio_cmds,
+		   "OBMF GPIO channel test commands", NULL);
+#endif /* CONFIG_SHELL */
