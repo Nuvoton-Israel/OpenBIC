@@ -1729,6 +1729,96 @@ static void obmf_channel_control_write(obmf_channel_config_header_t *ch_hdr,
 	ch_hdr->channel_status = status;
 }
 
+/*
+ * Whether byte @off of a channel configuration space may be written by the
+ * host: CHANNEL_NAME in the common header (Table 65), and the "rw" fields of
+ * the channel type's CONFIGURATION_DATA (Tables 75-87).  CHANNEL_CONTROL is
+ * handled separately; CHANNEL_SPECIFIC_CONTROL controls are not implemented.
+ */
+static bool ch0_cfg_byte_writable(uint8_t type, uint32_t off)
+{
+	uint32_t o;
+
+	if (off >= CHAN_CFG_NAME_OFFSET && off < CHAN_CFG_DEVICE_ROLE_OFFSET) {
+		return true;
+	}
+	if (off < CHAN_CFG_CONFIG_DATA_OFFSET) {
+		return false;
+	}
+	o = off - CHAN_CFG_CONFIG_DATA_OFFSET;
+
+	switch (type) {
+	case OBMF_ICP_CHANNEL_TYPE_MMIO:
+		/* MAX_MMIO_READ_SIZE and MAX_MMIO_WRITE_SIZE */
+		return true;
+	case OBMF_ICP_CHANNEL_TYPE_GPIO:
+		/* GPIO_COUNT and each entry's trailing RESERVED are read-only */
+		if (o < offsetof(obmf_gpio_config_data_t, entries)) {
+			return false;
+		}
+		o = (o - offsetof(obmf_gpio_config_data_t, entries)) %
+		    sizeof(obmf_gpio_config_entry_t);
+		return o < offsetof(obmf_gpio_config_entry_t, reserved);
+	case OBMF_ICP_CHANNEL_TYPE_SERIAL:
+		return true;
+	case OBMF_ICP_CHANNEL_TYPE_I2C_CONTROLLER:
+		/* I2C_CONTROLLER_OPTIONS is read-only */
+		return o == offsetof(obmf_i2c_config_data_t, controller_speed);
+	case OBMF_ICP_CHANNEL_TYPE_I2C_TARGET:
+		/* I2C_TARGET_ADDRESS_COUNT is read-only */
+		return o != offsetof(obmf_i2c_target_config_data_t,
+				     target_address_count);
+	case OBMF_ICP_CHANNEL_TYPE_I3C_CONTROLLER:
+		/* DEV_NACK_RETRY_COUNT */
+		return o < offsetof(obmf_i3c_config_data_t, i3c_feature_flags);
+	case OBMF_ICP_CHANNEL_TYPE_SPI_CONTROLLER:
+		/* SPI_SUPPORTED_CONFIG_FLAGS and RESERVED are read-only */
+		return (o >= offsetof(obmf_spi_config_data_t, config_flags) &&
+			o < offsetof(obmf_spi_config_data_t, reserved)) ||
+		       o >= offsetof(obmf_spi_config_data_t, rd_max_speed_hz);
+	case OBMF_ICP_CHANNEL_TYPE_IO:
+		/* The header and each range's reserved flags byte are read-only */
+		if (o < offsetof(obmf_io_config_data_t, ranges)) {
+			return false;
+		}
+		o = (o - offsetof(obmf_io_config_data_t, ranges)) %
+		    sizeof(obmf_io_range_cfg_t);
+		return o != offsetof(obmf_io_range_cfg_t, reserved);
+	default:
+		/* IPMI has no Configuration Data; MEM_DEV_CFG is read-only */
+		return false;
+	}
+}
+
+/* Force the read-only bits inside writable bytes back to their values */
+static void ch0_cfg_sanitize(obmf_channel_config_header_t *hdr)
+{
+	uint8_t *data = (uint8_t *)hdr + CHAN_CFG_CONFIG_DATA_OFFSET;
+
+	switch (hdr->channel_type) {
+	case OBMF_ICP_CHANNEL_TYPE_GPIO: {
+		obmf_gpio_config_data_t *gpio = (obmf_gpio_config_data_t *)data;
+
+		/* GPIO_INDEX[15:12] read as 0 */
+		for (int i = 0; i < OBMF_GPIO_MAX_ENTRIES; i++) {
+			gpio->entries[i].gpio_index &= 0x0FFF;
+		}
+		break;
+	}
+	case OBMF_ICP_CHANNEL_TYPE_IO: {
+		obmf_io_config_data_t *io = (obmf_io_config_data_t *)data;
+
+		/* IO_RANGE_FLAGS[15:1] are reserved */
+		for (int i = 0; i < OBMF_IO_MAX_RANGES; i++) {
+			io->ranges[i].range_flags &= OBMF_IO_RANGE_ENABLE;
+		}
+		break;
+	}
+	default:
+		break;
+	}
+}
+
 static void handle_ch0_write_req(obmf_icp_header_t *req_hdr,
 				 uint8_t *req_payload,
 				 uint32_t req_len,
@@ -1800,85 +1890,43 @@ static void handle_ch0_write_req(obmf_icp_header_t *req_hdr,
 	obmf_mmio_rsp_sub_header(rsp_sub, req_sub_w);
 
 	/*
-	 * v0.9 Channel 0 writable fields:
-	 * - CONFIG_STATUS (0x2B): MANUF_CONFIG_LOCK_REQUEST bit
-	 * - Each channel config space: CHANNEL_CONTROL (offset 0x13)
-	 *   and CONFIGURATION_DATA region
+	 * Writable fields (Table 63 "rw"): CONFIG_STATUS, and in each
+	 * channel configuration space CHANNEL_NAME, CHANNEL_CONTROL and the
+	 * rw fields of its CONFIGURATION_DATA, up to CONFIG_SIZE.  Anything
+	 * else inside the discovery structure is read-only.
 	 */
+	for (uint8_t ch = 1; ch <= OBMF_MAX_CHANNELS; ch++) {
+		obmf_channel_config_header_t *ch_hdr = obmf_chan_cfg_hdr(ch);
+		uint32_t base, end, rel;
 
-	/* Check all channel config spaces for writable regions */
-	struct {
-		uint32_t cfg_offset;
-		uint32_t cfg_data_size;
-	} chan_cfgs[] = {
-		{ CH0_MMIO_CHAN_CONFIG_OFFSET,
-		  sizeof(obmf_mmio_config_data_t) },
-		{ CH0_SERIAL_CHAN_CONFIG_OFFSET,
-		  sizeof(obmf_serial_config_data_t) },
-		{ CH0_IPMI_CHAN_CONFIG_OFFSET, 0 },
-		{ CH0_SPI_CHAN_CONFIG_OFFSET,
-		  sizeof(obmf_spi_config_data_t) },
-		{ CH0_MEM_DEV_CHAN_CONFIG_OFFSET,
-		  sizeof(obmf_mem_dev_config_data_t) },
-		{ CH0_GPIO_CHAN_CONFIG_OFFSET,
-		  sizeof(obmf_gpio_config_data_t) },
-		{ CH0_SGPIO1_CHAN_CONFIG_OFFSET,
-		  sizeof(obmf_gpio_config_data_t) },
-		{ CH0_SMC_GPIO_CHAN_CONFIG_OFFSET,
-		  sizeof(obmf_gpio_config_data_t) },
-		{ CH0_SGPIO0_CHAN_CONFIG_OFFSET,
-		  sizeof(obmf_gpio_config_data_t) },
-		{ CH0_IO_CHAN_CONFIG_OFFSET,
-		  sizeof(obmf_io_config_data_t) },
-		{ CH0_I2C_CHAN_CONFIG_OFFSET,
-		  sizeof(obmf_i2c_config_data_t) },
-		{ CH0_I2C1_CHAN_CONFIG_OFFSET,
-		  sizeof(obmf_i2c_config_data_t) },
-		{ CH0_I2C2_CHAN_CONFIG_OFFSET,
-		  sizeof(obmf_i2c_config_data_t) },
-		{ CH0_I2C3_CHAN_CONFIG_OFFSET,
-		  sizeof(obmf_i2c_config_data_t) },
-		{ CH0_I2C_TARGET_CHAN_CONFIG_OFFSET(0),
-		  sizeof(obmf_i2c_target_config_data_t) },
-		{ CH0_I2C_TARGET_CHAN_CONFIG_OFFSET(1),
-		  sizeof(obmf_i2c_target_config_data_t) },
-		{ CH0_SERIAL_CHAN_1_CONFIG_OFFSET,
-		  sizeof(obmf_serial_config_data_t) },
-		{ CH0_I3C_CHAN_CONFIG_OFFSET,
-		  sizeof(obmf_i3c_config_data_t) },
-		{ CH0_I3C1_CHAN_CONFIG_OFFSET,
-		  sizeof(obmf_i3c_config_data_t) },
-	};
-
-	for (int ci = 0; ci < (int)(sizeof(chan_cfgs) / sizeof(chan_cfgs[0])); ci++) {
-		uint32_t cfg_base = chan_cfgs[ci].cfg_offset;
-		uint32_t ctrl_off = cfg_base + CHAN_CFG_CONTROL_OFFSET;
-		uint32_t data_off = cfg_base + CHAN_CFG_CONFIG_DATA_OFFSET;
-		uint32_t data_end = data_off + chan_cfgs[ci].cfg_data_size;
-		const obmf_channel_config_header_t *slot =
-			(const obmf_channel_config_header_t *)
-			((uint8_t *)&discovery_struct + cfg_base);
-
-		/* Unconfigured slots are all zero, so channel_number is 0 */
-		if (slot->channel_number == OBMF_ICP_CONTROL_CHANNEL) {
+		if (!ch_hdr || !obmf_channel_is_present(ch)) {
 			continue;
 		}
+		base = (uint8_t *)ch_hdr - (uint8_t *)&discovery_struct;
+		end = base + CHAN_CFG_CONFIG_DATA_OFFSET + ch_hdr->config_size;
+		if (addr < base || addr >= end) {
+			continue;
+		}
+		rel = addr - base;
 
-		if (addr == ctrl_off && write_size == 1) {
-			obmf_channel_control_write(
-				(obmf_channel_config_header_t *)
-				((uint8_t *)&discovery_struct + cfg_base),
-				write_data[0]);
+		if (rel == CHAN_CFG_CONTROL_OFFSET && write_size == 1) {
+			obmf_channel_control_write(ch_hdr, write_data[0]);
 			goto success;
 		}
-
-		if (chan_cfgs[ci].cfg_data_size > 0 &&
-		    addr >= data_off && addr + write_size <= data_end) {
-			/* Write to CONFIGURATION_DATA */
-			memcpy((uint8_t *)&discovery_struct + addr,
-			       write_data, write_size);
-			goto success;
+		if (write_size > end - addr) {
+			goto denied;
 		}
+		for (uint16_t i = 0; i < write_size; i++) {
+			if (!ch0_cfg_byte_writable(ch_hdr->channel_type,
+						   rel + i)) {
+				goto denied;
+			}
+		}
+
+		memcpy((uint8_t *)&discovery_struct + addr, write_data,
+		       write_size);
+		ch0_cfg_sanitize(ch_hdr);
+		goto success;
 	}
 
 	/*
@@ -1890,11 +1938,12 @@ static void handle_ch0_write_req(obmf_icp_header_t *req_hdr,
 		goto success;
 	}
 
-	/* No writable region matched */
-	LOG_ERR("CH0 Write rejected: addr=0x%llx is outside"
-		" known writable fields.", addr);
+denied:
+	/* Inside the discovery structure, but not a writable field */
+	LOG_ERR("CH0 Write rejected: addr=0x%llx size=%u is read-only",
+		addr, write_size);
 	OBMF_ICP_SET_RQRESP_STATUS(rsp_hdr, OBMF_ICP_MSG_TYPE_RESPONSE,
-				   OBMF_ICP_ERR_ADDR_OUT_OF_RANGE);
+				   OBMF_ICP_ERR_INSUFFICIENT_PRIVILEGE);
 	OBMF_ICP_SET_SIZE(rsp_hdr, OBMF_MMIO_SUB_HDR_SIZE);
 	*rsp_len = OBMF_FULL_MMIO_HDR_SIZE;
 	return;
