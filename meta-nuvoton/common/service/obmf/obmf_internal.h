@@ -26,6 +26,8 @@
 #define OBMF_REQUEST_TIMEOUT_MS 5000
 
 #define OBMF_HEADER_SIZE sizeof(obmf_icp_header_t)
+/* Size of the buffer every channel handler builds its response in */
+#define OBMF_RSP_BUF_SIZE 256
 #define OBMF_MMIO_SUB_HDR_SIZE sizeof(obmf_icp_mmio_sub_header_t)
 #define OBMF_FULL_MMIO_HDR_SIZE (OBMF_HEADER_SIZE + OBMF_MMIO_SUB_HDR_SIZE)
 

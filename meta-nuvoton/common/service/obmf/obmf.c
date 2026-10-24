@@ -23,7 +23,6 @@ LOG_MODULE_REGISTER(obmf);
 #define OBMF_CH0_MAX_TRANS_SIZE 64
 #define OBMF_PRIMARY_ENDPOINT 0
 #define OBMF_MIN_MSG_SIZE OBMF_HEADER_SIZE
-#define OBMF_RSP_BUF_SIZE 256
 /* Short transactions use a 32-bit address, Long a 64-bit one.  Reads
  * carry a 2-byte Read Length; writes carry no length field, the data runs
  * to the end of the message (OBMF-ICP 1.0.0 Tables 8, 10, 12, 14).
