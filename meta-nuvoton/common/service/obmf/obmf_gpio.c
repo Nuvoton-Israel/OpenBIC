@@ -376,7 +376,6 @@ int obmf_gpio_notify(const uint16_t *indices, const uint8_t *values,
 
 	if (rc != 0 && retries == 0) {
 		LOG_ERR("GPIO ch:%d write request failed after retries: %d", channel, rc);
-		channel_tags[channel].is_outstanding = false;
 	} else if (rc != 0 && rc != -ENETDOWN) {
 		LOG_ERR("GPIO ch:%d write request failed: %d", channel, rc);
 	}
@@ -505,7 +504,6 @@ int obmf_gpio_get_values(const uint16_t *indices, uint16_t count, uint8_t channe
 
 	if (rc != 0 && retries == 0) {
 		LOG_ERR("GPIO ch:%d write request failed after retries: %d", channel, rc);
-		channel_tags[channel].is_outstanding = false;
 	} else if (rc != 0 && rc != -ENETDOWN) {
 		LOG_ERR("GPIO ch:%d write request failed: %d", channel, rc);
 	}
@@ -555,7 +553,6 @@ int obmf_gpio_set_values(const uint16_t *indices, const uint8_t *values,
 
 	if (rc != 0 && retries == 0) {
 		LOG_ERR("GPIO ch:%d write request failed after retries: %d", channel, rc);
-		channel_tags[channel].is_outstanding = false;
 	} else if (rc != 0 && rc != -ENETDOWN) {
 		LOG_ERR("GPIO ch:%d write request failed: %d", channel, rc);
 	}
