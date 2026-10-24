@@ -812,6 +812,17 @@ static obmf_channel_config_header_t *obmf_chan_cfg_hdr(uint8_t channel)
 	}
 }
 
+const obmf_gpio_config_data_t *obmf_gpio_channel_config(uint8_t channel)
+{
+	obmf_channel_config_header_t *hdr = obmf_chan_cfg_hdr(channel);
+
+	if (!hdr || hdr->channel_type != OBMF_ICP_CHANNEL_TYPE_GPIO) {
+		return NULL;
+	}
+	return (const obmf_gpio_config_data_t *)
+	       ((uint8_t *)hdr + CHAN_CFG_CONFIG_DATA_OFFSET);
+}
+
 bool obmf_channel_is_enabled(uint8_t channel)
 {
 	obmf_channel_config_header_t *hdr = obmf_chan_cfg_hdr(channel);

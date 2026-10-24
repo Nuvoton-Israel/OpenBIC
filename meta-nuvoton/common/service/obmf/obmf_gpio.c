@@ -59,6 +59,45 @@ void obmf_register_gpio_get_cb(obmf_gpio_get_cb_t cb, void *ctx)
 }
 
 /*
+ * Check every entry of a Get/Set request against the channel's GPIO
+ * Configuration Array: the index must be one the channel exposes, and Set
+ * Values may only drive an output.  Nothing is applied unless all pass.
+ */
+static uint8_t gpio_check_entries(uint8_t channel, uint8_t command,
+				  const obmf_gpio_entry_t *entries,
+				  uint16_t count)
+{
+	const obmf_gpio_config_data_t *cfg = obmf_gpio_channel_config(channel);
+	uint16_t n;
+
+	if (!cfg) {
+		return OBMF_ICP_SUCCESS;
+	}
+	n = MIN(cfg->gpio_count, OBMF_GPIO_MAX_ENTRIES);
+
+	for (uint16_t i = 0; i < count; i++) {
+		uint16_t index = OBMF_GPIO_ENTRY_GET_INDEX(&entries[i]);
+		const obmf_gpio_config_entry_t *e = NULL;
+
+		for (uint16_t j = 0; j < n; j++) {
+			if ((cfg->entries[j].gpio_index & 0x0FFF) == index) {
+				e = &cfg->entries[j];
+				break;
+			}
+		}
+		if (!e) {
+			return OBMF_GPIO_STATUS_INDEX_NOT_SUPPORTED;
+		}
+		if (command == OBMF_GPIO_CMD_SET_VALUES &&
+		    e->gpio_direction == OBMF_GPIO_DIR_INPUT) {
+			return OBMF_GPIO_STATUS_INVALID_OPERATION;
+		}
+	}
+
+	return OBMF_ICP_SUCCESS;
+}
+
+/*
  * Get / Set Interrupt Config. A Set request is validated as a whole before
  * any entry is applied, so a bad entry leaves the configuration untouched.
  */
@@ -142,6 +181,26 @@ void handle_gpio_request(obmf_icp_header_t *req_hdr,
 	/* Build response common header */
 	obmf_icp_header_t *rsp_hdr = (obmf_icp_header_t *)rsp_buf;
 	OBMF_ICP_SET_CHANNEL(rsp_hdr, channel);
+
+	if (command <= OBMF_GPIO_CMD_SET_INT_CONFIG) {
+		uint8_t status = gpio_check_entries(channel, command, entries,
+						    num_entries);
+
+		if (status != OBMF_ICP_SUCCESS) {
+			obmf_gpio_response_t *rsp_e =
+				(obmf_gpio_response_t *)(rsp_buf +
+							 OBMF_HEADER_SIZE);
+
+			LOG_WRN("GPIO ch%d command %d rejected: 0x%02x",
+				channel, command, status);
+			OBMF_ICP_SET_RQRESP_STATUS(rsp_hdr,
+				OBMF_ICP_MSG_TYPE_RESPONSE, status);
+			rsp_e->command = command;
+			OBMF_ICP_SET_SIZE(rsp_hdr, OBMF_GPIO_RSP_HDR_SIZE);
+			*rsp_len = OBMF_HEADER_SIZE + OBMF_GPIO_RSP_HDR_SIZE;
+			return;
+		}
+	}
 
 	switch (command) {
 	case OBMF_GPIO_CMD_GET_VALUES: {
