@@ -681,8 +681,8 @@ typedef struct __attribute__((packed)) {
 /* Serial Channel Request: Operation/Event bits */
 #define OBMF_SERIAL_OP_GENERATE_BREAK    (1 << 0)
 #define OBMF_SERIAL_OP_BREAK_DETECTED    (1 << 1)
-#define OBMF_SERIAL_OP_TX_OVERRUN        (1 << 4)
-#define OBMF_SERIAL_OP_CARRIER_DOWN      (1 << 5)
+#define OBMF_SERIAL_OP_TX_OVERRUN        (1 << 2)
+#define OBMF_SERIAL_OP_CARRIER_DOWN      (1 << 3)
 
 /* Serial Channel Request (spec section 9.1.12.1) */
 typedef struct __attribute__((packed)) {
