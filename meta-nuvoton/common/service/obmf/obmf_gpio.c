@@ -110,10 +110,12 @@ void handle_gpio_request(obmf_icp_header_t *req_hdr,
 	void *set_ctx =
 		(channel <= OBMF_MAX_CHANNELS) ? gpio_set_cb_ctx[channel] : NULL;
 
-	if (payload_len < OBMF_GPIO_REQ_HDR_SIZE) {
-		LOG_ERR("GPIO ch%d request too short (%d bytes)",
+	if (payload_len < OBMF_GPIO_REQ_HDR_SIZE ||
+	    (payload_len - OBMF_GPIO_REQ_HDR_SIZE) % sizeof(obmf_gpio_entry_t)) {
+		LOG_ERR("GPIO ch%d malformed request (%d bytes)",
 			channel, payload_len);
-		*rsp_len = 0;
+		obmf_build_err_response(req_hdr, OBMF_ICP_STATUS_INVALID_CMD,
+					rsp_buf, rsp_len, false);
 		return;
 	}
 
@@ -167,6 +169,8 @@ void handle_gpio_request(obmf_icp_header_t *req_hdr,
 		break;
 	}
 	case OBMF_GPIO_CMD_SET_VALUES: {
+		uint8_t status = OBMF_ICP_SUCCESS;
+
 		if (!set_cb) {
 			OBMF_ICP_SET_RQRESP_STATUS(rsp_hdr,
 				OBMF_ICP_MSG_TYPE_RESPONSE,
@@ -180,14 +184,25 @@ void handle_gpio_request(obmf_icp_header_t *req_hdr,
 			return;
 		}
 
+		/* Apply nothing unless every entry carries a valid level */
 		for (uint16_t i = 0; i < num_entries; i++) {
-			uint16_t index = OBMF_GPIO_ENTRY_GET_INDEX(&entries[i]);
-			uint8_t val = OBMF_GPIO_ENTRY_GET_DATA(&entries[i]);
-			set_cb(index, val, set_ctx);
+			if (OBMF_GPIO_ENTRY_GET_DATA(&entries[i]) >
+			    OBMF_GPIO_VALUE_HIGH) {
+				status = OBMF_ICP_ERR_CMD_NOT_SUPPORTED;
+				break;
+			}
+		}
+
+		if (status == OBMF_ICP_SUCCESS) {
+			for (uint16_t i = 0; i < num_entries; i++) {
+				set_cb(OBMF_GPIO_ENTRY_GET_INDEX(&entries[i]),
+				       OBMF_GPIO_ENTRY_GET_DATA(&entries[i]),
+				       set_ctx);
+			}
 		}
 
 		OBMF_ICP_SET_RQRESP_STATUS(rsp_hdr,
-			OBMF_ICP_MSG_TYPE_RESPONSE, OBMF_ICP_SUCCESS);
+			OBMF_ICP_MSG_TYPE_RESPONSE, status);
 
 		obmf_gpio_response_t *rsp =
 			(obmf_gpio_response_t *)(rsp_buf + OBMF_HEADER_SIZE);
