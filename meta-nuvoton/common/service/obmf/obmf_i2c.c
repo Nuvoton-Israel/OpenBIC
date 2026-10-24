@@ -338,6 +338,16 @@ int obmf_i2c_target_write(uint8_t channel, uint8_t address,
 		return -1;
 	}
 
+	/* Never forward more than I2C_TARGET_BUFFER_SIZE advertises */
+	if (write_len > OBMF_I2C_TARGET_BUFFER_SIZE) {
+		LOG_ERR("I2C target write: %u bytes, max %u", write_len,
+			OBMF_I2C_TARGET_BUFFER_SIZE);
+		return -EMSGSIZE;
+	}
+
+	/* A response that arrived after an earlier timeout is not ours */
+	k_msgq_purge(&i2c_target_msgq[OBMF_I2C_TGT_CHAN_IDX(channel)]);
+
 	uint32_t total_len =
 		OBMF_HEADER_SIZE + OBMF_I2C_TARGET_REQ_HDR_SIZE + write_len;
 	uint8_t *tx_buf = (uint8_t *)malloc(total_len);

@@ -1199,6 +1199,7 @@ static int obmf_channel_config_fill(const struct obmf_plat_channel *pc,
 
 		/* Addresses are added later with obmf_i2c_target_set_address() */
 		tgt->target_speed = pc->cfg.i2c_target.speed;
+		tgt->target_buffer_size = OBMF_I2C_TARGET_BUFFER_SIZE;
 		tgt->target_address_count = 0;
 		return offsetof(obmf_i2c_target_config_data_t,
 				target_address_list);

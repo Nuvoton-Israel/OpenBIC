@@ -1077,10 +1077,16 @@ typedef struct __attribute__((packed)) {
 /* Maximum configurable I2C target address entries advertised in config */
 #define OBMF_I2C_TARGET_MAX_ADDRS  4
 
-/* I2C Target Channel Configuration Data (spec "Channel Configuration Data") */
+/*
+ * Longest I2C write the target forwards (I2C_TARGET_BUFFER_SIZE).  The
+ * receive buffer holds 256 bytes, but the field is one byte wide.
+ */
+#define OBMF_I2C_TARGET_BUFFER_SIZE  255
+
+/* I2C Target Channel Configuration Data (OBMF-ICP 1.0.0 Table 80) */
 typedef struct __attribute__((packed)) {
 	uint8_t target_speed;       /* 0x00: I2C_TARGET_SPEED enum */
-	uint8_t reserved;           /* 0x01: RESERVED */
+	uint8_t target_buffer_size; /* 0x01: I2C_TARGET_BUFFER_SIZE */
 	uint8_t target_address_count; /* 0x02: I2C_TARGET_ADDRESS_COUNT */
 	uint8_t target_address_list[OBMF_I2C_TARGET_MAX_ADDRS]; /* 0x03: list */
 } obmf_i2c_target_config_data_t;
