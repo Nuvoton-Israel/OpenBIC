@@ -28,42 +28,6 @@ void obmf_register_mmio_write_cb(obmf_mmio_write_cb_t cb, void *ctx)
 	mmio_write_cb_ctx = ctx;
 }
 
-void obmf_mmio_local_update(uint32_t offset, uint32_t len, const uint8_t *data)
-{
-	uint8_t *dst = NULL;
-	uint32_t buf_offset = 0;
-	uint32_t buf_size = 0;
-
-	if (offset >= OBMF_MMIO_POST_CODE_BASE_OFFSET &&
-	    offset < OBMF_MMIO_POST_CODE_BASE_OFFSET + sizeof(mmio_local_post_code)) {
-		dst = (uint8_t *)&mmio_local_post_code;
-		buf_offset = offset - OBMF_MMIO_POST_CODE_BASE_OFFSET;
-		buf_size = sizeof(mmio_local_post_code);
-	} else if (offset >= OBMF_MMIO_UART_BASE_OFFSET &&
-		   offset < OBMF_MMIO_UART_BASE_OFFSET + sizeof(mmio_local_uart)) {
-		dst = (uint8_t *)&mmio_local_uart;
-		buf_offset = offset - OBMF_MMIO_UART_BASE_OFFSET;
-		buf_size = sizeof(mmio_local_uart);
-	} else if (offset >= OBMF_MMIO_VW_BASE_OFFSET &&
-		   offset < OBMF_MMIO_VW_BASE_OFFSET + sizeof(mmio_local_vw)) {
-		dst = (uint8_t *)&mmio_local_vw;
-		buf_offset = offset - OBMF_MMIO_VW_BASE_OFFSET;
-		buf_size = sizeof(mmio_local_vw);
-	} else if (offset >= OBMF_MMIO_FLASH_BASE_OFFSET + OBMF_FLASH_ERASE_START_ADDR_OFFSET &&
-		   offset < OBMF_MMIO_FLASH_BASE_OFFSET + OBMF_FLASH_ERASE_START_ADDR_OFFSET +
-			   sizeof(mmio_local_flash_erase)) {
-		dst = (uint8_t *)&mmio_local_flash_erase;
-		buf_offset = offset - (OBMF_MMIO_FLASH_BASE_OFFSET + OBMF_FLASH_ERASE_START_ADDR_OFFSET);
-		buf_size = sizeof(mmio_local_flash_erase);
-	} else {
-		return;
-	}
-
-	if (buf_offset + len <= buf_size) {
-		memcpy(dst + buf_offset, data, len);
-	}
-}
-
 /* --- MMIO Producer: local buffer lookup --- */
 
 static const uint8_t *mmio_local_get_buf(uint64_t addr, uint32_t *avail_size)
@@ -98,6 +62,20 @@ static const uint8_t *mmio_local_get_buf(uint64_t addr, uint32_t *avail_size)
 	}
 	*avail_size = 0;
 	return NULL;
+}
+
+/* Copy host-written data into the local region; fails if it doesn't fit */
+int obmf_mmio_local_update(uint64_t offset, uint32_t len, const uint8_t *data)
+{
+	uint32_t avail = 0;
+	uint8_t *dst = (uint8_t *)mmio_local_get_buf(offset, &avail);
+
+	if (!dst || len > avail) {
+		return -ERANGE;
+	}
+
+	memcpy(dst, data, len);
+	return 0;
 }
 
 /* --- MMIO Producer: Read Request Handler --- */
@@ -217,7 +195,12 @@ void handle_mmio_write_req(obmf_icp_header_t *req_hdr,
 	LOG_DBG("MMIO Write Request: addr=0x%llx, size=%d", addr, write_size);
 
 	/* Update local MMIO state */
-	obmf_mmio_local_update(addr, write_size, write_data);
+	if (obmf_mmio_local_update(addr, write_size, write_data)) {
+		LOG_ERR("MMIO write out of range: addr=0x%llx, size=%d",
+			addr, write_size);
+		OBMF_BUILD_ERR_AND_RETURN(req_hdr, OBMF_ICP_ERR_ADDR_OUT_OF_RANGE,
+					  rsp_buf, rsp_len, true);
+	}
 
 	/* Notify registered callback */
 	if (mmio_write_cb) {

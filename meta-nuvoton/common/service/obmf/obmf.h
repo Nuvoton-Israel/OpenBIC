@@ -1551,7 +1551,7 @@ int obmf_send_request(uint8_t channel, uint8_t *req_buf, uint32_t req_len);
  */
 bool obmf_channel_is_enabled(uint8_t channel);
 
-void obmf_mmio_local_update(uint32_t offset, uint32_t len, const uint8_t *data);
+int obmf_mmio_local_update(uint64_t offset, uint32_t len, const uint8_t *data);
 
 typedef void (*obmf_mmio_write_cb_t)(uint32_t offset, uint32_t len,
 				     const uint8_t *data, void *ctx);
