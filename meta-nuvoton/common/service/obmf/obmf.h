@@ -567,9 +567,9 @@ typedef struct __attribute__((packed)) {
 #define OBMF_GPIO_CMD_INT_NOTIFY         4
 #define OBMF_GPIO_CMD_INT_NOTIFY_DGRAM   5
 
-/* GPIO Data values (bits [15:12] of each GPIO entry) */
-#define OBMF_GPIO_VALUE_HIGH    0
-#define OBMF_GPIO_VALUE_LOW     1
+/* GPIO Data values (bits [15:12] of each GPIO entry), spec Table 18/19 */
+#define OBMF_GPIO_VALUE_LOW     0
+#define OBMF_GPIO_VALUE_HIGH    1
 
 /* GPIO Interrupt Config values */
 #define OBMF_GPIO_INT_DISABLE        0
