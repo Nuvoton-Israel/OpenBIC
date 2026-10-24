@@ -126,6 +126,19 @@ void handle_gpio_request(obmf_icp_header_t *req_hdr,
 	uint32_t entries_bytes = payload_len - OBMF_GPIO_REQ_HDR_SIZE;
 	uint16_t num_entries = entries_bytes / sizeof(obmf_gpio_entry_t);
 
+	/* Get responses echo every entry; they must fit the response buffer */
+	if ((command == OBMF_GPIO_CMD_GET_VALUES ||
+	     command == OBMF_GPIO_CMD_GET_INT_CONFIG) &&
+	    OBMF_HEADER_SIZE + OBMF_GPIO_RSP_HDR_SIZE + entries_bytes >
+	    OBMF_RSP_BUF_SIZE) {
+		LOG_ERR("GPIO ch%d: %u entries do not fit a response",
+			channel, num_entries);
+		obmf_build_err_response(req_hdr,
+					OBMF_ICP_STATUS_SIZE_NOT_SUPPORTED,
+					rsp_buf, rsp_len, false);
+		return;
+	}
+
 	/* Build response common header */
 	obmf_icp_header_t *rsp_hdr = (obmf_icp_header_t *)rsp_buf;
 	OBMF_ICP_SET_CHANNEL(rsp_hdr, channel);
