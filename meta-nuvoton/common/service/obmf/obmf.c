@@ -163,6 +163,11 @@ static void obmf_tx_thread(void *arg1, void *arg2, void *arg3)
 			(payload_len + max_payload_per_fragment - 1)
 			/ max_payload_per_fragment;
 
+		/* A header-only message (e.g. an error response) is one packet */
+		if (num_fragments == 0) {
+			num_fragments = 1;
+		}
+
 		LOG_DBG("TX: total payload=%d, fragments=%d, max_per_frag=%d",
 			payload_len, num_fragments, max_payload_per_fragment);
 
