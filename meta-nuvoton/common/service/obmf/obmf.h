@@ -579,6 +579,9 @@ typedef struct __attribute__((packed)) {
 #define OBMF_GPIO_INT_FALLING_EDGE   4
 #define OBMF_GPIO_INT_BOTH_EDGE      5
 
+/* GPIO indices below this limit can have an interrupt configured */
+#define OBMF_GPIO_MAX_INT_INDEX      128
+
 /* GPIO Channel-specific Status Codes */
 #define OBMF_GPIO_STATUS_INDEX_NOT_SUPPORTED   0x40
 #define OBMF_GPIO_STATUS_INT_NOT_SUPPORTED     0x41

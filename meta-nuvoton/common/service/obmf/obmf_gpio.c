@@ -23,6 +23,9 @@ static void              *gpio_set_cb_ctx[OBMF_MAX_CHANNELS + 1];
 static obmf_gpio_get_cb_t gpio_get_cb[OBMF_MAX_CHANNELS + 1];
 static void              *gpio_get_cb_ctx[OBMF_MAX_CHANNELS + 1];
 
+/* Interrupt configuration set by the Consumer, per channel and GPIO index */
+static uint8_t gpio_int_cfg[OBMF_MAX_CHANNELS + 1][OBMF_GPIO_MAX_INT_INDEX];
+
 /* Generic per-channel registration */
 void obmf_register_gpio_channel_get_cb(uint8_t channel,
 				       obmf_gpio_get_cb_t cb, void *ctx)
@@ -53,6 +56,43 @@ void obmf_register_gpio_set_cb(obmf_gpio_set_cb_t cb, void *ctx)
 void obmf_register_gpio_get_cb(obmf_gpio_get_cb_t cb, void *ctx)
 {
 	obmf_register_gpio_channel_get_cb(OBMF_ICP_VW_GPIO_CHANNEL, cb, ctx);
+}
+
+/*
+ * Get / Set Interrupt Config. A Set request is validated as a whole before
+ * any entry is applied, so a bad entry leaves the configuration untouched.
+ */
+static uint8_t gpio_handle_int_config(uint8_t channel, uint8_t command,
+				      const obmf_gpio_entry_t *entries,
+				      uint16_t count,
+				      obmf_gpio_entry_t *rsp_entries)
+{
+	for (uint16_t i = 0; i < count; i++) {
+		uint16_t index = OBMF_GPIO_ENTRY_GET_INDEX(&entries[i]);
+		uint8_t cfg = OBMF_GPIO_ENTRY_GET_DATA(&entries[i]);
+
+		if (index >= OBMF_GPIO_MAX_INT_INDEX) {
+			return OBMF_GPIO_STATUS_INT_NOT_SUPPORTED;
+		}
+		if (command == OBMF_GPIO_CMD_SET_INT_CONFIG &&
+		    cfg > OBMF_GPIO_INT_BOTH_EDGE) {
+			return OBMF_ICP_ERR_CMD_NOT_SUPPORTED;
+		}
+	}
+
+	for (uint16_t i = 0; i < count; i++) {
+		uint16_t index = OBMF_GPIO_ENTRY_GET_INDEX(&entries[i]);
+
+		if (command == OBMF_GPIO_CMD_SET_INT_CONFIG) {
+			gpio_int_cfg[channel][index] =
+				OBMF_GPIO_ENTRY_GET_DATA(&entries[i]);
+		} else {
+			OBMF_GPIO_ENTRY_SET(&rsp_entries[i], index,
+					    gpio_int_cfg[channel][index]);
+		}
+	}
+
+	return OBMF_ICP_SUCCESS;
 }
 
 void handle_gpio_request(obmf_icp_header_t *req_hdr,
@@ -157,10 +197,34 @@ void handle_gpio_request(obmf_icp_header_t *req_hdr,
 		break;
 	}
 	case OBMF_GPIO_CMD_GET_INT_CONFIG:
-	case OBMF_GPIO_CMD_SET_INT_CONFIG:
+	case OBMF_GPIO_CMD_SET_INT_CONFIG: {
+		obmf_gpio_response_t *rsp =
+			(obmf_gpio_response_t *)(rsp_buf + OBMF_HEADER_SIZE);
+		obmf_gpio_entry_t *rsp_entries =
+			(obmf_gpio_entry_t *)(rsp_buf + OBMF_HEADER_SIZE +
+					      OBMF_GPIO_RSP_HDR_SIZE);
+		uint8_t status = gpio_handle_int_config(channel, command,
+							entries, num_entries,
+							rsp_entries);
+		uint32_t rsp_payload_size = OBMF_GPIO_RSP_HDR_SIZE;
+
+		/* Only a successful Get carries the entry array back */
+		if (status == OBMF_ICP_SUCCESS &&
+		    command == OBMF_GPIO_CMD_GET_INT_CONFIG) {
+			rsp_payload_size += num_entries *
+					    sizeof(obmf_gpio_entry_t);
+		}
+
+		OBMF_ICP_SET_RQRESP_STATUS(rsp_hdr,
+			OBMF_ICP_MSG_TYPE_RESPONSE, status);
+		rsp->command = command;
+		OBMF_ICP_SET_SIZE(rsp_hdr, rsp_payload_size);
+		*rsp_len = OBMF_HEADER_SIZE + rsp_payload_size;
+		break;
+	}
 	case OBMF_GPIO_CMD_INT_NOTIFY:
 	case OBMF_GPIO_CMD_INT_NOTIFY_DGRAM:
-		/* These are Producer→Consumer notifications, not expected here */
+		/* Interrupt notifications are sent by the Producer, not to it */
 		LOG_DBG("GPIO ch%d command %d from host (unexpected)",
 			channel, command);
 		OBMF_ICP_SET_RQRESP_STATUS(rsp_hdr,
