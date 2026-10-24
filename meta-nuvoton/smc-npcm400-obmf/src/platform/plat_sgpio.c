@@ -168,9 +168,6 @@ static void sgpio_cb_handler(uint8_t sgpio_group, uint8_t gpio_val,
 {
 	LOG_DBG("SGPIO CB: g=%d pin=%d val=%d", sgpio_group, gpio_index, gpio_val);
 
-	/* Notify OBMF (one pin at a time for clarity) */
-	uint8_t gpio_value = (gpio_val > 0) ? OBMF_GPIO_VALUE_HIGH
-						: OBMF_GPIO_VALUE_LOW;
 	uint16_t obmf_index = 0;
 	int ret;
 
@@ -182,11 +179,9 @@ static void sgpio_cb_handler(uint8_t sgpio_group, uint8_t gpio_val,
 	uint8_t obmf_channel = (sgpio_group == SGPIO_GROUP1) ?
 		OBMF_ICP_SGPIO1_CHANNEL : OBMF_ICP_SGPIO0_CHANNEL;
 
-	uint16_t idx_array[1] = { obmf_index };
-	uint8_t val_array[1] = { gpio_value };
-	ret = obmf_gpio_set_values(idx_array, val_array, 1, obmf_channel);
+	ret = obmf_gpio_report_level(obmf_channel, obmf_index, gpio_val > 0);
 	if (ret != 0 && ret != -ENETDOWN) {
-		LOG_ERR("obmf_gpio_set_values failed: %d", ret);
+		LOG_ERR("obmf_gpio_report_level failed: %d", ret);
 	}
 }
 

@@ -116,13 +116,12 @@ static const char *vw_gpio_get_dts_line_name(uint16_t pin)
 
 static void vw_gpio_cb_handler(uint8_t gpio_val, uint8_t gpio_index)
 {
-	uint16_t gpio_indices[1] = { gpio_index };
-	uint8_t gpio_values[1] = { gpio_val > 0 ? OBMF_GPIO_VALUE_HIGH : OBMF_GPIO_VALUE_LOW };
 	int ret;
 
-	ret = obmf_gpio_set_values(gpio_indices, gpio_values, 1, OBMF_ICP_VW_GPIO_CHANNEL);
+	ret = obmf_gpio_report_level(OBMF_ICP_VW_GPIO_CHANNEL, gpio_index,
+				     gpio_val > 0);
 	if (ret != 0 && ret != -ENETDOWN) {
-		LOG_ERR("obmf_gpio_set_values failed: %d", ret);
+		LOG_ERR("obmf_gpio_report_level failed: %d", ret);
 	}
 }
 

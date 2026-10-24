@@ -1712,6 +1712,11 @@ void obmf_register_gpio_set_cb(obmf_gpio_set_cb_t cb, void *ctx);
 void obmf_register_gpio_get_cb(obmf_gpio_get_cb_t cb, void *ctx);
 int obmf_gpio_notify(const uint16_t *indices, const uint8_t *values,
 		     uint16_t count, uint8_t channel);
+/*
+ * Report a new pin level; sends Interrupt Notify only when it matches the
+ * interrupt configured by the Consumer for that index.
+ */
+int obmf_gpio_report_level(uint8_t channel, uint16_t index, bool high);
 
 /* GPIO channel configuration (Platform populates entries at init) */
 obmf_gpio_config_entry_t *obmf_gpio_get_config_entries(void);

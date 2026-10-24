@@ -338,14 +338,10 @@ void plat_obmf_gpio_irq_cb(uint8_t gpio_num)
 		return;
 	}
 
-	uint16_t indices[1] = { gpio_index };
-	uint8_t values[1] = {
-		(gpio_val > 0) ? OBMF_GPIO_VALUE_HIGH : OBMF_GPIO_VALUE_LOW
-	};
-
-	ret = obmf_gpio_set_values(indices, values, 1, OBMF_ICP_SMC_GPIO_CHANNEL);
+	ret = obmf_gpio_report_level(OBMF_ICP_SMC_GPIO_CHANNEL, gpio_index,
+				     gpio_val > 0);
 	if (ret != 0 && ret != -ENETDOWN) {
-		LOG_ERR("obmf_gpio_set_values failed: %d", ret);
+		LOG_ERR("obmf_gpio_report_level failed: %d", ret);
 	}
 }
 

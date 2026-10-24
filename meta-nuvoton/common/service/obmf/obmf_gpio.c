@@ -298,6 +298,39 @@ int obmf_gpio_notify(const uint16_t *indices, const uint8_t *values,
 	return rc;
 }
 
+int obmf_gpio_report_level(uint8_t channel, uint16_t index, bool high)
+{
+	const uint8_t data = 0; /* reserved for Interrupt Notify */
+	bool notify;
+
+	if (channel > OBMF_MAX_CHANNELS || index >= OBMF_GPIO_MAX_INT_INDEX) {
+		return -EINVAL;
+	}
+
+	switch (gpio_int_cfg[channel][index]) {
+	case OBMF_GPIO_INT_LEVEL_HIGH:
+	case OBMF_GPIO_INT_RISING_EDGE:
+		notify = high;
+		break;
+	case OBMF_GPIO_INT_LEVEL_LOW:
+	case OBMF_GPIO_INT_FALLING_EDGE:
+		notify = !high;
+		break;
+	case OBMF_GPIO_INT_BOTH_EDGE:
+		notify = true;
+		break;
+	default:
+		notify = false;
+		break;
+	}
+
+	if (!notify) {
+		return 0;
+	}
+
+	return obmf_gpio_notify(&index, &data, 1, channel);
+}
+
 /* =====================================================================
  * GPIO Channel (Consumer) - We send Get/Set GPIO requests to host
  * ===================================================================== */
