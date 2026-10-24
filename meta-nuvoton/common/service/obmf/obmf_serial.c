@@ -135,36 +135,45 @@ void handle_serial_request(obmf_icp_header_t *req_hdr,
 		return;
 	}
 
-	if (payload_len >= OBMF_SERIAL_REQ_HDR_SIZE) {
-		obmf_serial_request_t *serial_req =
-			(obmf_serial_request_t *)payload;
-		uint16_t char_count = serial_req->char_count;
-		const uint8_t *char_data =
-			payload + OBMF_SERIAL_REQ_HDR_SIZE;
-
-		uint16_t accepted = char_count;
-
-		if (char_count > 0 &&
-		    payload_len >= OBMF_SERIAL_REQ_HDR_SIZE + char_count &&
-		    st->rx_cb) {
-			accepted = st->rx_cb(char_data, char_count,
-					     st->rx_cb_ctx);
-		}
-
-		/* Build response (ACK or partial NACK per spec §partial-accept) */
-		obmf_icp_header_t *rsp_hdr = (obmf_icp_header_t *)rsp_buf;
-		OBMF_ICP_SET_CHANNEL(rsp_hdr, channel);
-		OBMF_ICP_SET_RQRESP_STATUS(rsp_hdr,
-			OBMF_ICP_MSG_TYPE_RESPONSE,
-			OBMF_ICP_SUCCESS);
-
-		obmf_serial_response_t *serial_rsp =
-			(obmf_serial_response_t *)(rsp_buf + OBMF_HEADER_SIZE);
-		serial_rsp->ack_nack = (accepted < char_count) ? 1 : 0;
-		serial_rsp->accepted_count = accepted;
-		OBMF_ICP_SET_SIZE(rsp_hdr, OBMF_SERIAL_RSP_SIZE);
-		*rsp_len = OBMF_HEADER_SIZE + OBMF_SERIAL_RSP_SIZE;
+	/* Never acknowledge characters that did not arrive */
+	if (payload_len < OBMF_SERIAL_REQ_HDR_SIZE) {
+		LOG_ERR("Serial request too short (%u bytes)", payload_len);
+		obmf_build_err_response(req_hdr, OBMF_ICP_STATUS_INVALID_CMD,
+					rsp_buf, rsp_len, false);
+		return;
 	}
+
+	obmf_serial_request_t *serial_req = (obmf_serial_request_t *)payload;
+	uint16_t char_count = serial_req->char_count;
+	const uint8_t *char_data = payload + OBMF_SERIAL_REQ_HDR_SIZE;
+
+	if (payload_len - OBMF_SERIAL_REQ_HDR_SIZE < char_count) {
+		LOG_ERR("Serial request carries %u of %u characters",
+			payload_len - OBMF_SERIAL_REQ_HDR_SIZE, char_count);
+		obmf_build_err_response(req_hdr, OBMF_ICP_STATUS_INVALID_CMD,
+					rsp_buf, rsp_len, false);
+		return;
+	}
+
+	uint16_t accepted = char_count;
+
+	if (char_count > 0 && st->rx_cb) {
+		accepted = st->rx_cb(char_data, char_count, st->rx_cb_ctx);
+	}
+
+	/* Build response (ACK or partial NACK per spec §partial-accept) */
+	obmf_icp_header_t *rsp_hdr = (obmf_icp_header_t *)rsp_buf;
+	OBMF_ICP_SET_CHANNEL(rsp_hdr, channel);
+	OBMF_ICP_SET_RQRESP_STATUS(rsp_hdr,
+		OBMF_ICP_MSG_TYPE_RESPONSE,
+		OBMF_ICP_SUCCESS);
+
+	obmf_serial_response_t *serial_rsp =
+		(obmf_serial_response_t *)(rsp_buf + OBMF_HEADER_SIZE);
+	serial_rsp->ack_nack = (accepted < char_count) ? 1 : 0;
+	serial_rsp->accepted_count = accepted;
+	OBMF_ICP_SET_SIZE(rsp_hdr, OBMF_SERIAL_RSP_SIZE);
+	*rsp_len = OBMF_HEADER_SIZE + OBMF_SERIAL_RSP_SIZE;
 }
 
 /* =====================================================================
