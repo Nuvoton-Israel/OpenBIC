@@ -244,9 +244,10 @@ void handle_i2c_request(obmf_icp_header_t *req_hdr,
 					req->command, NULL, 0,
 					rsp_buf, rsp_len);
 		} else {
+			/* No channel-specific code fits; 0x07+ are reserved */
 			LOG_ERR("I2C CH%d: cmd %u to addr 0x%02x failed (ret %d)",
 				channel, command, address, ret);
-			build_i2c_response(channel, OBMF_ICP_ERR_OTHER,
+			build_i2c_response(channel, OBMF_ICP_ERR_PERMANENT_ERROR,
 					req->command, NULL, 0,
 					rsp_buf, rsp_len);
 		}
