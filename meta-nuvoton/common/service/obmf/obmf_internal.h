@@ -104,6 +104,8 @@ const obmf_gpio_config_data_t *obmf_gpio_channel_config(uint8_t channel);
 /* Add or update an IBI_TARGET_CONFIG_ARRAY entry (defined in obmf.c) */
 int obmf_i3c_ibi_target_set(uint8_t channel, uint8_t dynamic_addr,
 			    uint16_t max_ibi_payload_len);
+/* Clamp the I3C Configuration Data after a host write (obmf_i3c.c) */
+void obmf_i3c_config_written(obmf_i3c_config_data_t *cfg);
 void obmf_i2c_target_channels_init(void);
 void obmf_serial_channels_init(void);
 

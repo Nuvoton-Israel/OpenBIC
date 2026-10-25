@@ -55,6 +55,22 @@ void obmf_i3c_set_controller_bus(uint8_t channel, uint8_t bus)
 #endif
 }
 
+/* Clamp a host write of the IBI target array to what the producer can do */
+void obmf_i3c_config_written(obmf_i3c_config_data_t *cfg)
+{
+	for (int i = 0; i < OBMF_I3C_MAX_IBI_TARGETS; i++) {
+		obmf_i3c_ibi_target_cfg_t *t = &cfg->ibi_targets[i];
+
+		t->dynamic_addr &= 0x7F;
+		/* No automatic follow-up read: the BMC issues it (see below) */
+		t->control_flags = 0;
+		t->max_ibi_payload_len = MIN(t->max_ibi_payload_len,
+					     IBI_PAYLOAD_SIZE);
+		t->max_pending_read_len = MIN(t->max_pending_read_len,
+					      IBI_PAYLOAD_SIZE);
+	}
+}
+
 /* I3C Controller channel bound to a physical bus, or 0 if none is. */
 static uint8_t i3c_channel_of_bus(uint8_t bus)
 {
