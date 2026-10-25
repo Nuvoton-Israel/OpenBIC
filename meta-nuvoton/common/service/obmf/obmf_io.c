@@ -210,9 +210,8 @@ void handle_io_request(obmf_icp_header_t *req_hdr,
 
 	} else {
 		/* ---- Read path ---- */
-		uint8_t *rsp_status = rsp_buf + OBMF_FULL_IO_HDR_SIZE;
-		uint8_t *rsp_data   = rsp_status + 1;
-		uint16_t collected  = 0;
+		uint8_t *rsp_data  = rsp_buf + OBMF_FULL_IO_HDR_SIZE;
+		uint16_t collected = 0;
 
 		for (uint8_t i = 0; i < size; i++) {
 			uint16_t target = is_fixed ?
@@ -234,11 +233,9 @@ void handle_io_request(obmf_icp_header_t *req_hdr,
 		LOG_DBG("IO Read: port=0x%04x size=%u %s",
 			port_addr, size, is_fixed ? "fixed" : "seq");
 
-		/* Read response: status(1) + data(size) */
-		*rsp_status = OBMF_ICP_SUCCESS;
-		OBMF_ICP_SET_SIZE(rsp_hdr,
-				  OBMF_ICP_IO_SUB_HDR_SIZE + 1 + collected);
-		*rsp_len = OBMF_FULL_IO_HDR_SIZE + 1 + collected;
+		/* Read response: data only, status is in the common header */
+		OBMF_ICP_SET_SIZE(rsp_hdr, OBMF_ICP_IO_SUB_HDR_SIZE + collected);
+		*rsp_len = OBMF_FULL_IO_HDR_SIZE + collected;
 	}
 
 	channel_tags[channel].producer_tag ^= 1;
