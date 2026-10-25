@@ -823,6 +823,40 @@ const obmf_gpio_config_data_t *obmf_gpio_channel_config(uint8_t channel)
 	       ((uint8_t *)hdr + CHAN_CFG_CONFIG_DATA_OFFSET);
 }
 
+int obmf_i3c_ibi_target_set(uint8_t channel, uint8_t dynamic_addr,
+			     uint16_t max_ibi_payload_len)
+{
+	obmf_channel_config_header_t *hdr = obmf_chan_cfg_hdr(channel);
+	obmf_i3c_config_data_t *cfg;
+	uint8_t n;
+
+	if (!hdr || hdr->channel_type != OBMF_ICP_CHANNEL_TYPE_I3C_CONTROLLER) {
+		return -EINVAL;
+	}
+	cfg = (obmf_i3c_config_data_t *)((uint8_t *)hdr +
+					 CHAN_CFG_CONFIG_DATA_OFFSET);
+	n = MIN(cfg->ibi_target_count, OBMF_I3C_MAX_IBI_TARGETS);
+
+	for (uint8_t i = 0; i < n; i++) {
+		if (cfg->ibi_targets[i].dynamic_addr == dynamic_addr) {
+			cfg->ibi_targets[i].max_ibi_payload_len =
+				max_ibi_payload_len;
+			return 0;
+		}
+	}
+	if (n == OBMF_I3C_MAX_IBI_TARGETS) {
+		return -ENOMEM;
+	}
+
+	cfg->ibi_targets[n] = (obmf_i3c_ibi_target_cfg_t) {
+		.dynamic_addr = dynamic_addr,
+		.max_ibi_payload_len = max_ibi_payload_len,
+	};
+	cfg->ibi_target_count = n + 1;
+	hdr->config_size = OBMF_I3C_CONFIG_SIZE(n + 1);
+	return 0;
+}
+
 bool obmf_channel_is_enabled(uint8_t channel)
 {
 	obmf_channel_config_header_t *hdr = obmf_chan_cfg_hdr(channel);
@@ -1204,10 +1238,15 @@ static int obmf_channel_config_fill(const struct obmf_plat_channel *pc,
 		return offsetof(obmf_i2c_target_config_data_t,
 				target_address_list);
 	}
-	case OBMF_ICP_CHANNEL_TYPE_I3C_CONTROLLER:
-		memcpy(data, &pc->cfg.i3c, sizeof(pc->cfg.i3c));
+	case OBMF_ICP_CHANNEL_TYPE_I3C_CONTROLLER: {
+		obmf_i3c_config_data_t *i3c = (obmf_i3c_config_data_t *)data;
+
+		/* IBI targets are added by obmf_i3c_ibi_target_set() */
+		*i3c = pc->cfg.i3c;
+		i3c->ibi_target_count = 0;
 		obmf_i3c_set_controller_bus(ch, pc->bus);
-		return sizeof(pc->cfg.i3c);
+		return OBMF_I3C_CONFIG_SIZE(0);
+	}
 	default:
 		return -ENOTSUP;
 	}
@@ -1928,8 +1967,9 @@ static bool ch0_cfg_byte_writable(uint8_t type, uint32_t off)
 		return o != offsetof(obmf_i2c_target_config_data_t,
 				     target_address_count);
 	case OBMF_ICP_CHANNEL_TYPE_I3C_CONTROLLER:
-		/* DEV_NACK_RETRY_COUNT */
-		return o < offsetof(obmf_i3c_config_data_t, i3c_feature_flags);
+		/* DEV_NACK_RETRY_COUNT and the IBI target array */
+		return o < offsetof(obmf_i3c_config_data_t, i3c_feature_flags) ||
+		       o >= offsetof(obmf_i3c_config_data_t, ibi_targets);
 	case OBMF_ICP_CHANNEL_TYPE_SPI_CONTROLLER:
 		/* SPI_SUPPORTED_CONFIG_FLAGS and RESERVED are read-only */
 		return (o >= offsetof(obmf_spi_config_data_t, config_flags) &&

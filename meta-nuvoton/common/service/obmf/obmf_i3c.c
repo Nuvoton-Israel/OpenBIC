@@ -1037,6 +1037,13 @@ int obmf_i3c_request_ibi(uint8_t bus, uint8_t dynamic_addr)
 
 	LOG_INF("I3C IBI registered and enabled for dev@%02x on bus %u",
 		dynamic_addr, bus);
+
+	/* Publish the target in the channel's IBI_TARGET_CONFIG_ARRAY */
+	if (obmf_i3c_ibi_target_set(i3c_channel_of_bus(bus), dynamic_addr,
+				    OBMF_I3C_IBI_BUF_SIZE)) {
+		LOG_WRN("I3C dev@%02x: not listed in IBI_TARGET_CONFIG_ARRAY",
+			dynamic_addr);
+	}
 	return 0;
 }
 

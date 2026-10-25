@@ -1259,10 +1259,21 @@ typedef struct __attribute__((packed)) {
 	uint16_t counter_value; /* 16-bit unsigned counter value */
 } obmf_i3c_stats_entry_t;
 
+/* IBI_TARGET_CONFIG_ARRAY entry (OBMF-ICP 1.0.0 Table 82, 6 bytes) */
+typedef struct __attribute__((packed)) {
+	uint8_t  dynamic_addr;          /* 0x00: Target dynamic address (rw) */
+	uint8_t  control_flags;         /* 0x01: [0] AUTO_PENDING_READ_ENABLE */
+	uint16_t max_ibi_payload_len;   /* 0x02: CONFIGURED_MAX_IBI_PAYLOAD_LEN */
+	uint16_t max_pending_read_len;  /* 0x04: CONFIGURED_MAX_PENDING_READ_LEN */
+} obmf_i3c_ibi_target_cfg_t;
+
+/* IBI targets the configuration space has room for */
+#define OBMF_I3C_MAX_IBI_TARGETS  8
+
 /**
- * @brief I3C Controller Channel Configuration Data (spec section 9.2.1).
+ * @brief I3C Controller Channel Configuration Data (OBMF-ICP 1.0.0 Table 81).
  *
- * Uses the existing v0.9 obmf_channel_config_header_t unchanged.
+ * CONFIG_SIZE covers the IBI_TARGET_COUNT entries in use only.
  */
 typedef struct __attribute__((packed)) {
 	uint16_t dev_nack_retry_count;  /* 0x00: Configured NACK retry count (rw) */
@@ -1273,8 +1284,14 @@ typedef struct __attribute__((packed)) {
 	uint16_t max_read_turnaround;   /* 0x08: Max read turnaround in µs (r) */
 	uint16_t max_dev_nack_retry;    /* 0x0A: Max NACK retry count (r) */
 	uint16_t max_payload_size;      /* 0x0C: Max payload per command in bytes (r) */
-	uint16_t max_ibi_payload_size;  /* 0x0E: Max IBI payload in bytes (r) */
+	uint8_t  ibi_target_count;      /* 0x0E: IBI targets registered (r) */
+	obmf_i3c_ibi_target_cfg_t ibi_targets[OBMF_I3C_MAX_IBI_TARGETS]; /* 0x0F */
 } obmf_i3c_config_data_t;
+
+/* CONFIG_SIZE of an I3C channel with @n IBI targets registered */
+#define OBMF_I3C_CONFIG_SIZE(n) \
+	(offsetof(obmf_i3c_config_data_t, ibi_targets) + \
+	 (n) * sizeof(obmf_i3c_ibi_target_cfg_t))
 
 /* Full I3C Controller Channel Configuration Space */
 typedef struct __attribute__((packed)) {
@@ -1525,8 +1542,7 @@ struct obmf_plat_config {
 	{ .i3c_feature_flags = OBMF_I3C_FEATURE_IBI_PRIV_READ,                 \
 	  .max_chained_ops = 16, .max_scl_pp_khz = 12500,                      \
 	  .max_scl_od_khz = 400, .max_read_turnaround = 1000,                  \
-	  .max_dev_nack_retry = 3, .max_payload_size = 256,                    \
-	  .max_ibi_payload_size = 128 }
+	  .max_dev_nack_retry = 3, .max_payload_size = 256 }
 
 /** I3C controller channel on local bus @p _bus with default capabilities. */
 #define OBMF_CHANNEL_I3C(_ch, _name, _bus)                                     \

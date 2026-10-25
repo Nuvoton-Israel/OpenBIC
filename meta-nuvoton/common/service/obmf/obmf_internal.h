@@ -101,6 +101,9 @@ void handle_i3c_response(obmf_icp_header_t *rsp_hdr,
 void obmf_channel_specific_status_set(uint8_t channel, uint8_t bits, bool set);
 /* GPIO Configuration Data of a GPIO channel, or NULL (defined in obmf.c) */
 const obmf_gpio_config_data_t *obmf_gpio_channel_config(uint8_t channel);
+/* Add or update an IBI_TARGET_CONFIG_ARRAY entry (defined in obmf.c) */
+int obmf_i3c_ibi_target_set(uint8_t channel, uint8_t dynamic_addr,
+			    uint16_t max_ibi_payload_len);
 void obmf_i2c_target_channels_init(void);
 void obmf_serial_channels_init(void);
 
