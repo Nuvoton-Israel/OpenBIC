@@ -159,6 +159,34 @@ void handle_io_request(obmf_icp_header_t *req_hdr,
 					  rsp_buf, rsp_len, true);
 	}
 
+	/* A read response carries the header byte plus size data bytes */
+	if (!is_write && OBMF_FULL_IO_HDR_SIZE + size > OBMF_RSP_BUF_SIZE) {
+		LOG_ERR("IO CH%d: read of %u bytes does not fit a response",
+			channel, size);
+		OBMF_BUILD_ERR_AND_RETURN(req_hdr,
+					  OBMF_ICP_STATUS_SIZE_NOT_SUPPORTED,
+					  rsp_buf, rsp_len, true);
+	}
+
+	/* Every port a write touches must be in a range this device serves */
+	if (is_write) {
+		for (uint8_t i = 0; i < size; i++) {
+			uint16_t target = is_fixed ?
+				port_addr : (uint16_t)(port_addr + i);
+			uint8_t *dst;
+			uint16_t avail;
+
+			if (io_local_get_buf(target, &dst, &avail) != 0) {
+				LOG_ERR("IO Write: port=0x%04x out of range",
+					target);
+				OBMF_BUILD_ERR_AND_RETURN(
+					req_hdr,
+					OBMF_IO_STATUS_ADDR_OUT_OF_RANGE,
+					rsp_buf, rsp_len, true);
+			}
+		}
+	}
+
 	/* Pre-fill common response header fields */
 	obmf_icp_header_t *rsp_hdr = (obmf_icp_header_t *)rsp_buf;
 	obmf_icp_io_sub_header_t *rsp_sub =
