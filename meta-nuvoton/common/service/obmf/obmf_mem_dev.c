@@ -182,7 +182,7 @@ void handle_mem_dev_response(obmf_icp_header_t *rsp_hdr,
 	uint8_t channel = OBMF_ICP_GET_CHANNEL(rsp_hdr);
 	uint8_t status_hdr = OBMF_ICP_GET_STATUS(rsp_hdr);
 	struct obmf_mem_dev_rsp_entry entry = {
-		.status = OBMF_ICP_ERR_OTHER,
+		.status = OBMF_ICP_ERR_PERMANENT_ERROR,
 		.data_len = 0
 	};
 

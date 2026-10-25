@@ -157,7 +157,6 @@ typedef struct __attribute__((packed)) {
 #define OBMF_ICP_ERR_NOT_READY              OBMF_ICP_STATUS_NOT_READY
 #define OBMF_ICP_ERR_INSUFFICIENT_PRIVILEGE OBMF_ICP_MMIO_STATUS_ACCESS_DENIED
 #define OBMF_ICP_ERR_ADDR_OUT_OF_RANGE      OBMF_ICP_MMIO_STATUS_ADDR_OUT_OF_RANGE
-#define OBMF_ICP_ERR_OTHER                  0x07
 
 /* Channel 0: Control Channel */
 #define OBMF_ICP_CONTROL_CHANNEL 0
