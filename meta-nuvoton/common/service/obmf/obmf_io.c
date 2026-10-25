@@ -94,22 +94,9 @@ void handle_io_request(obmf_icp_header_t *req_hdr,
 {
 	uint8_t channel = OBMF_ICP_GET_CHANNEL(req_hdr);
 
-	/* Parse the I/O channel 2-byte sub-header */
+	/* Parse the 1-byte I/O channel header (Table 52) */
 	obmf_icp_io_sub_header_t *req_sub =
 		(obmf_icp_io_sub_header_t *)((uint8_t *)req_hdr + OBMF_HEADER_SIZE);
-
-	/* Tag validation (spec section 5.2, rule 5) */
-	uint8_t tag = OBMF_ICP_IO_GET_TAG(req_sub);
-
-	if (tag != channel_tags[channel].producer_tag) {
-		LOG_ERR("IO CH%d: tag mismatch (got %u, expected %u) – resetting",
-			channel, tag, channel_tags[channel].producer_tag);
-		obmf_build_err_response(req_hdr, OBMF_ICP_ERR_OTHER,
-					rsp_buf, rsp_len, false);
-		channel_tags[channel].producer_tag = 0;
-		channel_tags[channel].consumer_tag = 0;
-		return;
-	}
 
 	uint8_t trans = OBMF_ICP_IO_GET_TRANS(req_sub);
 
@@ -180,7 +167,7 @@ void handle_io_request(obmf_icp_header_t *req_hdr,
 	OBMF_ICP_SET_CHANNEL(rsp_hdr, channel);
 	OBMF_ICP_SET_RQRESP_STATUS(rsp_hdr, OBMF_ICP_MSG_TYPE_RESPONSE,
 				   OBMF_ICP_SUCCESS);
-	*rsp_sub = *req_sub;
+	rsp_sub->trans_rsvd = trans;
 
 	if (is_write) {
 		/* ---- Write path ---- */
@@ -237,8 +224,6 @@ void handle_io_request(obmf_icp_header_t *req_hdr,
 		OBMF_ICP_SET_SIZE(rsp_hdr, OBMF_ICP_IO_SUB_HDR_SIZE + collected);
 		*rsp_len = OBMF_FULL_IO_HDR_SIZE + collected;
 	}
-
-	channel_tags[channel].producer_tag ^= 1;
 }
 
 /* -----------------------------------------------------------------------
@@ -260,13 +245,13 @@ void handle_io_response(obmf_icp_header_t *rsp_hdr,
 	}
 
 	/*
-	 * For read responses the payload is: status(1) + data(N).
+	 * For read responses the payload is the data only (Table 56).
 	 * Currently no Consumer-initiated I/O reads are used for POST codes,
 	 * but the hook is present for future use.
 	 */
-	if (payload_len > 1) {
+	if (payload_len > 0) {
 		LOG_DBG("IO CH%d read response: %u data bytes",
-			channel, payload_len - 1);
+			channel, payload_len);
 	}
 }
 
@@ -282,7 +267,7 @@ void handle_io_response(obmf_icp_header_t *rsp_hdr,
  * For a single-port burst (same address repeated) pass is_fixed = true;
  * the Fixed-Port variants are then selected instead.
  *
- * Request packet layout after the 3-byte IO sub-header:
+ * Request packet layout after the 1-byte IO header:
  *   Bytes 0-1  port address (LE uint16)
  *   Byte  2    size in bytes
  *   Bytes 3+   write data (write only)
@@ -319,8 +304,8 @@ int obmf_io_write(uint16_t port, uint16_t len, const uint8_t *buf, bool fixed)
 	}
 
 	/*
-	 * Packet: OBMF common header (5)
-	 *       + IO sub-header      (3)
+	 * Packet: OBMF common header (4)
+	 *       + IO header          (1)
 	 *       + port addr (2) + size (1) + data (len)
 	 */
 	uint32_t total_len = OBMF_FULL_IO_HDR_SIZE + 2 + 1 + len;
@@ -336,7 +321,6 @@ int obmf_io_write(uint16_t port, uint16_t len, const uint8_t *buf, bool fixed)
 	obmf_icp_io_sub_header_t *sub_hdr =
 		(obmf_icp_io_sub_header_t *)(tx_buf + OBMF_HEADER_SIZE);
 	OBMF_ICP_IO_SET_TRANS(sub_hdr, trans);
-	/* Tag is set by obmf_send_request */
 
 	/* Fill payload */
 	uint8_t *payload = tx_buf + OBMF_FULL_IO_HDR_SIZE;
@@ -395,7 +379,7 @@ int obmf_io_read(uint16_t port, uint16_t len, bool fixed)
 			      : OBMF_ICP_IO_TRANS_SEQ_READ_8;
 	}
 
-	/* Packet: common header (5) + IO sub-header (3) + port (2) + size (1) */
+	/* Packet: common header (4) + IO header (1) + port (2) + size (1) */
 	uint32_t total_len = OBMF_FULL_IO_HDR_SIZE + 2 + 1;
 	uint8_t tx_buf[OBMF_FULL_IO_HDR_SIZE + 2 + 1];
 	memset(tx_buf, 0, sizeof(tx_buf));

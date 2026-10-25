@@ -81,25 +81,23 @@ typedef struct __attribute__((packed)) {
 } obmf_icp_mmio_sub_header_t;
 
 /**
- * @brief OBMF-ICP I/O Channel Sub-Header (v0.9.2, 2 bytes)
+ * @brief OBMF-ICP I/O Channel header (OBMF-ICP 1.0.0 Table 52, 1 byte)
  *
  * Byte 0: Transaction Type [3:0], Reserved [7:4]
- * Byte 1: Tag [7:0]
+ *
+ * The transaction payload starts at byte 1; there is no Tag.
  */
 typedef struct __attribute__((packed)) {
 	uint8_t trans_rsvd;     /* Byte 0: [3:0]=Transaction, [7:4]=Reserved */
-	uint8_t tag;            /* Byte 1: Tag */
 } obmf_icp_io_sub_header_t;
 
 /* I/O Sub-Header macros */
 #define OBMF_ICP_IO_GET_TRANS(sh)  ((sh)->trans_rsvd & 0x0F)
-#define OBMF_ICP_IO_GET_TAG(sh)    ((sh)->tag)
 #define OBMF_ICP_IO_SET_TRANS(sh, val) \
 	do { \
 		(sh)->trans_rsvd &= ~0x0F; \
 		(sh)->trans_rsvd |= ((val) & 0x0F); \
 	} while (0)
-#define OBMF_ICP_IO_SET_TAG(sh, val)   ((sh)->tag = (val))
 
 /* Common Header macros */
 #define OBMF_ICP_GET_CHANNEL(h)       ((h)->channel)

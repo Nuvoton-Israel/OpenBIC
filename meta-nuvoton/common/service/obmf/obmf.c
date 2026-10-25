@@ -312,8 +312,8 @@ static void obmf_queue_response(const uint8_t *buf, uint32_t len)
  *
  * Runs in USB interrupt context, so it must stay ISR-safe: just flag the
  * event and let the RX thread perform the real cleanup (freeing fragment
- * buffers and clearing channel tags) at a safe point before processing the
- * next request. This resynchronizes the tag sequence after a host reboot.
+ * buffers and clearing outstanding requests) at a safe point before
+ * processing the next request.
  */
 static void obmf_bus_reset_cb(const struct device *dev)
 {
@@ -474,7 +474,7 @@ static void obmf_rx_task(void *arg1, void *arg2, void *arg3)
 		 * Handle a pending USB bus reset / disconnect (host reboot).
 		 * Do it here, in thread context, before parsing the freshly
 		 * read fragment: this frees any stale partial reassembly
-		 * buffers and resets the tag sequence so the new fragment is
+		 * buffers and outstanding requests so the new fragment is
 		 * processed as the first message after reconnect.
 		 */
 		if (atomic_cas(&obmf_reset_pending, 1, 0)) {
@@ -735,9 +735,8 @@ static uint32_t obmf_suspended_mask;
 
 /*
  * Reset all per-channel state after a USB bus reset / disconnect (e.g. a host
- * reboot). Frees any in-progress fragment reassembly buffers and clears the
- * channel tags so the tag sequence restarts at 0, matching the host which
- * also restarts its tag sequence after reconnecting.
+ * reboot). Frees any in-progress fragment reassembly buffers and forgets
+ * requests that will never be answered.
  *
  * Called from the RX thread context only (never from the ISR callback).
  */
@@ -752,8 +751,6 @@ static void obmf_reset_channel_state(void)
 		obmf_frag_bufs[i].discarding = false;
 
 		channel_tags[i].is_outstanding = false;
-		channel_tags[i].producer_tag = 0;
-		channel_tags[i].consumer_tag = 0;
 	}
 
 	obmf_unk.active = false;
@@ -879,8 +876,8 @@ void obmf_channel_specific_status_set(uint8_t channel, uint8_t bits, bool set)
 }
 
 /*
- * Tags are deliberately left untouched: a plain USB suspend may be followed
- * by a resume without a bus reset, and the host's tag sequence continues.
+ * Outstanding requests are deliberately left untouched: a plain USB suspend
+ * may be followed by a resume without a bus reset.
  */
 static void obmf_channels_link_down(void)
 {
@@ -1097,6 +1094,8 @@ void obmf_build_err_response(obmf_icp_header_t *req_hdr,
 	obmf_icp_header_t *rsp_hdr = (obmf_icp_header_t *)rsp_buf;
 	uint8_t channel = OBMF_ICP_GET_CHANNEL(req_hdr);
 
+	ARG_UNUSED(alt);
+
 	/* Build common header for response */
 	OBMF_ICP_SET_CHANNEL(rsp_hdr, channel);
 	/* v1.0.0 RC1: Status code goes in common header byte 1[6:0] */
@@ -1114,19 +1113,15 @@ void obmf_build_err_response(obmf_icp_header_t *req_hdr,
 		OBMF_ICP_SET_SIZE(rsp_hdr, OBMF_MMIO_SUB_HDR_SIZE);
 		*rsp_len = OBMF_FULL_MMIO_HDR_SIZE;
 	} else if (channel == OBMF_ICP_IO_CHANNEL) {
-		/* I/O channel still carries a Tag; echo its sub-header */
+		/* I/O channel: echo the transaction, reserved bits zero */
 		obmf_icp_io_sub_header_t *req_sub =
 			(obmf_icp_io_sub_header_t *)((uint8_t *)req_hdr + OBMF_HEADER_SIZE);
 		obmf_icp_io_sub_header_t *rsp_sub =
 			(obmf_icp_io_sub_header_t *)(rsp_buf + OBMF_HEADER_SIZE);
 
-		*rsp_sub = *req_sub;
+		rsp_sub->trans_rsvd = OBMF_ICP_IO_GET_TRANS(req_sub);
 		OBMF_ICP_SET_SIZE(rsp_hdr, OBMF_ICP_IO_SUB_HDR_SIZE);
 		*rsp_len = OBMF_FULL_IO_HDR_SIZE;
-
-		if (alt) {
-			channel_tags[channel].producer_tag ^= 1;
-		}
 	} else {
 		/* All other channels have no sub-header - error responses carry no payload */
 		OBMF_ICP_SET_SIZE(rsp_hdr, 0);
@@ -1353,9 +1348,6 @@ int obmf_service_init(const struct obmf_plat_config *cfg)
 
 	for (int i = 0; i < OBMF_MAX_CHANNELS + 1; i++) {
 		channel_tags[i].is_outstanding = false;
-		/* First message on a channel shall use Tag = 0 */
-		channel_tags[i].producer_tag = 0;
-		channel_tags[i].consumer_tag = 0;
 	}
 
 	/* Initialize I2C Target channel message queues */
@@ -1463,7 +1455,7 @@ int obmf_get_response(uint8_t *msg, uint32_t len,
 		payload_len = (len > OBMF_FULL_MMIO_HDR_SIZE) ?
 			      len - OBMF_FULL_MMIO_HDR_SIZE : 0;
 	} else if (channel == OBMF_ICP_IO_CHANNEL) {
-		/* I/O channel has its own 2-byte sub-header */
+		/* I/O channel has its own 1-byte header (Table 52) */
 		payload = msg + OBMF_FULL_IO_HDR_SIZE;
 		payload_len = (len > OBMF_FULL_IO_HDR_SIZE) ?
 			      len - OBMF_FULL_IO_HDR_SIZE : 0;
@@ -1743,14 +1735,6 @@ int obmf_send_request(uint8_t channel, uint8_t *req_buf, uint32_t req_len)
 	/* Size = total payload size (everything after common header) */
 	OBMF_ICP_SET_SIZE(hdr, req_len - OBMF_HEADER_SIZE);
 
-	/* I/O channel retains a Tag for request/response correlation */
-	if (channel == OBMF_ICP_IO_CHANNEL) {
-		obmf_icp_io_sub_header_t *sub_hdr =
-			(obmf_icp_io_sub_header_t *)(req_buf + OBMF_HEADER_SIZE);
-		OBMF_ICP_IO_SET_TAG(sub_hdr, channel_tags[channel].consumer_tag);
-		channel_tags[channel].consumer_tag ^= 1;
-	}
-
 	/* Send request via TX thread message queue */
 	struct obmf_transport_msg msg;
 	msg.buf = (uint8_t *)malloc(req_len);
@@ -1912,10 +1896,6 @@ static void obmf_channel_control_write(obmf_channel_config_header_t *ch_hdr,
 	if (was_enabled != now_enabled) {
 		LOG_INF("Channel %d %s", ch_no, now_enabled ? "enabled" : "disabled");
 		channel_tags[ch_no].is_outstanding = false;
-		if (now_enabled) {
-			channel_tags[ch_no].producer_tag = 0;
-			channel_tags[ch_no].consumer_tag = 0;
-		}
 	}
 
 	/* Health follows the enable state unless an error is still flagged */

@@ -43,14 +43,11 @@ static inline void obmf_mmio_rsp_sub_header(obmf_icp_mmio_sub_header_t *rsp,
 #define OBMF_FULL_IO_HDR_SIZE (OBMF_HEADER_SIZE + OBMF_ICP_IO_SUB_HDR_SIZE)
 
 /*
- * Per-channel state. is_outstanding applies to every channel; producer_tag
- * and consumer_tag are only read/written for the I/O channel - v1.0.0 RC1
- * removed the Tag from the MMIO sub-header, so no other channel uses them.
+ * Per-channel state. OBMF-ICP 1.0.0 messages carry no Tag; one outstanding
+ * request per channel (Table 1, requirement 15) is all that is tracked.
  */
 typedef struct {
 	bool is_outstanding;
-	uint8_t producer_tag; /* Only used for I/O channel */
-	uint8_t consumer_tag; /* Only used for I/O channel */
 	int64_t sent_at;	/* k_uptime_get() when the request was queued */
 } OBMF_Channel_Tags;
 
@@ -109,7 +106,10 @@ void obmf_i3c_config_written(obmf_i3c_config_data_t *cfg);
 void obmf_i2c_target_channels_init(void);
 void obmf_serial_channels_init(void);
 
-/* Error response builder (defined in obmf.c) */
+/*
+ * Error response builder (defined in obmf.c). @alt used to advance the
+ * I/O channel Tag, which OBMF-ICP 1.0.0 no longer has; it is ignored.
+ */
 void obmf_build_err_response(obmf_icp_header_t *req_hdr,
 			     uint8_t error_code,
 			     uint8_t *rsp_buf, uint32_t *rsp_len,
