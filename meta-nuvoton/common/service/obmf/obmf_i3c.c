@@ -668,13 +668,18 @@ static void handle_daa(uint8_t channel, uint8_t bus,
 
 	ret = i3c_master_do_daa(master, addrs, &i3c_desc_count);
 	if (ret < 0) {
-		printk("bus_init: DAA failed: %d\n", ret);
+		LOG_ERR("I3C CH%d: DAA failed: %d", channel, ret);
+		build_i3c_response(channel, i3c_errno_to_chan_status(ret),
+				   OBMF_I3C_CMD_DO_DAA, 0, 0, rsp_buf, rsp_len);
 		return;
 	}
 	LOG_INF("bus_init: DAA assigned %d device(s)", i3c_desc_count);
 
 	if (i3c_desc_count > I3C_MAX_NUM) {
-		printk("too many devices\n");
+		LOG_ERR("I3C CH%d: DAA found %d devices, at most %d supported",
+			channel, i3c_desc_count, I3C_MAX_NUM);
+		build_i3c_response(channel, OBMF_ICP_STATUS_PERMANENT_ERROR,
+				   OBMF_I3C_CMD_DO_DAA, 0, 0, rsp_buf, rsp_len);
 		return;
 	}
 
