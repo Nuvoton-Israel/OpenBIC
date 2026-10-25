@@ -144,6 +144,9 @@ static int obmf_mem_dev_send_and_wait(uint8_t command, uint32_t addr,
 		       write_data, write_len);
 	}
 
+	/* A response that arrived after an earlier timeout is not ours */
+	k_msgq_purge(&obmf_mem_dev_msgq);
+
 	int rc = obmf_send_request(OBMF_ICP_MEM_DEV_CHANNEL, tx_buf, total_len);
 	if (rc != 0) {
 		mem_dev_pending_read_buf = NULL;
