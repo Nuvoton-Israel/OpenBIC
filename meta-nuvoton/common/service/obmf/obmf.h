@@ -883,13 +883,11 @@ typedef struct __attribute__((packed)) {
 
 #define OBMF_MEM_DEV_REQ_HDR_SIZE  sizeof(obmf_mem_dev_request_t)
 
-/* Memory Device Channel Response (spec section 4.12.2) */
-typedef struct __attribute__((packed)) {
-	uint8_t status;        /* Byte 0: Completion status */
-	/* Read Data follows (variable length, Memory Read success only) */
-} obmf_mem_dev_response_t;
-
-#define OBMF_MEM_DEV_RSP_HDR_SIZE  sizeof(obmf_mem_dev_response_t)
+/*
+ * Memory Device Channel Response (OBMF-ICP 1.0.0 Table 62): the Status is
+ * in the common header and the payload is only the read data, present for
+ * a successful Memory Read.
+ */
 
 /* Memory Device Channel Configuration Data (spec "MEM_DEV_CFG") */
 typedef struct __attribute__((packed)) {

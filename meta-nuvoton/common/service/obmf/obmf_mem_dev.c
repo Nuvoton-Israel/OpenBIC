@@ -195,21 +195,9 @@ void handle_mem_dev_response(obmf_icp_header_t *rsp_hdr,
 		return;
 	}
 
-	if (payload_len < OBMF_MEM_DEV_RSP_HDR_SIZE) {
-		LOG_ERR("Mem Dev response too short (%d bytes)", payload_len);
-		channel_tags[channel].is_outstanding = false;
-		mem_dev_pending_read_buf = NULL;
-		mem_dev_pending_page_read = false;
-		k_msgq_put(&obmf_mem_dev_msgq, &entry, K_NO_WAIT);
-		return;
-	}
-
-	/* Response has no explicit data-size field; read data (if any) is
-	 * whatever remains in the payload after the status byte.
-	 */
-	uint16_t read_len = (uint16_t)(payload_len - OBMF_MEM_DEV_RSP_HDR_SIZE);
-	const uint8_t *read_data =
-		(read_len > 0) ? (payload + OBMF_MEM_DEV_RSP_HDR_SIZE) : NULL;
+	/* The status is in the common header: the payload is the read data */
+	uint16_t read_len = (uint16_t)payload_len;
+	const uint8_t *read_data = (read_len > 0) ? payload : NULL;
 
 	entry.status = status_hdr;
 	entry.data_len = 0;
