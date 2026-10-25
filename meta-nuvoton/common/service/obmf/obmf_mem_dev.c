@@ -419,3 +419,81 @@ int obmf_mem_dev_erase(uint32_t addr, uint32_t erase_sz)
 	}
 	return rc;
 }
+
+#ifdef CONFIG_SHELL
+#include <shell/shell.h>
+
+/*
+ * Debug commands that issue Memory Device requests to the BMC, which are
+ * otherwise only sent on behalf of eSPI flash cycles from the host:
+ *   obmf_memdev read  <addr> <len>
+ *   obmf_memdev write <addr> <byte> <len>   (fills len bytes with byte)
+ *   obmf_memdev erase <addr> <bytes>
+ */
+static int cmd_memdev_read(const struct shell *sh, size_t argc, char **argv)
+{
+	static uint8_t buf[OBMF_MEM_DEV_PAGE_SIZE];
+	uint32_t addr = strtoul(argv[1], NULL, 0);
+	uint32_t len = strtoul(argv[2], NULL, 0);
+	int rc;
+
+	if (len == 0 || len > sizeof(buf)) {
+		shell_error(sh, "len must be 1-%u", (unsigned int)sizeof(buf));
+		return -EINVAL;
+	}
+	rc = obmf_mem_dev_read(addr, len, buf);
+	if (rc) {
+		shell_error(sh, "read 0x%x+%u failed: %d", addr, len, rc);
+		return rc;
+	}
+	shell_hexdump(sh, buf, len);
+	return 0;
+}
+
+static int cmd_memdev_write(const struct shell *sh, size_t argc, char **argv)
+{
+	static uint8_t buf[OBMF_MEM_DEV_PAGE_SIZE];
+	uint32_t addr = strtoul(argv[1], NULL, 0);
+	uint8_t val = strtoul(argv[2], NULL, 0);
+	uint32_t len = strtoul(argv[3], NULL, 0);
+	int rc;
+
+	if (len == 0 || len > sizeof(buf)) {
+		shell_error(sh, "len must be 1-%u", (unsigned int)sizeof(buf));
+		return -EINVAL;
+	}
+	memset(buf, val, len);
+	rc = obmf_mem_dev_write(addr, buf, len);
+	if (rc) {
+		shell_error(sh, "write 0x%x+%u failed: %d", addr, len, rc);
+		return rc;
+	}
+	shell_print(sh, "wrote %u bytes of 0x%02x at 0x%x", len, val, addr);
+	return 0;
+}
+
+static int cmd_memdev_erase(const struct shell *sh, size_t argc, char **argv)
+{
+	uint32_t addr = strtoul(argv[1], NULL, 0);
+	uint32_t size = strtoul(argv[2], NULL, 0);
+	int rc = obmf_mem_dev_erase(addr, size);
+
+	if (rc) {
+		shell_error(sh, "erase 0x%x+0x%x failed: %d", addr, size, rc);
+		return rc;
+	}
+	shell_print(sh, "erased 0x%x bytes at 0x%x", size, addr);
+	return 0;
+}
+
+SHELL_STATIC_SUBCMD_SET_CREATE(sub_memdev_cmds,
+	SHELL_CMD_ARG(read, NULL, "read <addr> <len>", cmd_memdev_read, 3, 0),
+	SHELL_CMD_ARG(write, NULL, "write <addr> <byte> <len>",
+		      cmd_memdev_write, 4, 0),
+	SHELL_CMD_ARG(erase, NULL, "erase <addr> <bytes>", cmd_memdev_erase,
+		      3, 0),
+	SHELL_SUBCMD_SET_END);
+
+SHELL_CMD_REGISTER(obmf_memdev, &sub_memdev_cmds,
+		   "OBMF Memory Device channel requests", NULL);
+#endif /* CONFIG_SHELL */
