@@ -57,6 +57,10 @@ void obmf_spi_producer_init(void)
 #define SPI_OPCODE_BLOCK_ERASE_64K   0xD8
 #define SPI_OPCODE_ADDR_HDR_LEN      5  /* opcode + 4-byte address */
 
+/* Largest read data that fits in the response buffer */
+#define SPI_MAX_READ_LEN \
+	(OBMF_RSP_BUF_SIZE - OBMF_HEADER_SIZE - OBMF_SPI_RSP_HDR_SIZE)
+
 /*
  * Two-phase transaction cache.
  * Some BMC clients split a single logical SPI op into two OBMF requests:
@@ -225,6 +229,14 @@ void handle_spi_request(obmf_icp_header_t *req_hdr,
 		LOG_WRN("SPI producer: write_data_size %u exceeds payload", wr_sz);
 		build_spi_response(OBMF_ICP_STATUS_INVALID_CMD, spi_cmd, NULL, 0,
 				   rsp_buf, rsp_len);
+		return;
+	}
+
+	if (rd_sz > SPI_MAX_READ_LEN) {
+		LOG_WRN("SPI producer: read_data_size %u exceeds max %u", rd_sz,
+			SPI_MAX_READ_LEN);
+		build_spi_response(OBMF_ICP_STATUS_SIZE_NOT_SUPPORTED, spi_cmd,
+				   NULL, 0, rsp_buf, rsp_len);
 		return;
 	}
 
