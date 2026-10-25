@@ -368,7 +368,6 @@ int obmf_io_write(uint16_t port, uint16_t len, const uint8_t *buf, bool fixed)
 
 	if (rc != 0 && retries == 0) {
 		LOG_ERR("IO write request failed after retries: %d", rc);
-		channel_tags[OBMF_ICP_IO_CHANNEL].is_outstanding = false;
 	} else if (rc != 0 && rc != -ENETDOWN) {
 		LOG_ERR("IO write request failed: %d", rc);
 	}
