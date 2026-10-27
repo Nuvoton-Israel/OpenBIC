@@ -263,7 +263,15 @@ static void obmf_tx_thread(void *arg1, void *arg2, void *arg3)
 typedef struct {
 	uint8_t *buf;
 	uint32_t offset;
+	int64_t last_ms;
+	uint8_t rqresp;
+	bool discarding;
+	uint32_t discard_seen;
+	uint32_t discard_expected;
 } obmf_frag_msg_buf;
+
+/* A partial message older than this is abandoned */
+#define OBMF_FRAG_TIMEOUT_MS 1000
 
 static obmf_frag_msg_buf obmf_frag_bufs[OBMF_MAX_CHANNELS + 1];
 
@@ -505,6 +513,47 @@ static void obmf_rx_task(void *arg1, void *arg2, void *arg3)
 
 		obmf_frag_msg_buf *frag_buf = &obmf_frag_bufs[channel];
 
+		/*
+		 * Drop a partial message that went stale, or whose next
+		 * fragment carries a different RqResp bit, and restart with
+		 * this fragment as a new message.
+		 */
+		int64_t now_ms = k_uptime_get();
+		bool mid_msg = frag_buf->buf || frag_buf->discarding;
+
+		if (mid_msg &&
+		    (now_ms - frag_buf->last_ms > OBMF_FRAG_TIMEOUT_MS ||
+		     frag_buf->rqresp != OBMF_ICP_GET_RQRESP(hdr))) {
+			LOG_WRN("OBMF channel %u: dropping partial message",
+				channel);
+			free(frag_buf->buf);
+			frag_buf->buf = NULL;
+			frag_buf->offset = 0;
+			frag_buf->discarding = false;
+		}
+		frag_buf->last_ms = now_ms;
+
+		/* Skip the rest of a message that overflowed the buffer */
+		if (frag_buf->discarding) {
+			frag_buf->discard_seen += fragment_len - OBMF_HEADER_SIZE;
+			if (frag_buf->discard_seen >= frag_buf->discard_expected ||
+			    fragment_len < CONFIG_OBMF_BULK_EP_MPS) {
+				frag_buf->discarding = false;
+				if (OBMF_ICP_GET_RQRESP(hdr) ==
+				    OBMF_ICP_MSG_TYPE_REQUEST) {
+					uint8_t rsp_buf[OBMF_HEADER_SIZE];
+					uint32_t rsp_len = 0;
+
+					obmf_build_err_response(hdr,
+						OBMF_ICP_STATUS_SIZE_NOT_SUPPORTED,
+						rsp_buf, &rsp_len, false);
+					obmf_queue_response(rsp_buf, rsp_len);
+				}
+			}
+			k_yield();
+			continue;
+		}
+
 		/* First fragment (SOM): allocate buffer */
 		if (!frag_buf->buf) {
 			frag_buf->buf = (uint8_t *)malloc(OBMF_FRAG_BUF_SIZE);
@@ -516,19 +565,41 @@ static void obmf_rx_task(void *arg1, void *arg2, void *arg3)
 			}
 			memset(frag_buf->buf, 0, OBMF_FRAG_BUF_SIZE);
 			frag_buf->offset = 0;
+			frag_buf->rqresp = OBMF_ICP_GET_RQRESP(hdr);
 			LOG_DBG("OBMF SOM: allocated fragment buffer for"
 				" channel %u", channel);
 		}
 
 		/* Check buffer overflow */
 		if (frag_buf->offset + fragment_len > OBMF_FRAG_BUF_SIZE) {
+			obmf_icp_header_t *fh = (obmf_icp_header_t *)frag_buf->buf;
+
 			LOG_ERR("OBMF fragment buffer overflow on channel"
 				" %u: current %u + new %u > %u",
 				channel, frag_buf->offset,
 				fragment_len, OBMF_FRAG_BUF_SIZE);
+			frag_buf->discard_expected = OBMF_ICP_GET_SIZE(fh);
+			frag_buf->discard_seen = frag_buf->offset -
+				OBMF_HEADER_SIZE +
+				fragment_len - OBMF_HEADER_SIZE;
+			frag_buf->discarding = true;
 			free(frag_buf->buf);
 			frag_buf->buf = NULL;
 			frag_buf->offset = 0;
+			if (frag_buf->discard_seen >= frag_buf->discard_expected ||
+			    fragment_len < CONFIG_OBMF_BULK_EP_MPS) {
+				frag_buf->discarding = false;
+				if (OBMF_ICP_GET_RQRESP(hdr) ==
+				    OBMF_ICP_MSG_TYPE_REQUEST) {
+					uint8_t rsp_buf[OBMF_HEADER_SIZE];
+					uint32_t rsp_len = 0;
+
+					obmf_build_err_response(hdr,
+						OBMF_ICP_STATUS_SIZE_NOT_SUPPORTED,
+						rsp_buf, &rsp_len, false);
+					obmf_queue_response(rsp_buf, rsp_len);
+				}
+			}
 			k_yield();
 			continue;
 		}
@@ -643,6 +714,7 @@ static void obmf_reset_channel_state(void)
 			obmf_frag_bufs[i].buf = NULL;
 		}
 		obmf_frag_bufs[i].offset = 0;
+		obmf_frag_bufs[i].discarding = false;
 
 		channel_tags[i].is_outstanding = false;
 		channel_tags[i].producer_tag = 0;

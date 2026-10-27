@@ -23,7 +23,8 @@
  * A request still unanswered after this long is abandoned, so that a lost
  * response cannot block its channel for good (matches the BMC driver).
  */
-#define OBMF_REQUEST_TIMEOUT_MS 5000
+/* Must exceed the longest caller wait (mem-dev, 10 s) */
+#define OBMF_REQUEST_TIMEOUT_MS 12000
 
 #define OBMF_HEADER_SIZE sizeof(obmf_icp_header_t)
 /* Size of the buffer every channel handler builds its response in */
