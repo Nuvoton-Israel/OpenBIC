@@ -275,6 +275,16 @@ typedef struct {
 
 static obmf_frag_msg_buf obmf_frag_bufs[OBMF_MAX_CHANNELS + 1];
 
+/* Reassembly progress of a message addressed to a channel that does not exist */
+static struct {
+	bool active;
+	uint8_t channel;
+	uint8_t rqresp;
+	int64_t last_ms;
+	uint32_t seen;
+	uint32_t expected;
+} obmf_unk;
+
 static void obmf_out_cb(const struct device *dev, uint32_t len, uint8_t *data);
 
 /* Hand a response to the TX thread; the caller keeps @buf */
@@ -496,16 +506,41 @@ static void obmf_rx_task(void *arg1, void *arg2, void *arg3)
 			LOG_ERR("Invalid OBMF channel: %u", channel);
 			LOG_HEXDUMP_ERR(fragment_buf, fragment_len,
 						 "Invalid fragment data:");
-			/* Answer the request once, on its last fragment */
-			if (OBMF_ICP_GET_RQRESP(hdr) == OBMF_ICP_MSG_TYPE_REQUEST &&
-			    fragment_len < CONFIG_OBMF_BULK_EP_MPS) {
-				uint8_t rsp_buf[OBMF_HEADER_SIZE];
-				uint32_t rsp_len = 0;
+			/*
+			 * Track the message by its Size field so that it is
+			 * answered once, on its last fragment, even when that
+			 * fragment fills a whole packet.
+			 */
+			int64_t unk_now = k_uptime_get();
+			bool unk_cont = obmf_unk.active &&
+					obmf_unk.channel == channel &&
+					obmf_unk.rqresp == OBMF_ICP_GET_RQRESP(hdr) &&
+					unk_now - obmf_unk.last_ms <=
+						OBMF_FRAG_TIMEOUT_MS;
 
-				obmf_build_err_response(hdr,
-							OBMF_ICP_ERR_UNKNOWN_CHANNEL,
-							rsp_buf, &rsp_len, false);
-				obmf_queue_response(rsp_buf, rsp_len);
+			if (!unk_cont) {
+				obmf_unk.channel = channel;
+				obmf_unk.rqresp = OBMF_ICP_GET_RQRESP(hdr);
+				obmf_unk.expected = OBMF_ICP_GET_SIZE(hdr);
+				obmf_unk.seen = 0;
+			}
+			obmf_unk.last_ms = unk_now;
+			obmf_unk.seen += fragment_len - OBMF_HEADER_SIZE;
+			obmf_unk.active = true;
+
+			if (obmf_unk.seen >= obmf_unk.expected ||
+			    fragment_len < CONFIG_OBMF_BULK_EP_MPS) {
+				obmf_unk.active = false;
+				if (OBMF_ICP_GET_RQRESP(hdr) ==
+				    OBMF_ICP_MSG_TYPE_REQUEST) {
+					uint8_t rsp_buf[OBMF_HEADER_SIZE];
+					uint32_t rsp_len = 0;
+
+					obmf_build_err_response(hdr,
+						OBMF_ICP_ERR_UNKNOWN_CHANNEL,
+						rsp_buf, &rsp_len, false);
+					obmf_queue_response(rsp_buf, rsp_len);
+				}
 			}
 			k_yield();
 			continue;
@@ -720,6 +755,8 @@ static void obmf_reset_channel_state(void)
 		channel_tags[i].producer_tag = 0;
 		channel_tags[i].consumer_tag = 0;
 	}
+
+	obmf_unk.active = false;
 
 	/* The host re-runs discovery after a reset, so drop any pending restore */
 	obmf_suspended_mask = 0;
@@ -1789,6 +1826,7 @@ static void obmf_channel_control_write(obmf_channel_config_header_t *ch_hdr,
 			obmf_frag_bufs[ch_no].buf = NULL;
 		}
 		obmf_frag_bufs[ch_no].offset = 0;
+		obmf_frag_bufs[ch_no].discarding = false;
 		status |= CHAN_STATUS_RESET_DONE;
 	}
 
