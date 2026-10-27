@@ -223,12 +223,10 @@ static void obmf_tx_thread(void *arg1, void *arg2, void *arg3)
 			}
 
 			/*
-			 * Note: Last fragment with len < MPS will be treated
-			 * as EOM by receiver. If last fragment happens to be
-			 * exactly MPS, the receiver's short packet detection
-			 * will not trigger. In that case, we may need to
-			 * send a ZLP or rely on host-side framing
-			 * (each fragment has header).
+			 * A fragment that is an exact multiple of MPS is
+			 * followed by a zero-length packet, which
+			 * usb_transfer_sync() adds itself, so the host still
+			 * sees the end of each transfer.
 			 */
 		}
 
@@ -551,21 +549,28 @@ static void obmf_rx_task(void *arg1, void *arg2, void *arg3)
 		}
 
 		/*
-		 * Detect end of message (EOM):
-		 * If received length < MPS, this is the last fragment
-		 * (short packet). USB host uses short packets to
-		 * indicate end of transfer.
+		 * Detect end of message (EOM).  The first fragment's Size
+		 * field carries the total payload, so the message is complete
+		 * once that many bytes arrived; this also covers a message
+		 * that exactly fills the last packet and so has no short
+		 * packet.  A short packet always ends it as well.
 		 */
-		if (fragment_len < CONFIG_OBMF_BULK_EP_MPS) {
+		obmf_icp_header_t *first_hdr = (obmf_icp_header_t *)frag_buf->buf;
+		uint32_t expected_len =
+			OBMF_HEADER_SIZE + OBMF_ICP_GET_SIZE(first_hdr);
+
+		if (frag_buf->offset >= expected_len ||
+		    fragment_len < CONFIG_OBMF_BULK_EP_MPS) {
 			is_complete = true;
 			LOG_DBG("OBMF EOM detected on channel %u:"
-				" fragment len %u (< MPS %u), total %u bytes",
-				channel, fragment_len,
-				CONFIG_OBMF_BULK_EP_MPS, frag_buf->offset);
+				" fragment len %u, total %u of %u bytes",
+				channel, fragment_len, frag_buf->offset,
+				expected_len);
 		} else {
 			LOG_DBG("OBMF fragment on channel %u: len %u,"
-				" accumulated %u bytes (waiting for more)",
-				channel, fragment_len, frag_buf->offset);
+				" accumulated %u of %u bytes (waiting for more)",
+				channel, fragment_len, frag_buf->offset,
+				expected_len);
 		}
 
 		/* Process complete message */
