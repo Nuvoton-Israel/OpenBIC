@@ -282,8 +282,16 @@ static void obmf_bus_reset_cb(const struct device *dev)
 	atomic_set(&obmf_reset_pending, 1);
 }
 
+/* Let the USB layer NAK the host instead of dropping what does not fit */
+static uint32_t obmf_rx_space_cb(const struct device *dev)
+{
+	ARG_UNUSED(dev);
+	return ring_buf_space_get(&obmf_ringbuf);
+}
+
 static struct obmf_ops obmf_usb_ops = {
 	.read = obmf_out_cb,
+	.rx_space = obmf_rx_space_cb,
 	.bus_reset = obmf_bus_reset_cb,
 	.link_down = obmf_link_down_cb,
 	.link_up = obmf_link_up_cb,
@@ -312,6 +320,7 @@ static uint16_t obmf_ringbuf_read(uint8_t *buf, uint32_t len)
 			__func__, rx_len);
 		/* Drain the garbage so the reader does not get stuck */
 		ring_buf_get(&obmf_ringbuf, hdr_buf, rx_len);
+		obmf_usb_rx_resume(NULL);
 		return 0;
 	}
 
@@ -356,6 +365,7 @@ static uint16_t obmf_ringbuf_read(uint8_t *buf, uint32_t len)
 	got = ring_buf_get(&obmf_ringbuf, buf + OBMF_HEADER_SIZE, payload_len);
 
 	ret = (uint16_t)(OBMF_HEADER_SIZE + got);
+	obmf_usb_rx_resume(NULL);
 	return ret;
 }
 
