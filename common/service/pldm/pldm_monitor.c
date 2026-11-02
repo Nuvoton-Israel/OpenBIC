@@ -15,6 +15,7 @@
  */
 
 #include <logging/log.h>
+#include <stddef.h>
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -156,9 +157,17 @@ uint8_t pldm_get_state_sensor_reading(void *mctp_inst, uint8_t *buf, uint16_t le
 	status = plat_pldm_state_sensor_get_reading(sensor_number, res_p);
 #endif
 	res_p->completion_code = status;
+	if (status != PLDM_SUCCESS || res_p->composite_sensor_count == 0 ||
+	    res_p->composite_sensor_count > ARRAY_SIZE(res_p->field)) {
+		goto ret;
+	}
 
-	*resp_len = sizeof(struct pldm_get_state_sensor_reading_resp);
+	/* DSP0248: completionCode, compositeSensorCount, then one 4-byte field per sensor */
+	*resp_len = offsetof(struct pldm_get_state_sensor_reading_resp, field) +
+		    res_p->composite_sensor_count * sizeof(res_p->field[0]);
+	return PLDM_SUCCESS;
 ret:
+	*resp_len = 1;
 	return PLDM_SUCCESS;
 }
 
