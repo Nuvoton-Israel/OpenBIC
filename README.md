@@ -48,8 +48,8 @@ Board setup, flashing and verification steps are in each project's README.
 | --- | --- |
 | `common/` | Upstream OpenBIC common code: HAL, services (MCTP, PLDM, IPMI, sensors, ...), device drivers, libraries and shell commands |
 | `meta-nuvoton/smc-npcm400/` | Standard SMC firmware project |
-| `meta-nuvoton/smc-npcm400-obmf/` | OBMF firmware project. Its `patches/` directory holds Zephyr driver changes (for example, OBMF over USB) that its `CMakeLists.txt` applies to `zephyr_nuvoton` with `git am` at configure time, skipping any patch that is already in the history |
-| `meta-nuvoton/common/` | Nuvoton code shared by the projects, currently the OBMF-ICP service (`service/obmf/`) with one handler per channel type |
+| `meta-nuvoton/smc-npcm400-obmf/` | OBMF firmware project |
+| `meta-nuvoton/common/` | Nuvoton code shared by the projects: the OBMF-ICP service (`service/obmf/`) with one handler per channel type, and `patches/` with Zephyr SoC and driver changes that `apply_zephyr_patches.cmake` applies to `zephyr_nuvoton` with `git am` at configure time for both projects, skipping any patch that is already in the history. A project can add its own patches in `<project>/patches/` |
 | `meta-facebook/` | Upstream Meta platforms |
 | `west.yml` | `west` manifest that pins the `zephyr_nuvoton` revision |
 
