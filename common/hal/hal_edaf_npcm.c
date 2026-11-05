@@ -121,10 +121,6 @@ static void safs_isr(void *arvg0, void *arvg1, void *arvg2)
 			continue;
 		}
 
-		if (ioc.pkt == NULL) {
-			LOG_ERR("ioc.pkt is NULL, skipping processing.");
-			continue;
-		}
 		addr = __bswap_32(rwe_pkt->addr_be);
 		cyc = rwe_pkt->cyc;
 		tag = rwe_pkt->tag;

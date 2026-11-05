@@ -122,9 +122,7 @@ int add_work(worker_job *job)
 	new_job->fn = job->fn;
 	new_job->ptr_arg = job->ptr_arg;
 	new_job->ui32_arg = job->ui32_arg;
-	if (job->name != NULL) {
-		snprintf(new_job->name, sizeof(new_job->name), "%s", job->name);
-	}
+	snprintf(new_job->name, sizeof(new_job->name), "%s", job->name);
 
 	if (k_mutex_lock(&mutex_use_count, K_MSEC(1000))) {
 		LOG_ERR("add_work mutex lock fail");
