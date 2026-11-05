@@ -85,7 +85,9 @@ static struct _pldm_handler_query_entry query_tbl[] = {
 	{ PLDM_TYPE_SMBIOS, pldm_smbios_handler_query },
 	{ PLDM_TYPE_PLAT_MON_CTRL, pldm_monitor_handler_query },
 	{ PLDM_TYPE_FW_UPDATE, pldm_fw_update_handler_query },
+#ifdef ENABLE_PLDM_FRU
 	{ PLDM_TYPE_FRU, pldm_fru_handler_query },
+#endif
 	{ PLDM_TYPE_OEM, pldm_oem_handler_query },
 };
 
