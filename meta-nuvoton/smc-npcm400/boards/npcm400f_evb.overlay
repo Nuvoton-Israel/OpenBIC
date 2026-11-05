@@ -23,6 +23,8 @@
 /* MCTP over SMBus to BMC */
 &i2c1a {
 	clock-frequency = <I2C_BITRATE_STANDARD>;
+	/* shared with the peer SMC, which is a master on the same bus */
+	multi-master = <1>;
 	status = "okay";
 };
 

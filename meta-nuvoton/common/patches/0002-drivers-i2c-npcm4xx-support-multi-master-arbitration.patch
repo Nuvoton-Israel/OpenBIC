@@ -1,0 +1,399 @@
+From e3ecc8f22883451fb45aa9953e3420e4a8950370 Mon Sep 17 00:00:00 2001
+From: Joseph Liu <kwliu@nuvoton.com>
+Date: Thu, 5 Nov 2026 14:33:56 +0800
+Subject: [PATCH] drivers: i2c: npcm4xx: support multi-master arbitration loss
+
+When the "multi-master" DT property is set, the controller can share its
+bus with another master that also addresses this module as a target. The
+existing code does not handle that case well:
+
+- A busy bus is polled for only 3 x wait-free-time before recover_bus()
+  clocks SCL in the middle of the other master's transfer and the
+  transfer fails with -EBUSY.
+- On a lost arbitration (BER) recover_bus() always runs and its return
+  value overwrites the error, so the caller may see a false success.
+- Own target addresses are disabled (SAEN cleared) for the whole master
+  transfer, so the master that won arbitration is NACKed.
+- BER/SLVSTP raised while the slave side is active can be routed to the
+  master ISR and lost.
+
+With multi-master enabled:
+
+- Wait up to 35 ms for the bus to become free before starting. A stale
+  BB with SCL/SDA idle for 50 us is cleared; SCL is never toggled.
+- Keep own target addresses enabled during master transfers.
+- In the ISR, a BER without MASTER while a master transfer is pending
+  aborts that transfer with -EAGAIN and releases the controller state
+  so the winning master can be served as a target. Slave events
+  (NMATCH, SLVSTP, active slave transfer) go to the slave ISR; a
+  latched SLVSTP is completed before the master ISR runs.
+- After a lost arbitration, wait for the other master to finish and
+  reset the module only when the bus is free and no target transfer is
+  in progress; fall back to recover_bus() only if the bus stays busy.
+  The transfer returns -EAGAIN so the caller retries.
+
+Behaviour without the property is unchanged.
+
+Signed-off-by: Joseph Liu <kwliu@nuvoton.com>
+---
+ drivers/i2c/i2c_npcm4xx.c | 276 +++++++++++++++++++++++++++++++++-----
+ 1 file changed, 239 insertions(+), 37 deletions(-)
+
+diff --git a/drivers/i2c/i2c_npcm4xx.c b/drivers/i2c/i2c_npcm4xx.c
+index ba6c4a0a568..cd778d46f76 100755
+--- a/drivers/i2c/i2c_npcm4xx.c
++++ b/drivers/i2c/i2c_npcm4xx.c
+@@ -45,6 +45,12 @@ LOG_MODULE_REGISTER(i2c_npcm4xx, LOG_LEVEL_ERR);
+ 
+ #define I2C_RECOVER_BUS_DELAY_US 5
+ 
++/* multi-master: longest wait for another controller to release the bus (SMBus tTIMEOUT max) */
++#define I2C_BUS_FREE_TIMEOUT_MS 35
++/* SMBus tHIGH max: SCL and SDA high for longer than this means the bus is idle */
++#define I2C_BUS_IDLE_TIME_US 50
++#define I2C_BUS_IDLE_POLL_US 5
++
+ /* I2C operation state */
+ enum i2c_npcm4xx_oper_state {
+ 	I2C_NPCM4XX_OPER_STA_IDLE,
+@@ -95,6 +101,7 @@ struct i2c_npcm4xx_data {
+ 	uint8_t tx_buf[CONFIG_I2C_MAX_RX_SIZE];
+ 	uint8_t *rx_msg_buf;
+ 	int err_code;
++	bool lost_bus; /* the pending master transfer lost arbitration */
+ 	struct i2c_slave_config *slave_cfg[I2C_SLAVE_NUM];
+ 	uint8_t value[I2C_SLAVE_NUM];
+ 	enum i2c_npcm4xx_slave_addrno match_addr_no;
+@@ -478,6 +485,31 @@ static void i2c_conf_slave(const struct device *dev, int index, uint8_t value)
+ 
+ 
+ 
++static void i2c_npcm4xx_slave_stop(const struct device *dev)
++{
++	struct i2c_reg *const inst = I2C_INSTANCE(dev);
++	struct i2c_npcm4xx_data *const data = I2C_DRV_DATA(dev);
++	struct i2c_slave_config *cfg = data->slave_cfg[data->match_addr_no];
++	const struct i2c_slave_callbacks *slave_cb = cfg ? cfg->callbacks : NULL;
++	uint16_t len;
++
++	if (!slave_cb) {
++		data->slave_oper_state = I2C_NPCM4XX_OPER_STA_IDLE;
++	} else if (data->slave_oper_state == I2C_NPCM4XX_OPER_STA_READ) {
++		len = 0;
++		while (len < i2c_npcm4xx_get_dma_cnt(dev)) {
++			slave_cb->write_received(cfg, data->rx_buf[len]);
++			len++;
++		}
++	}
++	if (data->slave_oper_state != I2C_NPCM4XX_OPER_STA_IDLE) {
++		slave_cb->stop(cfg);
++	}
++	data->slave_oper_state = I2C_NPCM4XX_OPER_STA_START;
++	/* clear STOP flag */
++	inst->SMBnST = BIT(NPCM4XX_SMBnST_SLVSTP);
++}
++
+ static void i2c_npcm4xx_master_isr(const struct device *dev)
+ {
+ 	struct i2c_reg *const inst = I2C_INSTANCE(dev);
+@@ -747,7 +779,14 @@ static void i2c_npcm4xx_slave_isr(const struct device *dev)
+ 	/* --------------------------------------------- */
+ 	/* SDA status is set - transmit or receive       */
+ 	/* --------------------------------------------- */
+-	if (inst->SMBnST & BIT(NPCM4XX_SMBnST_SDAST)) {
++	/*
++	 * A START pending as master is generated right after the STOP that
++	 * ends a slave write, so MASTER and SDAST can already be set here.
++	 * That SDAST asks for the master address byte: leave it to the master
++	 * handler instead of taking it for a slave overflow.
++	 */
++	if ((inst->SMBnST & (BIT(NPCM4XX_SMBnST_SDAST) | BIT(NPCM4XX_SMBnST_MASTER))) ==
++	    BIT(NPCM4XX_SMBnST_SDAST)) {
+ 		const struct i2c_slave_callbacks *slave_cb =
+ 			data->slave_cfg[data->match_addr_no]->callbacks;
+ 
+@@ -775,23 +814,7 @@ static void i2c_npcm4xx_slave_isr(const struct device *dev)
+ 	/* Slave STOP occurred                           */
+ 	/* --------------------------------------------- */
+ 	if (inst->SMBnST & BIT(NPCM4XX_SMBnST_SLVSTP)) {
+-		const struct i2c_slave_callbacks *slave_cb =
+-			data->slave_cfg[data->match_addr_no]->callbacks;
+-
+-		if (data->slave_oper_state == I2C_NPCM4XX_OPER_STA_READ) {
+-			len = 0;
+-			while (len < i2c_npcm4xx_get_dma_cnt(dev)) {
+-				slave_cb->write_received(data->slave_cfg[data->match_addr_no],
+-						data->rx_buf[len]);
+-				len++;
+-			}
+-		}
+-		if (data->slave_oper_state != I2C_NPCM4XX_OPER_STA_IDLE) {
+-			slave_cb->stop(data->slave_cfg[data->match_addr_no]);
+-		}
+-		data->slave_oper_state = I2C_NPCM4XX_OPER_STA_START;
+-		/* clear STOP flag */
+-		inst->SMBnST = BIT(NPCM4XX_SMBnST_SLVSTP);
++		i2c_npcm4xx_slave_stop(dev);
+ 	}
+ }
+ 
+@@ -940,12 +963,164 @@ static int i2c_npcm4xx_slave_unregister(const struct device *dev,
+ 	return 0;
+ }
+ 
++/* Disable/enable the module (drops any transfer) and keep serving as a slave */
++static void i2c_npcm4xx_reset_keep_slaves(const struct device *dev)
++{
++	struct i2c_reg *const inst = I2C_INSTANCE(dev);
++	struct i2c_npcm4xx_data *const data = I2C_DRV_DATA(dev);
++	bool registered = false;
++	int i;
++
++	i2c_npcm4xx_reset_module(dev);
++	/* also clears a DMA_EN left from the dropped transfer */
++	inst->DMA_CTRL = BIT(NPCM4XX_DMA_CTRL_DMA_INT_CLR);
++
++	for (i = 0; i < I2C_SLAVE_NUM; i++) {
++		if (data->slave_cfg[i]) {
++			registered = true;
++			i2c_set_slave_addr(dev, i, data->slave_cfg[i]->address);
++		}
++	}
++	data->slave_oper_state = registered ? I2C_NPCM4XX_OPER_STA_START :
++					      I2C_NPCM4XX_OPER_STA_IDLE;
++}
++
++static bool i2c_npcm4xx_lines_high(struct i2c_reg *const inst)
++{
++	return IS_BIT_SET(inst->SMBnCTL3, NPCM4XX_SMBnCTL3_SCL_LVL) &&
++	       IS_BIT_SET(inst->SMBnCTL3, NPCM4XX_SMBnCTL3_SDA_LVL);
++}
++
++static bool i2c_npcm4xx_slave_active(struct i2c_npcm4xx_data *data)
++{
++	return data->slave_oper_state == I2C_NPCM4XX_OPER_STA_READ ||
++	       data->slave_oper_state == I2C_NPCM4XX_OPER_STA_WRITE ||
++	       data->slave_oper_state == I2C_NPCM4XX_OPER_STA_QUICK;
++}
++
++/*
++ * multi-master: wait until no other master owns the bus. Own addresses stay
++ * enabled meanwhile, so a transaction addressed to this module is still
++ * served. Never clock SCL here: that would corrupt the other transaction.
++ */
++static int i2c_npcm4xx_wait_bus_free(const struct device *dev)
++{
++	struct i2c_reg *const inst = I2C_INSTANCE(dev);
++	int64_t deadline = k_uptime_get() + I2C_BUS_FREE_TIMEOUT_MS;
++	uint32_t idle_us;
++
++	do {
++		if (!(inst->SMBnCST & BIT(NPCM4XX_SMBnCST_BB))) {
++			return 0;
++		}
++
++		/*
++		 * BB is only cleared by a STOP. If both lines stay high longer
++		 * than SMBus tHIGH(max) no transaction is in progress, so the
++		 * STOP was missed (e.g. the module was enabled mid-transaction).
++		 */
++		for (idle_us = 0; idle_us < I2C_BUS_IDLE_TIME_US;
++		     idle_us += I2C_BUS_IDLE_POLL_US) {
++			if (!i2c_npcm4xx_lines_high(inst) ||
++			    !(inst->SMBnCST & BIT(NPCM4XX_SMBnCST_BB))) {
++				break;
++			}
++			k_busy_wait(I2C_BUS_IDLE_POLL_US);
++		}
++		if (!(inst->SMBnCST & BIT(NPCM4XX_SMBnCST_BB))) {
++			return 0;
++		}
++		if (idle_us >= I2C_BUS_IDLE_TIME_US) {
++			inst->SMBnCST = BIT(NPCM4XX_SMBnCST_BB);
++			return 0;
++		}
++
++		k_msleep(1);
++	} while (k_uptime_get() < deadline);
++
++	return -EAGAIN;
++}
++
++/*
++ * After a lost arbitration the module may not generate another START until
++ * it is disabled and enabled again (SMB Bus Error Recovery). Do that once
++ * the other master is done, unless it addresses this module again.
++ */
++static void i2c_npcm4xx_reset_after_ber(const struct device *dev)
++{
++	struct i2c_reg *const inst = I2C_INSTANCE(dev);
++	struct i2c_npcm4xx_data *const data = I2C_DRV_DATA(dev);
++	unsigned int key = irq_lock();
++
++	if (!(inst->SMBnCST & BIT(NPCM4XX_SMBnCST_BB)) &&
++	    !(inst->SMBnST & BIT(NPCM4XX_SMBnST_NMATCH)) &&
++	    !i2c_npcm4xx_slave_active(data)) {
++		i2c_npcm4xx_reset_keep_slaves(dev);
++	}
++	irq_unlock(key);
++}
++
++static void i2c_npcm4xx_mm_isr(const struct device *dev)
++{
++	struct i2c_reg *const inst = I2C_INSTANCE(dev);
++	struct i2c_npcm4xx_data *data = I2C_DRV_DATA(dev);
++	uint8_t st = inst->SMBnST;
++
++	/*
++	 * BER while requesting or owning the bus as master means the module
++	 * lost arbitration (MASTER is already cleared). It keeps matching the
++	 * address of the master that won, so do not reset it here: drop the
++	 * master transfer and let a match reach the slave handler. The
++	 * transfer resets the module once the bus is free again.
++	 */
++	if ((st & BIT(NPCM4XX_SMBnST_BER)) && !(st & BIT(NPCM4XX_SMBnST_MASTER)) &&
++	    data->master_oper_state != I2C_NPCM4XX_OPER_STA_IDLE) {
++		inst->SMBnST = BIT(NPCM4XX_SMBnST_BER) | BIT(NPCM4XX_SMBnST_NEGACK) |
++			       BIT(NPCM4XX_SMBnST_STASTR);
++		inst->SMBnCTL1 &= ~(BIT(NPCM4XX_SMBnCTL1_START) | BIT(NPCM4XX_SMBnCTL1_STOP));
++		/* also clears a DMA_EN set up for the dropped transfer */
++		inst->DMA_CTRL = BIT(NPCM4XX_DMA_CTRL_DMA_INT_CLR);
++		data->master_oper_state = I2C_NPCM4XX_OPER_STA_IDLE;
++		data->lost_bus = true;
++		i2c_npcm4xx_notify(dev, -EAGAIN);
++		st = inst->SMBnST;
++	}
++
++	/*
++	 * A master transfer can be pending while another master addresses
++	 * this module. NMATCH/SLVSTP are write-1-to-clear and NMATCH stalls
++	 * the bus, so they must reach the slave handler or the interrupt
++	 * never deasserts.
++	 */
++	if (!(st & BIT(NPCM4XX_SMBnST_MASTER)) &&
++	    ((st & (BIT(NPCM4XX_SMBnST_NMATCH) | BIT(NPCM4XX_SMBnST_SLVSTP))) ||
++	     i2c_npcm4xx_slave_active(data))) {
++		i2c_npcm4xx_slave_isr(dev);
++	} else if (data->master_oper_state != I2C_NPCM4XX_OPER_STA_IDLE) {
++		/* A slave write may have ended right before we got the bus */
++		if (inst->SMBnST & BIT(NPCM4XX_SMBnST_SLVSTP)) {
++			i2c_npcm4xx_slave_stop(dev);
++		}
++		i2c_npcm4xx_master_isr(dev);
++	} else if (data->slave_oper_state == I2C_NPCM4XX_OPER_STA_IDLE) {
++		/* clear all interrupt status */
++		inst->SMBnST = 0xFF;
++	} else {
++		i2c_npcm4xx_slave_isr(dev);
++	}
++}
++
+ /* I2C controller isr function */
+ static void i2c_npcm4xx_isr(const struct device *dev)
+ {
+ 	struct i2c_reg *const inst = I2C_INSTANCE(dev);
+ 	struct i2c_npcm4xx_data *data = I2C_DRV_DATA(dev);
+ 
++	if (I2C_DRV_CONFIG(dev)->multi_master) {
++		i2c_npcm4xx_mm_isr(dev);
++		return;
++	}
++
+ 	if (data->master_oper_state != I2C_NPCM4XX_OPER_STA_IDLE) {
+ 		i2c_npcm4xx_master_isr(dev);
+ 	} else {
+@@ -1134,30 +1309,42 @@ static int i2c_npcm4xx_transfer(const struct device *dev, struct i2c_msg *msgs,
+ 		return -ENODEV;
+ 	}
+ 
+-	for (i = 0; i < 3; i++) {
+-		bus_busy = inst->SMBnCST & BIT(NPCM4XX_SMBnCST_BB);
+-		if (!bus_busy) {
+-			/* save original slave addr setting and disable all the slave devices */
+-			for (i = 0; i < I2C_SLAVE_NUM; i++) {
+-				data->value[i] = i2c_ret_slave(dev, i);
+-				i2c_conf_slave(dev, i, (data->value[i] & ~BIT(NPCM4XX_SMBnADDR_SAEN)));
++	if (config->multi_master) {
++		ret = i2c_npcm4xx_wait_bus_free(dev);
++		if (ret != 0) {
++			i2c_npcm4xx_mutex_unlock(dev);
++			return ret;
++		}
++		/*
++		 * Own addresses stay enabled: if another master wins
++		 * arbitration and addresses this module, it is served as a
++		 * slave and the transfer is retried instead of NACKing it.
++		 */
++		for (i = 0; i < I2C_SLAVE_NUM; i++) {
++			data->value[i] = i2c_ret_slave(dev, i);
++		}
++		bus_busy = false;
++	} else {
++		for (i = 0; i < 3; i++) {
++			bus_busy = inst->SMBnCST & BIT(NPCM4XX_SMBnCST_BB);
++			if (!bus_busy) {
++				/* save original slave addr setting and disable all the slave devices */
++				for (i = 0; i < I2C_SLAVE_NUM; i++) {
++					data->value[i] = i2c_ret_slave(dev, i);
++					i2c_conf_slave(dev, i,
++						       (data->value[i] & ~BIT(NPCM4XX_SMBnADDR_SAEN)));
++				}
++				break;
+ 			}
+-			break;
++			k_busy_wait(config->wait_free_time);
+ 		}
+-		k_busy_wait(config->wait_free_time);
+ 	}
+ 
+ 	if (bus_busy) {
+-		if (!config->multi_master) {
+-			ret = i2c_npcm4xx_recover_bus(dev);
+-			if (ret) {
+-				i2c_npcm4xx_mutex_unlock(dev);
+-				return ret;
+-			}
+-		} else {
+-			inst->SMBnCST |= BIT(NPCM4XX_SMBnCST_BB);
++		ret = i2c_npcm4xx_recover_bus(dev);
++		if (ret) {
+ 			i2c_npcm4xx_mutex_unlock(dev);
+-			return -EAGAIN;
++			return ret;
+ 		}
+ 	}
+ 
+@@ -1167,6 +1354,7 @@ static int i2c_npcm4xx_transfer(const struct device *dev, struct i2c_msg *msgs,
+ 	data->dev_addr = addr << 1;
+ 	data->master_oper_state = I2C_NPCM4XX_OPER_STA_START;
+ 	data->err_code = 0;
++	data->lost_bus = false;
+ 	if (i2c_npcm4xx_combine_msg(dev, msgs, num_msgs) < 0) {
+ 		/* restore slave addr setting */
+ 		for (i = 0; i < I2C_SLAVE_NUM; i++) {
+@@ -1216,7 +1404,21 @@ static int i2c_npcm4xx_transfer(const struct device *dev, struct i2c_msg *msgs,
+ 
+ 
+ 	if (data->err_code == -EAGAIN) {
+-		ret = i2c_npcm4xx_recover_bus(dev);
++		if (!config->multi_master) {
++			ret = i2c_npcm4xx_recover_bus(dev);
++		} else {
++			/*
++			 * Another master owns the bus now. Let it finish; only
++			 * clock the bus free if it never does. The message was
++			 * not sent either way, so the caller has to retry it.
++			 */
++			if (!data->lost_bus || i2c_npcm4xx_wait_bus_free(dev) != 0) {
++				(void)i2c_npcm4xx_recover_bus(dev);
++			} else {
++				i2c_npcm4xx_reset_after_ber(dev);
++			}
++			ret = -EAGAIN;
++		}
+ 	}
+ 
+ 	/* restore slave addr setting */
+-- 
+2.43.0
+
