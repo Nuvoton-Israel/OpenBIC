@@ -57,6 +57,8 @@ target_include_directories(app PRIVATE ${common_path}/shell)
 
 # Nuvoton Common Includes
 target_include_directories(app PRIVATE ${nuvoton_common_path}/service/obmf)
+target_include_directories(app PRIVATE ${nuvoton_common_path}/lib)
+target_sources(app PRIVATE ${nuvoton_common_path}/lib/npcm4xx_rom_uid.c)
 
 # Platform Specific Includes
 target_include_directories(app PRIVATE src/lib)

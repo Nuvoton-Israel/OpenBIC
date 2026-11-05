@@ -37,6 +37,7 @@
 #include "util_sys.h"
 #include "plat_def.h"
 #include "guid.h"
+#include "npcm4xx_rom_uid.h"
 
 LOG_MODULE_REGISTER(plat_mctp);
 
@@ -461,6 +462,12 @@ uint8_t get_system_guid(uint16_t *data_len, uint8_t *data)
 	}
 
 	*data_len = 16;
+
+	/* Per-chip UUID from the ROM unique ID; fall back to the fake one if unavailable */
+	if (npcm4xx_rom_uuid_get(data) == 0) {
+		return GUID_READ_SUCCESS;
+	}
+
 	memcpy(data, fake_guid, 16);
 
 	return GUID_READ_SUCCESS;

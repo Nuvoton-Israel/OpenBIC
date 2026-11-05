@@ -19,6 +19,8 @@ target_sources(app PRIVATE ${common_path}/dev/eeprom.c)
 target_sources(app PRIVATE ${common_path}/dev/altera.c)
 target_sources(app PRIVATE ${common_path}/dev/pmic.c)
 target_sources(app PRIVATE ${common_path}/dev/guid.c)
+target_sources(app PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../common/lib/npcm4xx_rom_uid.c)
+target_include_directories(app PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../common/lib)
 target_sources(app PRIVATE ${app_sources})
 target_sources(app PRIVATE ${common_sources})
 
