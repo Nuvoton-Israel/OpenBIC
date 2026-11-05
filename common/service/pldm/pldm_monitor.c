@@ -685,8 +685,8 @@ void set_effecter_state_gpio_handler(const uint8_t *buf, uint16_t len, uint8_t *
 	uint8_t *completion_code_p = resp;
 	*resp_len = 1;
 
-	/* Check whether the range of AST1030 gpio pins is correct */
-	if (gpio_pin > PLDM_PLATFORM_OEM_AST1030_GPIO_PIN_NUM_MAX) {
+	/* Check whether the gpio pin is within the SoC's range */
+	if (gpio_pin > PLDM_PLATFORM_OEM_GPIO_PIN_NUM_MAX) {
 		LOG_ERR("Unsupport GPIO pin number, (%d)", gpio_pin);
 		*completion_code_p = PLDM_OEM_GPIO_UNSUPPORT_RANGE;
 		return;
@@ -870,7 +870,7 @@ void get_effecter_state_gpio_handler(const uint8_t *buf, uint16_t len, uint8_t *
 	struct pldm_get_state_effecter_states_resp *res_p =
 		(struct pldm_get_state_effecter_states_resp *)resp;
 
-	if (gpio_pin > PLDM_PLATFORM_OEM_AST1030_GPIO_PIN_NUM_MAX) {
+	if (gpio_pin > PLDM_PLATFORM_OEM_GPIO_PIN_NUM_MAX) {
 		LOG_ERR("Unsupport GPIO pin number, (%d)", gpio_pin);
 		res_p->completion_code = PLDM_OEM_GPIO_UNSUPPORT_RANGE;
 		return;
@@ -1047,7 +1047,7 @@ __weak void plat_pldm_set_effecter_state_host_power_control(const uint8_t *buf, 
 
 void pldm_assign_gpio_effecter_id(int plat_effecter_id_gpio_high_byte)
 {
-	for (uint8_t i = 0; i <= PLDM_PLATFORM_OEM_AST1030_GPIO_PIN_NUM_MAX; i++) {
+	for (uint8_t i = 0; i <= PLDM_PLATFORM_OEM_GPIO_PIN_NUM_MAX; i++) {
 		state_effecter_table[i].effecter_id = (plat_effecter_id_gpio_high_byte | i);
 	}
 	return;

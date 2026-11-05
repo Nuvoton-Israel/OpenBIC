@@ -64,7 +64,22 @@ typedef enum pldm_platform_monitor_commands {
 #define PLDM_PLATFORM_OEM_I3C_HUB_REINIT_EFFECTER_STATE_FIELD_COUNT 1
 #define PLDM_PLATFORM_OEM_SPI_REINIT_EFFECTER_STATE_FIELD_COUNT 1
 #define PLDM_PLATFORM_OEM_SWITCH_UART_EFFECTER_STATE_FIELD_COUNT 1
+/*
+ * Highest GPIO pin an OEM GPIO effecter/sensor may address. This bounds an
+ * index into dev_gpio[GPIO_GROUP_NUM], so it has to match the SoC being built
+ * for: a limit above the real pin count lets a PLDM request walk that array off
+ * the end. AST1030 has 168 pins, NPCM has 124 (16 groups of 8).
+ */
 #define PLDM_PLATFORM_OEM_AST1030_GPIO_PIN_NUM_MAX 167
+#define PLDM_PLATFORM_OEM_NPCM_GPIO_PIN_NUM_MAX 123
+
+#if defined(CONFIG_GPIO_ASPEED)
+#define PLDM_PLATFORM_OEM_GPIO_PIN_NUM_MAX PLDM_PLATFORM_OEM_AST1030_GPIO_PIN_NUM_MAX
+#elif defined(CONFIG_GPIO_NPCM4XX)
+#define PLDM_PLATFORM_OEM_GPIO_PIN_NUM_MAX PLDM_PLATFORM_OEM_NPCM_GPIO_PIN_NUM_MAX
+#else
+#error "Unsupported GPIO driver"
+#endif
 
 #define PLDM_COMPOSITE_EFFECTER_COUNT_MIN 0x01
 #define PLDM_COMPOSITE_EFFECTER_COUNT_MAX 0x08
