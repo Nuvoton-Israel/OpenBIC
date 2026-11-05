@@ -101,7 +101,7 @@ Each exposed channel is one entry in `plat_obmf_channels[]` in [`src/platform/pl
 static const struct obmf_plat_channel plat_obmf_channels[] = {
 	OBMF_CHANNEL_SERIAL(OBMF_ICP_SERIAL_CHANNEL_0, "Serial", 115200),
 	OBMF_CHANNEL_I2C(OBMF_ICP_I2C_CONTROLLER_CHANNEL_0, "I2C0", I2C_BUS1, 100000),
-	OBMF_CHANNEL_I3C(OBMF_ICP_I3C_CONTROLLER_CHANNEL, "I3C0", I3C_BUS_CONTROLLER_TO_HUB),
+	OBMF_CHANNEL_I3C(OBMF_ICP_I3C_CONTROLLER_CHANNEL, "I3C0", I3C_BUS4_CONTROLLER_TO_OBMF),
 	/* ... */
 };
 ```

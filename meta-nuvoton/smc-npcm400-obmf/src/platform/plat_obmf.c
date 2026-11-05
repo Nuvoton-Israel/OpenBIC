@@ -17,7 +17,6 @@
 #include <logging/log.h>
 #include "obmf.h"
 #include "plat_i2c.h"
-#include "plat_mctp.h"
 #include "plat_obmf.h"
 
 LOG_MODULE_REGISTER(plat_obmf);
@@ -79,9 +78,9 @@ static const struct obmf_plat_channel plat_obmf_channels[] = {
 
 	/* ch18/ch19: I3C controllers driven by the BMC */
 	OBMF_CHANNEL_I3C(OBMF_ICP_I3C_CONTROLLER_CHANNEL, "I3C0",
-			 I3C_BUS_CONTROLLER_TO_HUB),
+			 I3C_BUS4_CONTROLLER_TO_OBMF),
 	OBMF_CHANNEL_I3C(OBMF_ICP_I3C_CONTROLLER_CHANNEL_1, "I3C1",
-			 I3C_BUS_CONTROLLER_TO_HUB_1),
+			 I3C_BUS5_CONTROLLER_TO_OBMF),
 };
 
 static const struct obmf_plat_config plat_obmf_config =
